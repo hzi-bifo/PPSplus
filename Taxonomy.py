@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import sqlite3
 import re
 from Config import Config
@@ -197,8 +195,10 @@ class Taxonomy():
         return pathDict
 
 
-    #return the path from a clade to the root as semicolon separated ncbids
     def getPathToRootSemicolonSeparated(self, ncbid):
+        """
+            Return the path from a clade to the root as semicolon separated ncbids.
+        """
         pathDict = self.getPathToRoot(int(ncbid))
         outBuffer = ''
         for rank in self.taxonomicRanks:
@@ -215,12 +215,16 @@ class Taxonomy():
             return outBuffer
 
 
-    #param taxPathDictList: list of taxPathDicts
-    #param threshold: percent that says which fraction of the assigned sequences must lie at least at this rank (or lower)
-    #
-    #return: - longest path s.t. all placements up to this rank lie on this path, moreover at least X%
-    #of the sequences that are assigned are assigned at least to this rank or lower
-    def getLongestCommonPathFromMultipleAssignments2(self, taxPathDictList, threshold): # !!!!!!!!!!!
+    def getLongestCommonPathFromMultipleAssignments2(self, taxPathDictList, threshold):
+        """
+        !!!!!!!!!!!
+
+        @param taxPathDictList: list of taxPathDicts
+        @param threshold: percent that says which fraction of the assigned sequences must lie at least at this rank (or lower)
+
+        @return: - longest path s.t. all placements up to this rank lie on this path, moreover at least X%
+        of the sequences that are assigned are assigned at least to this rank or lower
+        """
 
         assert len(taxPathDictList) > 0
         if len(taxPathDictList) == 1:
@@ -260,17 +264,21 @@ class Taxonomy():
         return taxPathDict
 
 
-    #replicate the dictionary
-    def replicateTaxPathDict(self, taxPathDict): # !!!!!!!!!!!
+    def replicateTaxPathDict(self, taxPathDict):
+        """
+            Replicate the dictionary. !!!!!!!!!!!
+        """
         taxPathDict2 = dict([])
         for rank in taxPathDict:
             taxPathDict2[rank] = taxPathDict[rank].clone()
         return taxPathDict2
 
 
-    #input: list of taxPathDicts
-    #output: taxPathDict - longest path s.t. all placements up to this rank lie on this path
     def getLongestCommonPathFromMultipleAssignments(self, taxPathDictList):
+        """
+            input: list of taxPathDicts
+            output: taxPathDict - longest path s.t. all placements up to this rank lie on this path
+        """
         if len(taxPathDictList) == 0:
             return None
 
@@ -297,7 +305,6 @@ class Taxonomy():
                 ncbiLowest = ncbi1
 
         return self.getPathToRoot(ncbiLowest)
-
 
 
     def getPathFromLowestCommonAncestorToRoot(self, listOfNcbid):
@@ -339,9 +346,11 @@ class Taxonomy():
         return self.getPathToRoot(lowestCommonNcbid)
 
 
-    #get NCBID of a clade for which we know its scientific name
-    #@return ncbid or None
     def getNcbidFromScientificName(self, scientificName):
+        """
+            Gets NCBID of a clade for which we know its scientific name.
+            @return ncbid or None
+        """
         self.cursor.execute(str('SELECT T.ncbi_taxon_id FROM taxon_name TN, taxon T ' +
                                 'WHERE TN.name_class="scientific name" AND TN.name=? AND TN.taxon_id=T.taxon_id'),
                                 (scientificName,))

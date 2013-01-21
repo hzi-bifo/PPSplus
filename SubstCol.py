@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import re
 import os
 import Common
 
-#Replaces values in a column in a tabFile by the values from the mapFile
-#@param tabFile: file with tab separated columns
-#@param mapFile: file with two columns key -> value
-#@param colKeySrc: column of the first file that contains keys (number started from 0)
-#@param colValueDst: column of the output file that contains values
-#@param delColKeys: True or False - should the key column be included in the output file
-#@param shuffleList: numbers of columns that will be used in the given order from the tabFile (starts from 0; -1 ~ dummy value 0)
 def substCol(tabFile, mapFile, colKeySrc, colValueDst, delColKeys, shuffleList=None, outFile=None):
+    """
+        Replaces values in a column in a tabFile by the values from the mapFile
+
+        @param tabFile: file with tab separated columns
+        @param mapFile: file with two columns key -> value
+        @param colKeySrc: column of the first file that contains keys (number started from 0)
+        @param colValueDst: column of the output file that contains values
+        @param delColKeys: True or False - should the key column be included in the output file
+        @param shuffleList: numbers of columns that will be used in the given order from the tabFile (starts from 0; -1 ~ dummy value 0)
+    """
 
     try:
         f = open(os.path.normpath(mapFile),'r')

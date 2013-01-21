@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
 
 import os
 import sys
-from sys import argv
 from Bio import SeqIO
 
 def toStockholmFormat(fastaFile, stockholmFile):

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import re
 import os
 import glob
@@ -36,15 +34,17 @@ def writeSequences(outFile, contigsList, namesToSeq, maxLineLen):
         f.close()
 
 
-#For each file in the inDir that contains contig/sequence names produces one file in the outDir that
-#contains the appropriate sequences (i.e. >sequence_name \n sequence)
-#param inDir: directory that contains *.fasta files that contain only contig names
-#param outDir: directory to store output *.fasta files with the corresponding sequences
-#param mapFastaFile: file that contains all sequences (sequence/contig names + sequences) that can be contained in the inDir
-#param ignoreContigsFile: file that contains contigsNames that won`t be contained in any file in the outDir
-#param scaffoldContigsFile: file that contains: scaffold -> contigs mapping
 def fillInSeq(inDir, outDir, mapFastaFile, ignoreContigsFile, scaffoldContigsFile=None):
+    """
+        For each file in the inDir that contains contig/sequence names produces one file in the outDir that
+        contains the appropriate sequences (i.e. >sequence_name \n sequence).
 
+        @param inDir: directory that contains *.fasta files that contain only contig names
+        @param outDir: directory to store output *.fasta files with the corresponding sequences
+        @param mapFastaFile: file that contains all sequences (sequence/contig names + sequences) that can be contained in the inDir
+        @param ignoreContigsFile: file that contains contigsNames that won`t be contained in any file in the outDir
+        @param scaffoldContigsFile: file that contains: scaffold -> contigs mapping
+    """
     nameToSeq = dict([])
     try:
         f = open(os.path.normpath(mapFastaFile),'r')
@@ -114,6 +114,7 @@ def fillInSeq(inDir, outDir, mapFastaFile, ignoreContigsFile, scaffoldContigsFil
 
             outFile = os.path.normpath(os.path.join(outDir, os.path.basename(filePath)))
             writeSequences(outFile, contigsList, nameToSeq, maxLineLen)
+
 
 def addContigsFromTheSameScaffold(contigsList, scaffoldContigsFile):
     conToScaf = dict([])

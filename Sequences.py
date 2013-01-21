@@ -1,15 +1,9 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
-import sys
-import zlib
 import re
 import Config
-import Taxonomy
 from Common import noNewLine
-from Config import Config
 from sets import Set
 from Sequence import Sequence
 from Scaffold import Scaffold
@@ -177,8 +171,10 @@ class Sequences():
                     hashToSeqIdDict[h] = temp
 
 
-    #read contigs or scaffolds from a file
     def _readContigsScaffolds(self, filePath, readContigs = True):
+        """
+            Read contigs or scaffolds from a file.
+        """
         try:
             f = open(os.path.normpath(filePath),'r')
         except Exception:
@@ -210,16 +206,20 @@ class Sequences():
             f.close()
 
 
-    #add one sequence/contig
     def _addSeq(self, name, seq):
+        """
+            Adds one sequence/contig.
+        """
         s = Sequence((self._seqCounter + 1), name, seq)
         if s.seqBp >= self._minSeqLen:
             self.sequences.append(s)
             self._seqCounter += 1
 
 
-    #add one scaffold
     def _addScaff(self, name, contig, scaffSeq):
+        """
+            Adds one scaffold.
+        """
         self._scaffCounter += 1
         scaff = Scaffold(self._scaffCounter, name, contig, scaffSeq)
         assert name not in self.scaffNameToScaff, str('The scaffold name ' + name + ' already exists')
@@ -234,8 +234,11 @@ class Sequences():
         assert seqId in self.sequencesDict, str('seqId: "' + seqId + '" is not in the Sequences')
         return self.sequencesDict[seqId]
 
-    #non-DNA characters won`t be considered in the
+
     def setRemoveNonDna(self, removeNonDnaChars):
+        """
+            non-DNA characters won`t be considered in the..
+        """
         for seq in self.sequences:
             seq.setRemoveNonDna(removeNonDnaChars)
 
@@ -264,7 +267,6 @@ class Sequences():
         return len(scaffold.contigs)
 
 
-    #
     def _filterPlacements(self, weightsList, placementList, topPercentThreshold):
 
         assert len(placementList) == len(weightsList)
@@ -344,13 +346,14 @@ class Sequences():
             return None
 
 
-    #Place all contigs from the same scaffold.
-    #
-    #@param agThreshold: agreement threshold - all assignments must lie on the same path and below the line given by this threshold
-    #@param assignedPartThreshold:
-    #
-    def placeContigsFromTheSameScaffold(self, taxonomy, agThreshold, assignedPartThreshold, topPercentThreshold): # place all contigs from the same scaffold
+    def placeContigsFromTheSameScaffold(self, taxonomy, agThreshold, assignedPartThreshold, topPercentThreshold):
+        """
+            Place all contigs from the same scaffold.
 
+            @param agThreshold: agreement threshold - all assignments must lie on the same path and below the line given
+                                by this threshold
+            @param assignedPartThreshold:
+        """
         for scaffold in self.scaffolds:
             placedSeqList = []
             notPlacedSeqList = []
@@ -471,21 +474,25 @@ class Sequences():
             f.close()
 
 
-    #create a file that contains mapping: sequence name -> sequence id
     def writeSeqNameSeqId(self, mapFilePath):
+        """
+            Creates a file that contains mapping: sequence name -> sequence id.
+        """
         self._writeSeqOrScaffNameTabId(mapFilePath, True) #True ~ do it for sequences
 
 
-    #create a file that contains mapping: scaffold name -> scaffold id
     def writeScaffNameScaffId(self, mapFilePath):
+        """
+            Creates a file that contains mapping: scaffold name -> scaffold id.
+        """
         self._writeSeqOrScaffNameTabId(mapFilePath, False) #False ~ do it for scaffolds
 
 
-    #Creates a file that represents mapping: sequence/contig or scaffold name -> corresponding_id
-    #(name tab id)
-    #
-    #@param forSequences: True ~ do it for sequences, False ~ do it for scaffolds
     def _writeSeqOrScaffNameTabId(self, mapFilePath, forSequences = True):
+        """
+            Creates a file that represents mapping: sequence/contig or scaffold name -> corresponding_id (name tab id).
+            @param forSequences: True ~ do it for sequences, False ~ do it for scaffolds.
+        """
         try:
             f = open(os.path.normpath(mapFilePath), 'w')
             k = 0
@@ -507,8 +514,10 @@ class Sequences():
             f.close()
 
 
-    #create file: scaffold_id tab contig_id
     def writeScaffoldContigMap(self, outFilePath):
+        """
+            Creates file: scaffold_id tab contig_id.
+        """
         try:
             f = open(os.path.normpath(outFilePath), 'w')
             k = 0
@@ -591,6 +600,7 @@ class Sequences():
         finally:
             f.close()
 
+
     def discardInconsistentPlacements(self, discardContigThreshold, discardScaffThreshold, taxonomicRanks):
         discardedContigsCount = 0
         print 'discard placements: "discardContigThreshold:"', discardContigThreshold, ' discardScaffThreshold:', discardScaffThreshold
@@ -655,12 +665,14 @@ class Sequences():
         return discardedContigsCount
 
 
-#Reads scaffold contig mapping.
-#
-#@param scafContigFile: scaffold-contig mapping (tab separated)
-#
-#@return: map: scaffold -> list of contigs
 def toScafContigMap(scafContigFile):
+    """
+        Reads scaffold contig mapping.
+
+        @param scafContigFile: scaffold-contig mapping (tab separated)
+
+        @return: map: scaffold -> list of contigs
+    """
     scafToContigs = dict([])
     try:
         f = open(os.path.normpath(scafContigFile),'r')
@@ -682,13 +694,15 @@ def toScafContigMap(scafContigFile):
     return scafToContigs
 
 
-#Transforms the input dictionary (key -> list of items) into the inverse dictionary (item -> key).
-#To each item (contig) only one key (scaffold) exists.
-#
-#@param scaffToContigListDict: map: scaffold -> list of contigs
-#
-#@return: map: contig name -> scaffold name
 def toContigScafMap(scaffToContigListDict):
+    """
+        Transforms the input dictionary (key -> list of items) into the inverse dictionary (item -> key).
+        To each item (contig) only one key (scaffold) exists.
+
+        @param scaffToContigListDict: map: scaffold -> list of contigs
+
+        @return: map: contig name -> scaffold name
+    """
     contigToScaffDict = dict([])
     for scaff in scaffToContigListDict:
         for contig in scaffToContigListDict[scaff]:
@@ -697,12 +711,15 @@ def toContigScafMap(scaffToContigListDict):
     return contigToScaffDict
 
 
-#replace ids with names
-#@param nameToIdsFile: file that contains lines: contigName tab contigID
-#@param targetFile: file that contain in the first column scaffoldID_contigID which will be replaced by its name
-#@param outFile: file that contain the first column in the form scaffoldID_contigID with the name
-#(that can be modified by substitution defined in the config file .. according to outputFileContigSubPattern)
 def replaceIdsWithNames(outputFileContigSubPattern, nameToIDsFile, targetFile, outFile):
+    """
+        NOT IMPLEMENTED YET!!!
+        replace ids with names
+        @param nameToIdsFile: file that contains lines: contigName tab contigID
+        @param targetFile: file that contain in the first column scaffoldID_contigID which will be replaced by its name
+        @param outFile: file that contain the first column in the form scaffoldID_contigID with the name
+        (that can be modified by substitution defined in the config file .. according to outputFileContigSubPattern)
+    """
     idToName = dir([])
     assert False, 'NOT IMPLEMENTED YET'
     #try:
@@ -729,9 +746,12 @@ def replaceIdsWithNames(outputFileContigSubPattern, nameToIDsFile, targetFile, o
 #def seqLenCmp(seq1, seq2):
 #    return seq1.seqBp - seq2.seqBp
 
-#compare two sequences according to the assignment weight and if it`s the same or not defined,
-#it compares them according to their length
+
 def seqWeightThenLenCmp(seq1, seq2):
+    """
+        Compares two sequences according to the assignment weight and if it`s the same or not defined,
+        it compares them according to their length.
+    """
     weight1 = seq1.getTaxonomyPathWeight()
     weight2 = seq2.getTaxonomyPathWeight()
     if (weight1 != None) and (weight2 != None):

@@ -1,26 +1,25 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import sys
 import re
 import subprocess
 import Common
-from sets import Set
 from Bio import SeqIO
 
-#class that handels the rRNA 16S analysis
-
 class RRNA16S():
+    """
+        A class that handels the rRNA 16S analysis.
+    """
     def __init__(self, config, configRRNA16S):
         self._config = config
         self._configRRNA16S = configRRNA16S
         self._workingDir = os.path.normpath(self._config.get('workingDir'))
 
-    #run the hidden markov model to get regions in the input sequences where the 16S and 23S genes are located
     def runHMM(self, inputFastaFile, outLog=None):
-
+        """
+            Run the hidden markov model to get regions in the input sequences where the 16S and 23S genes are located.
+        """
         hmmInstallDir = os.path.normpath(self._configRRNA16S.get('rnaHmmInstallDir'))
         hmmerBinDir = os.path.normpath(self._configRRNA16S.get('hmmerBinDir'))
         regionsFile = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.gff'))
@@ -84,9 +83,10 @@ class RRNA16S():
                 #inputFastaFile + '.23S_rRNA.fna'
                 #inputFastaFile + '.5S_rRNA.fna'
 
-
-    #run mothur to classify the sequences
     def classify16S(self, inputFastaFile, outLog=None):
+        """
+            Run mothur to classify the sequences.
+        """
         self._classify(16, inputFastaFile, outLog)
 
     def classify23S(self, inputFastaFile, outLog=None):
@@ -154,9 +154,10 @@ class RRNA16S():
         #transform mothur prediction files to the tab separated files
         self.mothurPredToTabSepPred(mothurPredFileName, predFileName)
 
-
-    #Transforms the mothur output prediction file (*.taxonomy) to the tab separated prediction file seqName tab ncbid tab weight
     def mothurPredToTabSepPred(self, mothurPredFileName, outPredFileName):
+        """
+            Transforms the mothur output prediction file (*.taxonomy) to the tab separated prediction file seqName tab ncbid tab weight.
+        """
         try:
             fr = open(os.path.normpath(mothurPredFileName),'r')
         except Exception:

@@ -8,6 +8,7 @@ from TabSepFileFunctions import getMapping
 from TabSepFileFunctions import getColumnAsList
 from TabSepFileFunctions import OutFileBuffer
 
+
 class RandLognormLength():
     def __init__(self, mu, sigma, minLen):
         self.mu = mu
@@ -19,8 +20,6 @@ class RandLognormLength():
             d = random.lognormvariate(self.mu, self.sigma)
             if d >= self.minLen:
                 return int(round(d))
-
-
 
 
 def generateSimSet():
@@ -65,9 +64,6 @@ def generateSimSet():
 
     outFna.close()
     outLabels.close()
-
-
-
 
 
 if __name__ == "__main__":

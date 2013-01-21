@@ -1,26 +1,27 @@
 #!/usr/bin/env python
 
+"""
+To handle the Silva database, exported FASTA (http://www.arb-silva.de/download/arb-files/)
+"""
+
 import re
 import os
 
 from TaxonomyNcbi import TaxonomyNcbi
 from Taxonomy import Taxonomy
-from Common import noNewLine
-from sets import Set
 
 from TabSepFileFunctions import OutFileBuffer
 from TabSepFileFunctions import getMapping
 from TabSepFileFunctions import getColumnAsList
 from FastaFileFunctions import fastaFileToDictWholeNames
 
-#To handle the Silva database, exported FASTA (http://www.arb-silva.de/download/arb-files/)
-
-#input exported silva fasta file
-
-#Takes an exported fasta file from the Silva download page and transforms it to files that can be used
-#used for the Mothur Bayesian classifier
 def exportedSilvaFastaToMothurFormat(inFastaFile, outDir, taxonomyNcbi, taxonomy, accessionToNcbiFile):
+    """
+        input exported silva fasta file
 
+        Takes an exported fasta file from the Silva download page and transforms it to files that can be used
+        used for the Mothur Bayesian classifier
+    """
     seqIdToSeq = fastaFileToDictWholeNames(inFastaFile)
     accessionToNcbi = getMapping(accessionToNcbiFile, 0, 1, sep='\t', comment = '#')
 

@@ -1,14 +1,8 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
-import os
 import zlib
-import re
 from Common import noNewLine
 from Common import removeNonDna
-from sets import Set
-
 
 #---------------------------------------------------
 class Sequence():

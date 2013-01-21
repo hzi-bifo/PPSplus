@@ -1,30 +1,31 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
+"""
+    Contains methods that handle the Cow Rumen data set.
+"""
 
 import os
 import glob
 import re
 from sets import Set
-
 from TabSepFileFunctions import forEachLine
 from TabSepFileFunctions import OutFileBuffer
-
-from FastaFileFunctions import getSequenceToBpDict
-
 from TaxonomyNcbi import TaxonomyNcbi
 
-#Methods to handle the Cow Rumen dataset
 
-#maps each WGS bin to an ncbid at the rank order
 def getBinToOrderDict():
+    """
+        Maps each WGS bin to an ncbid at the rank order.
+    """
     return {'AC2a':171549, 'ADa':29, 'AFa':136, 'AGa':171549, 'AH': 171549, 'AIa':186802,
             'AJ':171549, 'AMa':136, 'AN':186802, 'APb':186802, 'AQ':171549, 'AS1a':186802,
             'ATa':186802, 'AWa':186802, 'BOa':186802}
 
 
-#Parse each bin and write sample output files to the outBuffers
 class BinParser():
+    """
+        Parse each bin and write sample output files to the outBuffers.
+    """
     def __init__(self, outBufferOrderIds, outBufferWgsIds, ncbid, wgsName):
         self.outBufferOrderIds = outBufferOrderIds
         self.outBufferWgsIds = outBufferWgsIds
@@ -47,7 +48,6 @@ def binsToPredictions():
 
     binToOrderDict = getBinToOrderDict()
 
-
     outBufferOrderIds = OutFileBuffer(outFileOrderIds)
     outBufferWgsIds = OutFileBuffer(outFileWgsIds)
 
@@ -57,12 +57,8 @@ def binsToPredictions():
         forEachLine(filePath, BinParser(outBufferOrderIds, outBufferWgsIds, binToOrderDict[wgsName], wgsName))
         print wgsName #, filePath
 
-
     outBufferOrderIds.close()
     outBufferWgsIds.close()
-
-
-
 
 
 class DictParser():

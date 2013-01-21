@@ -3,7 +3,6 @@
 import sys
 import signal
 import os
-import re
 import string
 import subprocess
 
@@ -21,9 +20,10 @@ from TabSepFileFunctions import getColumnAsList
 from Common import noNewLine
 
 
-#Print statistics about one DBK file.
 def printStatDbk():
-
+    """
+        Print statistics about one DBK file.
+    """
     seqIdSet = Set([])
     taxonSet = Set([])
     cumulativeLen = 0
@@ -72,11 +72,12 @@ def printStatDbk():
 #Find out which sequences are just full of zeros!
 
 
-
-#Read sequence descriptions from a DBK files (stdin), output sequence ids (record.id) if the corresponding description contain "plasmid".
-#Plasmids can be also within the sequences!
 def findPlasmids(outPlasmidFilePath):
-
+    """
+        Read sequence descriptions from a DBK files (stdin), output sequence ids (record.id) if the corresponding
+        description contain "plasmid".
+        Plasmids can be also within the sequences!
+    """
     #append to a file if it already exists
     if os.path.isfile(outPlasmidFilePath):
         outFileMode='a'
@@ -100,14 +101,15 @@ def findPlasmids(outPlasmidFilePath):
     #    if feature.type == "source":
 
 
-#Reads all sequences. For each taxonId creates a file that contain all sequences
-#mapped to this taxonId. If a seqId appears more than one it is ignored since
-#acession numbers are unique.
-#
-#@param mapFilePathList: list of files where each contain mapping: seqId -> taxonId
-#@param fastaFilePathList: list of fasta files that contain mapping: seqId -> seq
 def mergeSequences(mapFilePathList, fastaFilePathList, outputDir):
+    """
+        Reads all sequences. For each taxonId creates a file that contain all sequences
+        mapped to this taxonId. If a seqId appears more than one it is ignored since
+        acession numbers are unique.
 
+        @param mapFilePathList: list of files where each contain mapping: seqId -> taxonId
+        @param fastaFilePathList: list of fasta files that contain mapping: seqId -> seq
+    """
     taxonIdToOutBuffer = dict([])
     seqIdSet = Set([])
 
@@ -155,8 +157,10 @@ def mergeSequences(mapFilePathList, fastaFilePathList, outputDir):
     print 'sequences merged'
 
 
-#get get the length of the sequence that has maximum length in a fasta file
 def getMaxLen(fastaFilePath):
+    """
+        Gets the length of the sequence that has maximum length in a fasta file.
+    """
     max = 0
     for val in getSequenceToBpDict(fastaFilePath).itervalues():
         if max < int(val):
@@ -164,9 +168,10 @@ def getMaxLen(fastaFilePath):
     return max
 
 
-#@param identity: percentage identity
-#@param
 def toCentroids(cdHit, usearch1, usearch5, usearch6, identity, mergedDir, sortedDir, centroidsDir, clustersDir, taxonIdSet, sortS=True, clusterS=True):
+    """
+        @param identity: percentage identity
+    """
 
     inFilePathList = []
     sortedFilePathList = []
@@ -212,9 +217,11 @@ def toCentroids(cdHit, usearch1, usearch5, usearch6, identity, mergedDir, sorted
         print 'centroids computed'
 
 
-#@param inSortedFasta: DNA sequences sorted according to the sequence length
-#@param outSeedsFasta: a fasta file that contains all seeds
 def getSeeds(inSortedFasta, outSeedsFasta):
+    """
+        @param inSortedFasta: DNA sequences sorted according to the sequence length
+        @param outSeedsFasta: a fasta file that contains all seeds
+    """
     out = OutFileBuffer(outSeedsFasta)
     seedList = []
     seqList = getSequencesToList(inSortedFasta)
@@ -249,9 +256,9 @@ def getSeeds(inSortedFasta, outSeedsFasta):
 
 
 def filterOutSequencesBatch(taxonIdSet, srcDir, dstDir, notAllowedSeqIdSet):
-    '''
+    """
         For each fasta file that is in directory srcDir filters out sequences that are not defined in the allowedSeqIdSet.
-    '''
+    """
     for taxonId in taxonIdSet:
         srcFilePath = os.path.join(srcDir,str(str(taxonId) + '.fna'))
         dstFilePath = os.path.join(dstDir,str(str(taxonId) + '.fna'))

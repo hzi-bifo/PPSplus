@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import re
 import os
 import Common
 from Config import Config
 from Taxonomy import Taxonomy
 
-#takes scaffold-contigs mapping and scaffold placement, outputs contigs placement
-#
-#@param scafContigFile tab sepparated scaffold-contigs mapping (scaffold \t contig)
-#@param scafPPSOutFile scaffold predictions (PPS output file)
-#@param contigPPSOutFile contigs predictions (as if it was a PPS output file)
+
 def scafToContigOutput(scafContigFile, scafPPSOutFile, contigPPSOutFile):
+    """
+        Takes scaffold-contigs mapping and scaffold placement, outputs contigs placement
+
+        @param scafContigFile: tab sepparated scaffold-contigs mapping (scaffold \t contig)
+        @param scafPPSOutFile: scaffold predictions (PPS output file)
+        @param contigPPSOutFile: contigs predictions (as if it was a PPS output file)
+    """
     scafToContigs = dict([])
     try:
         f = open(os.path.normpath(scafContigFile),'r')
@@ -55,8 +56,11 @@ def scafToContigOutput(scafContigFile, scafPPSOutFile, contigPPSOutFile):
                 else:
                     print 'there is not scaffold-contigs mapping for scaffold:', scaffold
 
-#transforms the PPS out file to a compatible PPS PP.out file
+
 def ppsOutToPPOut(ppsOutFile, outPPOutFile, taxaRanks, taxonomy):
+    """
+        Transforms the PPS out file to a compatible PPS PP.out file.
+    """
     print ppsOutFile
 
     #contig file to an ncbid
@@ -105,8 +109,6 @@ def ppsOutToPPOut(ppsOutFile, outPPOutFile, taxaRanks, taxonomy):
     finally:
         f.close()
 
-
-    #open file for write
 
     def writePlacementsPPOut(self, outFile, taxaRanks, outputFileContigSubPattern):
 

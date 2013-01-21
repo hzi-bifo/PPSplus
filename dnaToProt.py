@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
-import sys
 from Bio import SeqIO
 
 

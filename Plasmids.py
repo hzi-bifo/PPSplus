@@ -2,45 +2,36 @@
 
 import sys
 import signal
-import os
+#import os
 import string
-import subprocess
+#import subprocess
 
 from Bio import SeqIO
 from sets import Set
 
-from FastaFileFunctions import fastaFileToDict
-from FastaFileFunctions import getSequenceToBpDict
-from TabSepFileFunctions import getMapping
+#from FastaFileFunctions import fastaFileToDict
+#from FastaFileFunctions import getSequenceToBpDict
+#from TabSepFileFunctions import getMapping
 from TabSepFileFunctions import OutFileBuffer
-from TabSepFileFunctions import getColumnAsList
-from Common import noNewLine
+#from TabSepFileFunctions import getColumnAsList
+#from Common import noNewLine
 
 
-
-#Reads in a genbank file from stdin, store an accession number of a sequence that
-#contain word 'plasmid' (ignorecase) in the record.description
-#Store also for each sequence a list of locations that contain
-#'plasmid' (ignorecase) in feature values
 def scanForPlasmids():
-#GBK files:
-nohup time zcat /local/johdro/refdata/static/ncbi-genomes-bacteria_20121122/dna.gbff.gz \
-/local/johdro/refdata/static/ncbi-draftgenomes-bacteria_20121122/dna-contigs.gbff.gz \
-/local/johdro/refdata/static/ncbi-draftgenomes-bacteria_20121122/dna-scaffolds.gbff.gz \
-/local/johdro/refdata/static/ncbi-hmp_20121016/dna-contigs.gbff.gz \
-/local/johdro/refdata/static/ncbi-hmp_20121016/dna-scaffolds.gbff.gz \
-/local/johdro/refdata/static/ncbi-refseq-microbial_56/dna.gbff.gz \
-| python /net/metagenomics/projects/PPSmg/scripts/scripts25/Plasmids.py &
+    """
+        Reads in a genbank file from stdin, store an accession number of a sequence that contain word
+        'plasmid' (ignorecase) in the record.description Store also for each sequence a list of locations
+        that contain 'plasmid' (ignorecase) in feature values
 
-
-#
-#
-#
-#
-#
-#
-#
-
+        USAGE:
+        nohup time zcat /local/johdro/refdata/static/ncbi-genomes-bacteria_20121122/dna.gbff.gz \
+        /local/johdro/refdata/static/ncbi-draftgenomes-bacteria_20121122/dna-contigs.gbff.gz \
+        /local/johdro/refdata/static/ncbi-draftgenomes-bacteria_20121122/dna-scaffolds.gbff.gz \
+        /local/johdro/refdata/static/ncbi-hmp_20121016/dna-contigs.gbff.gz \
+        /local/johdro/refdata/static/ncbi-hmp_20121016/dna-scaffolds.gbff.gz \
+        /local/johdro/refdata/static/ncbi-refseq-microbial_56/dna.gbff.gz \
+        | python /net/metagenomics/projects/PPSmg/scripts/scripts25/Plasmids.py &
+    """
 
     #plasmidAccessionFile = '/Users/ivan/Documents/nobackup/refseq/bacterialGenomes/accession_test.txt'
     plasmidAccessionFile = '/local/igregor/ref_20121122/nobackup/plasmid_accessions.txt'

@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import sys
 import re
 import subprocess
-import Common
 from sets import Set
 from Bio import SeqIO
 
@@ -16,9 +13,10 @@ from TabSepFileFunctions import isComment
 from TabSepFileFunctions import OutFileBuffer
 
 
-
-#helper class to store all paths to the marker gene files
 class _MgFiles():
+    """
+        Helper class to store all paths to the marker gene files.
+    """
     def __init__(self):
         self.mgDict = dict([])
 
@@ -45,8 +43,10 @@ class _MgFiles():
         return resultList
 
 
-#helper class to read the hmmer dom? file to get the regions that correspond to the Amphora marker genes
 class _MgRegions():
+    """
+        Helper class to read the hmmer dom? file to get the regions that correspond to the Amphora marker genes.
+    """
     def __init__(self):
         self.entryDict = dict([])
 
@@ -75,8 +75,10 @@ class _MgRegions():
         return self.entryDict
 
 
-#helper class to parse the mothur output file and creates a standardized output file for each marker gene
 class _MothurOutFileParser():
+    """
+        Helper class to parse the mothur output file and creates a standardized output file for each marker gene.
+    """
     def __init__(self, outBuffer, source):
         self.outBuffer = outBuffer
         self.source = source
@@ -107,9 +109,10 @@ class _MothurOutFileParser():
         self.outBuffer.close()
 
 
-#main class to perform the marker gene analysis based on the Amphora marker genes
 class MarkerGeneAnalysis():
-
+    """
+        Main class to perform the marker gene analysis based on the Amphora marker genes.
+    """
     def __init__(self, config, configMG, configRRNA16S, mgWorkingDir):
         self.markerGeneListFile = os.path.normpath(configMG.get('markerGeneListFile'))
         self.markerGeneWorkingDir = mgWorkingDir #os.path.normpath(configMG.get('markerGeneWorkingDir'))
@@ -121,8 +124,10 @@ class MarkerGeneAnalysis():
         self.mothur = os.path.join(os.path.normpath(configRRNA16S.get('mothurInstallDir')), 'mothur')
 
 
-    #run hmmer HMM and mothur classify (bayesian), same param as for the 16S analysis
     def runMarkerGeneAnalysis(self, fastaFileDNA, outLog=None):
+        """
+            Run hmmer HMM and mothur classify (bayesian), same param as for the 16S analysis.
+        """
         #read list of marker genes
         mgFiles = forEachLine(self.markerGeneListFile, _MgFiles())
 
@@ -291,15 +296,20 @@ class MarkerGeneAnalysis():
             stdoutLog.close()
         outAllBuffer.close()
 
-    #set candidate placement according to the marker gene analysis !!!!!!!!!!!!!!!!!
+
     def setCandidatePlacement(self, sequences, taxonomy, fastaFileDNA):
+        """
+            Set candidate placement according to the marker gene analysis !!!
+        """
         outPredAllFileName = os.path.join(self.markerGeneWorkingDir,
                                           str(os.path.basename(fastaFileDNA) + '_all.mP'))
         return forEachLine(outPredAllFileName, _SetCandidatePlacement(sequences, taxonomy)).getAssignedSeqCount()
 
 
-#helper class to set the candidate placements
 class _SetCandidatePlacement():
+    """
+        Helper class to set the candidate placements.
+    """
     def __init__(self, sequences, taxonomy):
         self.sequences = sequences
         self.taxonomy = taxonomy

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import sys
 import re
@@ -11,8 +9,6 @@ from Config import Config
 from Taxonomy import Taxonomy
 from dnaToProt import dnaToProt
 from sets import Set
-#import TabSepFileFunctions
-#import FastaFileFunctions
 from TabSepFileFunctions import getColumnAsList
 from TabSepFileFunctions import filterOutLines
 from FastaFileFunctions import filterOutSequences
@@ -115,8 +111,10 @@ class Amphora():
 
 #---------------------------
 
-#Marker gene analysis - filter out reference sequences that hasn`t been found via corresponding HMM profiles for 5S
 def filterOut5S():
+    """
+        Marker gene analysis - filter out reference sequences that hasn`t been found via corresponding HMM profiles for 5S
+    """
     mgDir = os.path.normpath('/net/metagenomics/projects/PPSmg/data/nobackup/markerGenes2')
     print 'for 5S'
     domFileDna1 = os.path.join(mgDir,'mGenesValidated', '5S_arc_hmmsearch.dom')
@@ -140,8 +138,10 @@ def filterOut5S():
     filterOutSequences(inFileNameFastaProt, outFileNameFastaProt, allowedEntriesSet, "fasta", protNameEntryToGid)
 
 
-#Marker gene analysis - as filterOut5S, but for all 31 marker genes
 def filterOutAmphoraMG():
+    """
+        Marker gene analysis - as filterOut5S, but for all 31 marker genes
+    """
     #for Amphora genes
     mgDir = os.path.normpath('/net/metagenomics/projects/PPSmg/data/nobackup/markerGenes2')
 

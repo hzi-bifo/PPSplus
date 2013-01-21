@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import sys
 import os
 import argparse
 import re
 import sqlite3
 import glob
-from sets import Set
 import shutil
 
-#-s summary.txt -p predictions.txt -f tw.fna -e expertSSDDir -t ncbitax_sqlite.db -o ssdDir -g 3 -b 100000
+
 
 def main():
+    """
+        #-s summary.txt -p predictions.txt -f tw.fna -e expertSSDDir -t ncbitax_sqlite.db -o ssdDir -g 3 -b 100000
+    """
     parser = argparse.ArgumentParser(description='''Generate the input data for PPS''',
                                      epilog='''clades and the sample specific data''')
 
@@ -281,8 +281,10 @@ def readPredictions(predFile, cladesSetS):
     return ncbidToSetOfSeqIds
 
 
-#writes a string to a file
 def writeToFile(buffer, dir, fileName):
+    """
+        Writes a string to a file.
+    """
     try:
         filePath = os.path.join(os.path.normpath(dir), fileName)
         f = open(filePath, 'w')
@@ -294,10 +296,11 @@ def writeToFile(buffer, dir, fileName):
         f.close()
 
 
-
-#@param ncbid
-#return: set of ncbids that lie
 def ncbidToParentNcbids(ncbid, databaseFile):
+    """
+        @param ncbid
+        @return: set of ncbids that lie
+    """
     parentSet = set([])
     try:
         conn = sqlite3.connect(os.path.normpath(databaseFile))

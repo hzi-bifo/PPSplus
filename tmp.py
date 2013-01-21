@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import random
 from sets import Set
+
 
 def noNewLine(str):
     return str.replace('\n', '').replace('\r','')
@@ -22,6 +21,7 @@ def transform(seq):
     writeToFile(seq2, os.path.normpath("D:\A_Phylo\A_Metagenomic\data\TM7\contigSubregion"), "contigSubregion.fna")
     return len(seq2)
 
+
 def writeToFile(buffer, dir, fileName):
     try:
         filePath = os.path.join(os.path.normpath(dir), fileName)
@@ -32,6 +32,7 @@ def writeToFile(buffer, dir, fileName):
         raise
     finally:
         f.close()
+
 
 def isAdditive(dist):
     #dist = []

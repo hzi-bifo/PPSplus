@@ -1,15 +1,11 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import sys
 import os
 import re
 import subprocess
-import datetime
 import glob
 from sets import Set
-import Common
 from Config import Config
 from Config import Config2
 from TabSepFileFunctions import forEachLine
@@ -18,8 +14,8 @@ from TabSepFileFunctions import getMapping
 from FastaFileFunctions import fastaFileToDict
 
 
-#Main class
 class MGCluster():
+    """ Main class """
 
     def __init__(self, config, configRRNA16S, configMG, mgWorkingDir, s16Prefix, sequences, taxonomy, sampleName):
         self._config = config
@@ -50,8 +46,10 @@ class MGCluster():
 
 #---------------------------------------------------------------------------------
 
-    # Init data, compute: alignment, distance matrix, clusters
     def _init(self, align=True, dm=True, cluster=True):
+        """
+            Init data, compute: alignment, distance matrix, clusters.
+        """
         if self._initDone:
             return
         self._initDone = True
@@ -502,8 +500,10 @@ class MGCluster():
 
 #---------------------------------------------------------------------------------
 
-#Phylip Distance matrix for a marker gene (and line parser).
 class DM():
+    """
+        Phylip Distance matrix for a marker gene (and line parser).
+    """
     def __init__(self):
         self._counter = -1
         self._seqNum = None
@@ -545,8 +545,10 @@ class DM():
 
 #---------------------------------------------------------------------------------
 
-#Clusters for different thresholds
 class MCluster():
+    """
+        Clusters for different thresholds
+    """
     def __init__(self, seqIdToTaxPathDict, maxSimilarityThreshold):
         self._thresholdsList = []
         self._thresholdIdxToTCluster = dict([])
@@ -611,18 +613,25 @@ class MCluster():
         #                mCluster = self._mgToCluster[mg]
         #                mCluster.setNoConflictThreshold()
 
-    #list of thresholds of different clusterings
     def getThresholdsList(self):
+        """
+            List of thresholds of different clusterings.
+        """
         return self._thresholdsList
 
-    #get cluster where the thresholdIdx correspond to the index in the array returned from getThresholdsList
+
     def getClusterAtThreshold(self, thresholdIdx):
+        """
+            Gets cluster where the thresholdIdx correspond to the index in the array returned from getThresholdsList.
+        """
         return self._thresholdIdxToTCluster[thresholdIdx]
 
 #---------------------------------------------------------------------------------
 
-#One clustering of marker genes at a specific threshold
 class TCluster():
+    """
+        One clustering of marker genes at a specific threshold.
+    """
     def __init__(self, line):
         tokens = line.split(',')
         self._threshold = float(re.sub(r'^([^\t]+)\t[^\t]+\t.*', r'\1', tokens[0]))

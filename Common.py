@@ -1,30 +1,38 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import re
 from sets import Set
 
-#replace stretches of nonDNA characters with one N
 def removeNonDna(seq):
+    """
+        Replaces stretches of nonDNA characters with one 'N'.
+    """
     return re.sub(r'[^ATGCatgc]+', 'N', seq).upper()
 
-#delete all '\n' and '\r' characters in a string
+
 def noNewLine(str):
+    """
+        Delete all '\n' and '\r' characters in a string.
+    """
     return str.replace('\n', '').replace('\r','')
 
-#return a path that results from the concatenation of dstDir and a file from filePath where the name of the file
-#changes from e.g.: input.n.fas" to "input.n._ids.fas"
+
 def createTagFilePath(dstDir, fileNameFromPath, tag):
+    """
+        Returns a path that results from the concatenation of dstDir and a file from filePath where the name of the file
+        changes from e.g.: input.n.fas" to "input.n._ids.fas"
+    """
     lastDotIdx = fileNameFromPath.rfind('.')
     return os.path.join(os.path.normpath(dstDir),
                         os.path.basename(os.path.normpath(str(fileNameFromPath[0:lastDotIdx] +  fileNameFromPath[lastDotIdx:]
                                                             + '.' + tag))))
 
 
-#returns true if two files contain the same sequences regardless of their names (and empty spaces)
 def seqFileCmp(file1, file2):
+    """
+        Returns true if two files contain the same sequences regardless of their names (and empty spaces).
+    """
     seqList1 = seqFileToSeqList(file1)
     seqList2 = seqFileToSeqList(file2)
     if (len(seqList1) != len(seqList2)):

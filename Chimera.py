@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+
+"""To detect Chimeras in the Mercier dataset - is NOT complete."""
 
 from sets import Set
 
@@ -8,13 +11,12 @@ from TabSepFileFunctions import OutFileBuffer
 
 from FastaFileFunctions import getSequenceToBpDict
 
-#to detect Chimeras in the Mercier dataset
 
-
-
-#Read in all entries from the alignmentsFile. Copy entries to the filteredAlignmentsFile that were aligned to
-#one of the reference genomes.
 def filterAlignments():
+    """
+        Read in all entries from the alignmentsFile. Copy entries to the filteredAlignmentsFile that were aligned to
+        one of the reference genomes.
+    """
     genomeNcbidsFile = '/net/metagenomics/projects/PPSmg/data/V35/genome_ncbids.txt'
     giToNcbidFile = '/net/metagenomics/projects/PPSmg/data/V35/chimera/gi_taxid_dna_leaves.dmp'
     alignmentsFile = '/net/metagenomics/projects/PPSmg/data/V35/chimera/nobackup/alignments.csv'
@@ -131,16 +133,6 @@ def getStat():
             print interval[0], interval[1], interval[2].refNcbid, interval[2].score, interval[2].queryLen
 
     print "count",count
-
-
-
-
-
-
-
-
-
-
 
 
 

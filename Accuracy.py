@@ -1,41 +1,39 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
-import sys
-import os
-import re
 import argparse
-from sets import Set
 
 from TaxonomyNcbi import TaxonomyNcbi
 from FastaFileFunctions import getSequenceToBpDict
 from TabSepFileFunctions import predToDict
 
 
-# Implements computation of the "precision" and "recall" according to different definitions.
 class Accuracy():
+    """
+        Implements computation of the "precision" and "recall" according to different definitions.
+    """
     def __init__(self, fastaFilePath, predFilePath, trueFilePath, databaseFile, ranks):
         self._seqToBp = getSequenceToBpDict(fastaFilePath)
         self._seqToPred = predToDict(predFilePath)
         self._seqToTrue = predToDict(trueFilePath)
         self._taxonomy = _TaxonomyWrapperA(databaseFile, ranks)
 
-
-    # Precision (specificity) and Recall (sensitivity) according to PhyloPythiaS and PhyloPythia papers.
-    # The number of classes correspond to the number of classes in the true reference and param "minFracClades".
-    #
-    # @param rank: on which taxonomic ranks the predictions are made
-    # @param minFracClade: a clade is considered only if the dataset (true predictions) contain at least this
-    #                      fraction of sequences that belong to the clade.
-    # @param minFracPred: a clade is considered only if the corresponding predicted bins contain at least this
-    #                     fraction of the overall sequences (None ~ this criteria is not considered and only
-    #                     true "reference" bins are used for the comparison).
-    # @param countAsBp: count it according to the sequence lengths
-    # @param weightAccordingBinSize: weight individual bins according to their bin size
-    #
-    # return [precision, recall, classPrecisionNum, classRecallNum]
     def getAccuracy(self, rank, minFracClade, minFracPred=None, asBp=False, weightAccordingBinSize=False):
+        """
+            Precision (specificity) and Recall (sensitivity) according to PhyloPythiaS and PhyloPythia papers.
+
+            The number of classes correspond to the number of classes in the true reference and param "minFracClades".
+
+            @param rank: on which taxonomic ranks the predictions are made
+            @param minFracClade: a clade is considered only if the dataset (true predictions) contain at least this
+                          fraction of sequences that belong to the clade.
+            @param minFracPred: a clade is considered only if the corresponding predicted bins contain at least this
+                         fraction of the overall sequences (None ~ this criteria is not considered and only
+                         true "reference" bins are used for the comparison).
+            @param countAsBp: count it according to the sequence lengths
+            @param weightAccordingBinSize: weight individual bins according to their bin size
+
+            @return [precision, recall, classPrecisionNum, classRecallNum]
+        """
         predAtRankDict = self._taxonomy.getPredDictAtRank(self._seqToPred, rank)
         trueAtRankDict = self._taxonomy.getPredDictAtRank(self._seqToTrue, rank)
         tp = dict([]) # class label -> count of sequences correctly assigned to clade i
@@ -185,8 +183,8 @@ class Accuracy():
         self._taxonomy.close()
 
 
-# Wraps the functionality of the database.
 class _TaxonomyWrapperA():
+    """ Wraps the functionality of the database. """
     def __init__(self, databaseFile, ranks):
         self._taxonomy = TaxonomyNcbi(databaseFile)
         self._rankToId = dict([])
@@ -209,8 +207,10 @@ class _TaxonomyWrapperA():
                 self._ncbidToRankId[ncbid] = self._rankToId[rank]
                 return self._ncbidToRankId[ncbid]
 
-    #gets predictions at the given rank as dict based on the argument dict
     def getPredDictAtRank(self, seqToDict, rank):
+        """
+            Gets predictions at the given rank as dict based on the argument dict.
+        """
         rankId = self._rankToId[rank]
         outDict = dict([])
         parentBuff = self._parentBuff[rankId]

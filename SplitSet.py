@@ -1,18 +1,9 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
-import sys
 import os
-import re
-import argparse
 import random
-from sets import Set
 
-from TaxonomyNcbi import TaxonomyNcbi
-from FastaFileFunctions import getSequenceToBpDict
 from FastaFileFunctions import fastaFileToDict
-from TabSepFileFunctions import predToDict
 from TabSepFileFunctions import OutFileBuffer #writeText close
 
 

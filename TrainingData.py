@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import sys
 import re
 import glob
-import random
 import Config
 from DBData import DBData
 import Common
@@ -14,14 +11,12 @@ from MlTreeMap import placeSequences
 from Sequences import Sequences
 from Sequences import seqWeightThenLenCmp
 from Taxonomy import Taxonomy
-from Config import Config
 from Config import Config2
 from sets import Set
 
 
 class PPSInput():
     """
-
     Attributes
     ...
 
@@ -134,12 +129,14 @@ class PPSInput():
         self.toSummary(self.ncbidToSequences, summaryAllFile) #alsoPrint=True
 
 
-    #Summary (e.g. which clades can be modeled)
-    #
-    #@param ncbidList: list of all ncbids that are considered in the summary (e.g. all clades that can be modeled)
-    #@param toFile: the summary will be stored to this file (if != None)
-    #@param alsoPrint: whether the summary should be printed to the stdout
     def toSummary(self, ncbidList, toFile=None, alsoPrint=False):
+        """
+            Summary (e.g. which clades can be modeled)
+
+            @param ncbidList: list of all ncbids that are considered in the summary (e.g. all clades that can be modeled)
+            @param toFile: the summary will be stored to this file (if != None)
+            @param alsoPrint: whether the summary should be printed to the stdout
+        """
 
         sumEntry = []
         for ncbid in ncbidList:
@@ -186,13 +183,14 @@ class PPSInput():
             print '-------------------------------------------------'
 
 
-    #Returns a list of leaf nodes (clades) from a list of ncbids (representing internal or leaf nodes)
-    #
-    #@param ncbidList: list of ncbids
-    #
-    #return: list of leaf ncbids
     def getLeafs(self, ncbidList):
+        """
+            Returns a list of leaf nodes (clades) from a list of ncbids (representing internal or leaf nodes)
 
+            @param ncbidList: list of ncbids
+
+            @return: list of leaf ncbids
+        """
         #for each ncbid: store a path from its parent to the root
         parentsSet = Set([])
         for ncbid in ncbidList:
@@ -210,22 +208,24 @@ class PPSInput():
         return leafs
 
 
-    #Create the input of PhyloPythiaS: a list of clades (ncbids) that will be modeled and corresponding sample specific data
-    #
-    #@param outFilePath: a file path where the list of the clades will be stored
-    #@param outTrainDataDir: a directory where the sample specific data will be stored
-    #@param rankIdAll: up to this rank all ncbids will be included (if there is enough data to model them)
-    #@param rankIdCut: the ncbids will be considered only up to this rank if there is enough data assigned to them
-    #@param rankIdCutMinBp: the nodes (from rankIdAll to rankIdCut) will be considered if there is at least this amount of data assigned to them
-    #@param minPercentInLeaf: (as rankIdCutMinBp) but furthermore this percentage of data have to be assigned to the clades
-    #@param maxLeafClades: this is the maximum number of leaf clades that will be considered
-    #@param minBpToModel: a clade can be modeled if there is at least this amount of the sample specific data assigned to it
-    #@param minGenomesWgs: a clade can be modeled if there is at least this number of genomes/draft genomes in the public DB
-    #@param wgsGenomesDir: a directory where the genomes/draft genomes are stored (ncbid.1.fas/fna)
-    #@param forbiddenDict: a dict (ncbid -> list of seq.ids) of data that can`t be used as the sample specific data
     def createPPSInputFiles(self, outFilePath, outTrainDataDir, rankIdAll, rankIdCut, rankIdCutMinBp, minPercentInLeaf,
                             maxLeafClades, minBpToModel, minGenomesWgs, wgsGenomesDir, forbiddenDict, dbFile, taxonomicRanks,
                             fastaLineMaxChar, minSSDfileSize, maxSSDfileSize, weightStayAll, summaryTrainFile=None):
+        """
+            Create the input of PhyloPythiaS: a list of clades (ncbids) that will be modeled and corresponding sample specific data
+
+            @param outFilePath: a file path where the list of the clades will be stored
+            @param outTrainDataDir: a directory where the sample specific data will be stored
+            @param rankIdAll: up to this rank all ncbids will be included (if there is enough data to model them)
+            @param rankIdCut: the ncbids will be considered only up to this rank if there is enough data assigned to them
+            @param rankIdCutMinBp: the nodes (from rankIdAll to rankIdCut) will be considered if there is at least this amount of data assigned to them
+            @param minPercentInLeaf: (as rankIdCutMinBp) but furthermore this percentage of data have to be assigned to the clades
+            @param maxLeafClades: this is the maximum number of leaf clades that will be considered
+            @param minBpToModel: a clade can be modeled if there is at least this amount of the sample specific data assigned to it
+            @param minGenomesWgs: a clade can be modeled if there is at least this number of genomes/draft genomes in the public DB
+            @param wgsGenomesDir: a directory where the genomes/draft genomes are stored (ncbid.1.fas/fna)
+            @param forbiddenDict: a dict (ncbid -> list of seq.ids) of data that can`t be used as the sample specific data
+        """
 
         #get all ncbids whose rank is at least rankIdAll or whose rank is at least rankIdCut and there is at least
         #rankIdCutMinBp of the sample specific data
@@ -369,16 +369,18 @@ class PPSInput():
         self.toSummary(outNcbids, summaryTrainFile, alsoPrint=True)
 
 
-    #Store the sample specific data to a directory. Creates files of form: "ncbid.1.fna"
-    #
-    #@param SSDDir: directory to store the sample specific data
-    #@param ncbidList: list of all ncbids for which the SSD should be stored
-    #@param ncbidToSeqDict: dictionary: ncbid -> list of sequences
-    #@param forbiddenDict: is a dict of lists (map: ncbid -> list of sequence.id) that contain sequences that
-    #@param maxSSDfileSize: in bp maximum size of one file, short sequences are eliminated
-    #@param minSSDfileSize: in bp min size of a file, if there is less data the file won`t be created
-    #will not be used as sample specific data for a respective ncbid (if None ~ not considered)
     def storeSSD(self, SSDDir, ncbidList, ncbidToSeqDict, fastaLineMaxChar, forbiddenDict, minSSDfileSize, maxSSDfileSize):
+        """
+            Store the sample specific data to a directory. Creates files of form: "ncbid.1.fna"
+
+            @param SSDDir: directory to store the sample specific data
+            @param ncbidList: list of all ncbids for which the SSD should be stored
+            @param ncbidToSeqDict: dictionary: ncbid -> list of sequences
+            @param forbiddenDict: is a dict of lists (map: ncbid -> list of sequence.id) that contain sequences that
+            @param maxSSDfileSize: in bp maximum size of one file, short sequences are eliminated
+            @param minSSDfileSize: in bp min size of a file, if there is less data the file won`t be created
+                will not be used as sample specific data for a respective ncbid (if None ~ not considered)
+        """
         try:
             os.mkdir(os.path.normpath(SSDDir))
         except OSError:
@@ -470,11 +472,13 @@ class PPSInput():
                 f.close()
 
 
-#Stores a dictionary of lists (i.e. map: key -> list of items) to a file in format: (key tab item)
-#
-#@param filePath: a file in which the dictionary will be stored in format: (key tab item)
-#@param dictOfLists: dict to be stored that represents mapping: (key -> list of items)
 def storeDictToAFile(filePath, dictOfLists):
+    """
+        Stores a dictionary of lists (i.e. map: key -> list of items) to a file in format: (key tab item)
+
+        @param filePath: a file in which the dictionary will be stored in format: (key tab item)
+        @param dictOfLists: dict to be stored that represents mapping: (key -> list of items)
+    """
     try:
         f = open(os.path.normpath(filePath), 'w')
         k = 0
@@ -493,12 +497,14 @@ def storeDictToAFile(filePath, dictOfLists):
         f.close()
 
 
-#Returns a dictionary that is stored in a file.
-#
-#@param filePath: a file in which a dictionary is stored in format: (key tab item)
-#
-#@return: dict that represents mapping: (key -> list of items)
 def loadDictFromAFile(filePath):
+    """
+        Returns a dictionary that is stored in a file.
+
+        @param filePath: a file in which a dictionary is stored in format: (key tab item)
+
+        @return: dict that represents mapping: (key -> list of items)
+    """
     try:
         dictOfLists = dict([])
         f = open(os.path.normpath(filePath), 'r')
@@ -523,16 +529,17 @@ def loadDictFromAFile(filePath):
         f.close()
 
 
-#Appends (key tab item) pairs that are given as a list to a file. If the file doesn`t exists it creates it.
-#Values that are already contained in the list are not appended. The updated file then represents a dict of lists
-#(i.e. map: key -> list of items)
-#
-#@param forbiddenList: a list of several fields where the first entry is in format ([0-9]+_[0-9]+)
-#and the second field is a number. The second field represent keys. The second number in the first field
-#represent corresponding items
-#@param filePath: a file that will be updated
 def updateForbiddenList(forbiddenList, filePath):
+    """
+        Appends (key tab item) pairs that are given as a list to a file. If the file doesn`t exists it creates it.
+        Values that are already contained in the list are not appended. The updated file then represents a dict of lists
+        (i.e. map: key -> list of items)
 
+        @param forbiddenList: a list of several fields where the first entry is in format ([0-9]+_[0-9]+)
+            and the second field is a number. The second field represent keys. The second number in the first field
+            represent corresponding items
+        @param filePath: a file that will be updated
+    """
     #if file exists then read values from it
     if os.path.isfile(os.path.normpath(filePath)):
         dictOfLists = loadDictFromAFile(filePath)

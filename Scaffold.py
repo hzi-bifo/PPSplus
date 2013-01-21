@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
-import os
 import zlib
-import re
 from Common import noNewLine
 from Common import removeNonDna
 
@@ -72,6 +68,8 @@ class Scaffold():
         assert self._hash != None, 'The hash code of the scaffold is not defined!'
         return self._hash
 
-    #@return: True if the sequence for this scaffold is defined
     def getScaffSeqDef(self):
+        """
+            @return: True if the sequence for this scaffold is defined.
+        """
         return self._scaffDef

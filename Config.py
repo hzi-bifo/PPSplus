@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import ConfigParser
 import os
 import re

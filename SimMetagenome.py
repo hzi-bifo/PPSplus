@@ -5,7 +5,6 @@ import subprocess
 import string
 import os
 import sys
-import re
 import gzip
 
 from Config import Config
@@ -13,10 +12,12 @@ from FastaFileFunctions import fastaFileToDict
 from TabSepFileFunctions import getMapping
 from TabSepFileFunctions import OutFileBuffer
 
-#Sample config: /Users/ivan/Documents/work/binning/data/V35/simMetagenome/configMetagenome01.cfg
-
-#Wraps pIRS read simulator to simulate Illumina paired end reads
 def main():
+    """
+        Wraps pIRS read simulator to simulate Illumina paired end reads.
+
+        Sample config: /Users/ivan/Documents/work/binning/data/V35/simMetagenome/configMetagenome01.cfg
+    """
     if os.name != 'posix':
         print 'runs only on posix systems'
         return

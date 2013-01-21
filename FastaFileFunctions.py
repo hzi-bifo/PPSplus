@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
+"""
+    Defines functions that implement common operations with Fasta files.
+"""
 
 import sys
 import os
@@ -10,27 +12,17 @@ import types
 from Bio import SeqIO
 
 from TabSepFileFunctions import OutFileBuffer
-#from TabSepFileFunctions import isComment
 from Common import removeNonDna
 from Common import noNewLine
 
-def test():
-    #filterOutNonDna('/Users/ivan/Documents/work/binning/data/TW/TWexpertSSD_nonDna/538960.1.fas',
-    #                '/Users/ivan/Documents/work/binning/data/TW/TWexpertSSD_nonDna/out/538960.1.fas');
-    filterOutNonDna('/Users/ivan/Documents/work/binning/data/Reindeer/927658.1.fas',
-                    '/Users/ivan/Documents/work/binning/data/Reindeer/nonDnaRemoved/927658.1.fas')
 
-
-#FUNCTIONS DEFINITION
-
-
-#From the input fasta file filter out sequences their names are not contained in the
-#allowedNamesSet.
-#
-#@allowedNamesSet: the set of entries that are allowed as a sequence names
-#@seqNameModifyFunction: a sequence`s name is modified by this function and then compared to the allowedNamesSet
-#
 def filterOutSequences(inFileName, outFileName, allowedNamesSet, formatName="fasta", seqNameModifyFunction = None):
+    """
+        From the input fasta file filter out sequences their names are not contained in the allowedNamesSet.
+
+        @param allowedNamesSet: the set of entries that are allowed as a sequence names
+        @param seqNameModifyFunction: a sequence`s name is modified by this function and then compared to the allowedNamesSet
+    """
     outFileBuffer = OutFileBuffer(outFileName)
     recordCondition = RecordConditionFilterOutSequences(allowedNamesSet, seqNameModifyFunction)
     parser = RecordFilter(outFileBuffer, formatName, recordCondition)
@@ -42,9 +34,12 @@ def filterOutNonDna(inFileName, outFileName):
     _forEachRecord(inFileName, parser)
 
 
-#Reads a fasta file and returns mapping: sequenceName -> sequenceLength
 def getSequenceToBpDict(fastaFilePath):
+    """
+        Reads a fasta file and returns mapping: sequenceName -> sequenceLength.
+    """
     return _forEachRecord(fastaFilePath, SeqToBpParser()).getSeqToBpDict()
+
 
 class SeqToBpParser():
     def __init__(self):
@@ -57,9 +52,12 @@ class SeqToBpParser():
         return "fasta"
 
 
-#Reads a fasta file and returns a list of: (sequenceName, sequence)
 def getSequencesToList(fastaFilePath):
+    """
+        Reads a fasta file and returns a list of: (sequenceName, sequence).
+    """
     return _forEachRecord(fastaFilePath, SeqToListParser()).getSeqToList()
+
 
 class SeqToListParser():
     def __init__(self):
@@ -70,7 +68,6 @@ class SeqToListParser():
         return self._seqToList
     def getFormatName(self):
         return "fasta"
-#-----------------------------
 
 
 class RemoveNonDnaParser():
@@ -93,8 +90,10 @@ class RecordConditionFilterOutSequences():
         self.allowedNamesSet = allowedNamesSet
         self.seqNameModifyFunction = seqNameModifyFunction
 
-    #if the record.id (modified by the function) is in the allowedNamesSet then the entry will be accepted
     def takeRecord(self, record):
+        """
+            If the record.id (modified by the function) is in the allowedNamesSet then the entry will be accepted.
+        """
         id = record.id
         if self.seqNameModifyFunction != None:
             id = self.seqNameModifyFunction(id)
@@ -104,8 +103,10 @@ class RecordConditionFilterOutSequences():
             return False
 
 
-#it appends a record that is currently parsed to the outFileBuffer if it satisfies the condition
 class RecordFilter():
+    """
+        Appends a record that is currently parsed to the outFileBuffer if it satisfies the condition.
+    """
     def __init__(self, outFileBuffer, formatName, recordCondition):
         self.outFileBuffer = outFileBuffer
         self.formatName = formatName
@@ -122,13 +123,18 @@ class RecordFilter():
         self.outFileBuffer.close()
 
 
-# Reads a fasta file and returns mapping: seqName -> sequence
 def fastaFileToDict(fastaFilePath, formatName='fasta'):
+    """
+        Reads a fasta file and returns mapping: seqName -> sequence.
+    """
     return _forEachRecord(fastaFilePath, _RecordStorage(formatName),formatName=formatName).getSeqNameToSeq()
 
-# Reads a fasta file and returns mapping: seqName -> sequence
-# the whole sequence name is used as seqName!!! (even if it contains space)
+
 def fastaFileToDictWholeNames(filePath):
+    """
+        Reads a fasta file and returns mapping: seqName -> sequence the whole sequence name is used
+        as seqName!!! (even if it contains space)
+    """
     seqIdToSeq = dict([])
     try:
         f = open(os.path.normpath(filePath),'r')
@@ -171,9 +177,10 @@ class _RecordStorage():
         return self._seqNameToSeq
 
 
-
-#call parser for each record in the file
 def _forEachRecord(filePath, parser, formatName = "fasta"):
+    """
+        Call the parser for each record in the file.
+    """
     try:
         if isinstance(parser.getFormatName, types.MethodType):
             formatName = parser.getFormatName()
@@ -205,6 +212,12 @@ def _forEachRecord(filePath, parser, formatName = "fasta"):
 
 def main():
     pass
+
+def test():
+    #filterOutNonDna('/Users/ivan/Documents/work/binning/data/TW/TWexpertSSD_nonDna/538960.1.fas',
+    #                '/Users/ivan/Documents/work/binning/data/TW/TWexpertSSD_nonDna/out/538960.1.fas');
+    filterOutNonDna('/Users/ivan/Documents/work/binning/data/Reindeer/927658.1.fas',
+        '/Users/ivan/Documents/work/binning/data/Reindeer/nonDnaRemoved/927658.1.fas')
 
 if __name__ == "__main__":
     #main()

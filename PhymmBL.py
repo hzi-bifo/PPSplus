@@ -1,10 +1,6 @@
-#!/AM/home-0/shared/python/Python-2.7.1/python
+#!/usr/bin/env python
 
-import sys
 import os
-import re
-#import argparse
-#import random
 
 from FastaFileFunctions import fastaFileToDict
 from TaxonomyNcbi import TaxonomyNcbi
@@ -21,14 +17,16 @@ class DummmyOutBuffer():
 
 class PhymmBLConfig():
 
-    # @param: referenceFastaFile: seq_id -> sequence
-    # @param: map: seq_id -> ncbid
-    # @param: database
-    # @param: taxonomic ranks: phylum, class, order, family, genus, species, (not defined at a rank: NO_VALUE)
-    # @param: output directory
-    # @param: outConfigFile: customGenomicData configuration file
-    # @param: relative path prefix
     def __init__(self, fastaFilePath, seqIdToNcbid, databaseFile, ranksToConsider, outDir, outConfigFile, pathPrefix):
+        """
+            @param: referenceFastaFile: seq_id -> sequence
+            @param: map: seq_id -> ncbid
+            @param: database
+            @param: taxonomic ranks: phylum, class, order, family, genus, species, (not defined at a rank: NO_VALUE)
+            @param: output directory
+            @param: outConfigFile: customGenomicData configuration file
+            @param: relative path prefix
+        """
         self._seqNameToSeq = fastaFileToDict(fastaFilePath)
         self._seqIdToNcbid = getMapping(seqIdToNcbid, 0, 1, sep=None, comment = '#')
         self._taxonomy = TaxonomyNcbi(databaseFile)

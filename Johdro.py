@@ -1,29 +1,27 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import re
 import subprocess
 import Common
 from Config import Config
 from Config import Config2
-from Sequences import Sequences
-from Taxonomy import Taxonomy
-
 
 class Johdro():
     def __init__(self, config, configJoh):
         self._config = config
         self._configJoh = configJoh
 
-    #test whether the env. variables are set - test only
+
     def setEnvVarCmd(self):
+        """ Test whether the env. variables are set - test only. """
         return str('export TAXATORTK_NCBI_ROOT=' + os.path.normpath(self._configJoh.get('johdroTaxdump')) + '; ')
 
 
-    #run blast and johdro postfilter
     def runBlast(self, fastaFile):
+        """
+            Run blast and johdro postfilter.
+        """
         workingDir = self._config.get('workingDir')
 
         cmd = str('time ' + os.path.join(os.path.normpath(self._configJoh.get('blastInstallDir')), 'blastn')
@@ -108,7 +106,9 @@ class Johdro():
 
 
     def _setScaffCandidatePlacementsToSequences(self, sequences, taxonomy, johdroPlacementFile):
-        #THE WEIGHT IS SET TO "None" SINCE IT IS NOT CONTAINED IN THE JOHDRO OUTPUT FILE !!!!!!!!!!!!
+        """
+            THE WEIGHT IS SET TO "None" SINCE IT IS NOT CONTAINED IN THE JOHDRO OUTPUT FILE !!!!!!!!!!!!
+        """
         count = 0
         try:
             f = open(os.path.normpath(johdroPlacementFile),'r')
@@ -145,7 +145,9 @@ class Johdro():
 
 
     def _setCandidatePlacementsToSequences(self, sequences, taxonomy, johdroPlacementFile):
-        #THE WEIGHT IS SET TO "None" SINCE IT IS NOT CONTAINED IN THE JOHDRO OUTPUT FILE !!!!!!!!!!!!
+        """
+            THE WEIGHT IS SET TO "None" SINCE IT IS NOT CONTAINED IN THE JOHDRO OUTPUT FILE !!!!!!!!!!!!
+        """
         count = 0
         try:
             f = open(os.path.normpath(johdroPlacementFile),'r')
@@ -181,11 +183,6 @@ def test():
     #sequences.writeSequences(config.get('inputIdsFastaFile'))
     #taxonomy = Taxonomy(config.get('databaseFile'), config.get('taxonomicRanks').split(','))
     #placeSequences(sequences, taxonomy, configJoh.get('placementFile'))
-
-
-
-
-
 
 if __name__ == "__main__":
   test()

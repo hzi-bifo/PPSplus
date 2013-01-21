@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 from __future__ import with_statement
 import os
 import glob
@@ -11,9 +9,10 @@ from Taxonomy import Taxonomy
 from Config import Config
 from Config import Config2
 
-#go through the final_RAxML_outputs directory and assign/place sequences accordingly
 def placeSequences(sequences, taxonomy, final_RAxML_outputs):
-
+    """
+        Go through the final_RAxML_outputs directory and assign/place sequences accordingly.
+    """
     for filePath in glob.glob(os.path.join(os.path.normpath(final_RAxML_outputs),r'*.txt')):
 
         file = re.findall(r'p_[0-9]+_[0-9]+[_]+RAxML_parsed.txt', filePath)

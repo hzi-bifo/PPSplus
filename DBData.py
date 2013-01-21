@@ -1,15 +1,11 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import sqlite3
 import re
 from Config import Config
 from sets import Set
 import os
 import glob
-import re
-
 
 class DBData():
 
@@ -25,14 +21,16 @@ class DBData():
             #print ncbid
         print count, 'genomes/WGS found in directory ', os.path.normpath(ncbiProcessDir)
 
-    #get the number of genomes/wgs available in the directory
-    #
-    #param threshold: it returns max. threshold genomes/wgs (after this threshold is reached, it returns)
-    #param dir: directory that contains genomes/wgs in the form: "ncbid.[0-9]*.f[an][sa]"
-    #
-    #return: the number of genomes/wgs from different species that are subclades of the input ncbid
-    def getGenomeWgsCount(self, ncbid, threshold):
 
+    def getGenomeWgsCount(self, ncbid, threshold):
+        """
+            Gets the number of genomes/wgs available in the directory.
+
+            @param threshold: it returns max. threshold genomes/wgs (after this threshold is reached, it returns)
+            @param dir: directory that contains genomes/wgs in the form: "ncbid.[0-9]*.f[an][sa]"
+
+            @return: the number of genomes/wgs from different species that are subclades of the input ncbid
+        """
         try:
             conn = sqlite3.connect(os.path.normpath(self._databaseFile))
             cursor = conn.cursor()
@@ -48,13 +46,14 @@ class DBData():
             conn.close()
 
 
-    #get the first ncbid of species/subspecies from the input list that is contained in the directory
-    #
-    #param dir: directory that contain genomes/wgs files
-    #
-    #return None or the first ncbid for which there is a genome or a draft genome in the directory
     def _genomeExists(self, listOfNcbids):
+        """
+            Gets the first ncbid of species/subspecies from the input list that is contained in the directory.
 
+            @param dir: directory that contain genomes/wgs files
+
+            @return None or the first ncbid for which there is a genome or a draft genome in the directory
+        """
         #for ncbid in listOfNcbids:
         #    if glob.glob(os.path.join(os.path.normpath(dir), str(str(ncbid) + '.[0-9]*.f[an][sa]'))):
         #        return ncbid
@@ -64,8 +63,10 @@ class DBData():
         return None
 
 
-    #param speciesIds: output list of ncbids (species or subspecies) for which there are genomes/wgs in the directory
     def _collectSpecies(self, speciesIds, cursor, root, threshold):
+        """
+            @param speciesIds: output list of ncbids (species or subspecies) for which there are genomes/wgs in the directory
+        """
         if len(speciesIds) >= threshold:
             return
         cursor.execute('SELECT node_rank FROM taxon T WHERE T.ncbi_taxon_id=?',(root,))
@@ -87,10 +88,11 @@ class DBData():
                 self._collectSpecies(speciesIds, cursor, int(item[0]), threshold)
 
 
-    #get ncbids of all subspecies of the root
-    #
-    #list: output list with all ncbids of the subspecies
     def _collectSubSpecies(self, list, cursor, root):
+        """
+            Get ncbids of all subspecies of the root
+            @list: output list with all ncbids of the subspecies
+        """
         cursor.execute('SELECT ncbi_taxon_id FROM taxon T WHERE T.parent_taxon_id=?',(root,))
         result = cursor.fetchall()
         if len(result) > 0:

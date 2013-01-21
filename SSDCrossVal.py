@@ -16,13 +16,17 @@ from Taxonomy import Taxonomy
 
 
 
-#Transforms a PPS assignments to a list of pairs <contigName, assigned_ncbid>
-#
-#@param ppsOutFile: PPS output file where the first column is the contig/scaffold name and the last column is ncbid
-#@param scafContigFile: scaffold contig mapping (tab separated) if None then all sequences are considered as contigs
-#
-#@return: list of pairs <contigName, assigned_ncbid>
+
 def ppsOut2Placements(ppsOutFile, scafContigFile=None):
+    """
+        Transforms a PPS assignments to a list of pairs <contigName, assigned_ncbid>
+
+        @param ppsOutFile: PPS output file where the first column is the contig/scaffold name and the last column is ncbid
+        @param scafContigFile: scaffold contig mapping (tab separated) if None then all sequences are considered as contigs
+
+        @return: list of pairs <contigName, assigned_ncbid>
+    """
+
     #print 'ppsOut2Placements ppsOutFile:', ppsOutFile
     #print 'ppsOut2Placements scafContigFile:', scafContigFile
 
@@ -64,14 +68,15 @@ def ppsOut2Placements(ppsOutFile, scafContigFile=None):
     return outList
 
 
-
-#Transforms sample specific data to placements. Sequences` names are not allowed to have gaps ' '
-#
-#@param ssdDir: directory that contains sample specific data
-#@param scafContigFile: scaffold contig mapping (tab separated) if None then all sequences are considered as contigs
-#
-#@return: list of pairs <contigName, assigned_ncbid>
 def ssd2Placements(ssdDir, scafContigFile=None):
+    """
+        Transforms sample specific data to placements. Sequences` names are not allowed to have gaps ' '
+
+        @param ssdDir: directory that contains sample specific data
+        @param scafContigFile: scaffold contig mapping (tab separated) if None then all sequences are considered as contigs
+
+        @return: list of pairs <contigName, assigned_ncbid>
+    """
 
     #collect map: scaffold -> list of contigs
     if scafContigFile != None:
@@ -109,15 +114,16 @@ def ssd2Placements(ssdDir, scafContigFile=None):
     return outList
 
 
-
-#Compare two placements
-#
-#@param refPlacement: reference placement is considered to be true, list of pairs <contigName, assigned_ncbid>
-#@param placement: list of pairs <contigName, assigned_ncbid>
-#@param taxonomy: NCBI taxonomy
-#
-#@return: list of n-tuples where each n-touple contains comparison of two placements of one contig
 def cmpPlacements(refPlacement, placement, taxonomy, taxonomicRanks):
+    """
+        Compare two placements
+
+        @param refPlacement: reference placement is considered to be true, list of pairs <contigName, assigned_ncbid>
+        @param placement: list of pairs <contigName, assigned_ncbid>
+        @param taxonomy: NCBI taxonomy
+
+        @return: list of n-tuples where each n-touple contains comparison of two placements of one contig
+    """
 
     placementDict = dict([]) #contig -> ncbid
     for p in placement:
@@ -196,16 +202,18 @@ def cmpPlacements(refPlacement, placement, taxonomy, taxonomicRanks):
     return outList
 
 
-#Filters out all placements that are mismatches and all placements to the higher ranks that are
-#lower than certain rank (e.g. bacteria or the root) and all placements that are more distant from the
-#reference placement than certain threshold.
-#
-#@param cmpListR: comparison with the reference placement returned by the method "cmpPlacements"
-#@param rankCut: if a contig is assigned on the same path higher but to this rank or higher, it will be filtered out (i.e. 0 for superkingdom)
-#@param maxDist: if a contig is assigned on the same path higher, it will be filtered out if the distance is higher than this value
-#@param taxonomy
-#@param outputInverse: if True, it outputs all entries that would be filtered out if False
 def filterCmpList(cmpListR, rankCut, maxDist, taxonomy, outputInverse = False):
+    """
+        Filters out all placements that are mismatches and all placements to the higher ranks that are
+        lower than certain rank (e.g. bacteria or the root) and all placements that are more distant from the
+        reference placement than certain threshold.
+
+        @param cmpListR: comparison with the reference placement returned by the method "cmpPlacements"
+        @param rankCut: if a contig is assigned on the same path higher but to this rank or higher, it will be filtered out (i.e. 0 for superkingdom)
+        @param maxDist: if a contig is assigned on the same path higher, it will be filtered out if the distance is higher than this value
+        @param taxonomy
+        @param outputInverse: if True, it outputs all entries that would be filtered out if False
+    """
 
     #filter out mismatches (only placements that lie on the same path remain)
     resultList = []
@@ -241,11 +249,13 @@ def filterCmpList(cmpListR, rankCut, maxDist, taxonomy, outputInverse = False):
     return resultList
 
 
-#Compute statistics and store the results
-#
-#@param cmpPlacementsList: list of contigs computed by: cmpPlacements
-#@param outFile if None then summary written to the stdout
 def cmp2Summary(cmpPlacementsList, outFile=None):
+    """
+        Compute statistics and store the results
+
+        @param cmpPlacementsList: list of contigs computed by: cmpPlacements
+        @param outFile if None then summary written to the stdout
+    """
 
     ncbidSet = set([])
     idToPlacementList = dict([]) #map ncbid -> list of corresponding placement lists

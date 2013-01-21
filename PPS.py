@@ -1,13 +1,8 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import re
 from sets import Set
-from Config import Config
-from Config import Config2
-from Sequences import Sequences
 from Taxonomy import Taxonomy
 from Common import noNewLine
 from TaxonomyNcbi import TaxonomyNcbi
@@ -16,8 +11,11 @@ from TabSepFileFunctions import getColumnAsList
 from TabSepFileFunctions import OutFileBuffer
 from TabSepFileFunctions import forEachLine
 
-#transforms a PPS file fileName.fas.PP.out that names sequences according to their ids to their real names
+
 def toRealNames(config, sequences):
+    """
+        Transforms a PPS file fileName.fas.PP.out that names sequences according to their ids to their real names.
+    """
     outIdsPPSFile = str(config.get('inputIdsFastaFile') + '.PP.out')
     outNamesPPSFile = outIdsPPSFile + '.n'
     #os.path.normpath
@@ -43,11 +41,14 @@ def toRealNames(config, sequences):
         fw.close()
 
 
-#reads the output file of PPS and for each sequence decides:
-#if overwriteAllPlacements=True is, then the sequence is placed according to the PPS file regardless of its previous placement
-#if overwriteAllPlacements=False then if a sequence is placed to a less specific rank, than PPS suggests then the sequence is placed
-#according to the PPS file
 def readPPSOutput(sequences, taxonomy, inputFastaIdsPPSFile, overwriteAllPlacements=False):
+    """
+        Reads the output file of PPS and for each sequence decides:
+        if overwriteAllPlacements=True is, then the sequence is placed according to the PPS file regardless of its
+        previous placement
+        if overwriteAllPlacements=False then if a sequence is placed to a less specific rank, than PPS suggests then
+        the sequence is placed according to the PPS file
+    """
 
     infile = str(inputFastaIdsPPSFile + '.out')
     try:
@@ -196,8 +197,11 @@ def main01():
     #toRealNames(config, sequences)
     taxonomy.close()
 
-#used in genomesToMask
+
 def collectChildren(taxonomy, ncbid):
+    """
+        Used in genomesToMask.
+    """
     list = taxonomy.childrenNcbids(ncbid)
     if list == None:
         return [ncbid]

@@ -1,25 +1,25 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import sys
-import re
 import sqlite3
 from sets import Set
 
 
-#Represents an interface to the sqlite3 database in which the NCBI database is stored.
-#(NOTE that methods and variables starting with "_" are local and shouldn`t be used from the outside)
 class TaxonomyNcbi():
+    """
+        Represents an interface to the sqlite3 database in which the NCBI database is stored.
+        (NOTE that methods and variables starting with "_" are local and shouldn`t be used from the outside)
+    """
 
-    #Constructor
-    #@param databaseFile: usually file named "ncbitax_sqlite.db"
-    #@param allowedRanks: taxonomic ranks that will be considered (where 'root' is the root of the taxonomy)
-    #@param considerNoRank: consider ranks 'no rank' if true
     def __init__(self, databaseFile, allowedRanks=['root','superkingdom','phylum','class','order','family','genus','species'],
                  considerNoRank=False):
-
+        """
+            Constructor
+            @param databaseFile: usually file named "ncbitax_sqlite.db"
+            @param allowedRanks: taxonomic ranks that will be considered (where 'root' is the root of the taxonomy)
+            @param considerNoRank: consider ranks 'no rank' if true
+        """
         self._allowedRanks = Set(allowedRanks)
         if considerNoRank:
             self._allowedRanks.add('no rank')
@@ -31,9 +31,10 @@ class TaxonomyNcbi():
             raise
 
 
-    #@return scientific name or None
     def getScientificName(self, ncbid, checkRank = False):
-
+        """
+            @return: scientific name or None
+        """
         if ncbid == -1:
             ncbid = 1
             sys.stderr.write('ncbid -1 converted to 1')
@@ -51,8 +52,10 @@ class TaxonomyNcbi():
             return None
 
 
-    #@return ncbid or None
     def getNcbid(self, scientificName, checkRank = False):
+        """
+            @return ncbid or None
+        """
         self.cursor.execute(str('SELECT T.ncbi_taxon_id FROM taxon_name TN, taxon T ' +
                                 'WHERE TN.name_class="scientific name" AND TN.name=? AND TN.taxon_id=T.taxon_id'),
                                 (scientificName,))
@@ -69,8 +72,11 @@ class TaxonomyNcbi():
                 sys.stderr.write(str('TaxonomyNcbi: scientific name "' + scientificName + '" is ambiguous!\n'))
             return None
 
-    #@return ncbid or None; name doesn`t have to be a scientific name
+
     def getNcbid2(self, name, checkRank = False):
+        """
+            @return ncbid or None; name doesn`t have to be a scientific name.
+        """
         self.cursor.execute(str('SELECT T.ncbi_taxon_id FROM taxon_name TN, taxon T ' +
                                 'WHERE TN.name=? AND TN.taxon_id=T.taxon_id'),
                                 (name,))
@@ -100,8 +106,10 @@ class TaxonomyNcbi():
             return resultList
 
 
-    #@return ncbid or None
     def getParentNcbid(self, ncbid):
+        """
+            @return: ncbid or None
+        """
         if ncbid == 1:
             return None
         taxonId = self._getTaxonId(ncbid)
@@ -117,15 +125,19 @@ class TaxonomyNcbi():
                 return ncbid
 
 
-    #@return rank or None
     def getRank(self, ncbid, checkRank = False):
+        """
+            @return: rank or None
+        """
         if checkRank and (not self.isRankNcbidAllowed(ncbid)):
             return None
         return self._getRank(self._getTaxonId(ncbid))
 
 
-    #@return: True or False
     def isRankNcbidAllowed(self, ncbid):
+        """
+            @return: True or False
+        """
         taxonId = self._getTaxonId(ncbid)
         rank = self._getRank(taxonId)
         if rank in self._allowedRanks:
@@ -134,16 +146,20 @@ class TaxonomyNcbi():
             return False
 
 
-    #@return True or False
     def isRankAllowed(self, rank):
+        """
+            @return True or False
+        """
         if rank in self._allowedRanks:
             return True
         else:
             return False
 
 
-    #close the database after you stop using it
     def close(self):
+        """
+            Close the database after you stop using it.
+        """
         self.cursor.close()
         self.conn.close()
 
@@ -196,25 +212,22 @@ def test():
 
     print 'Get rank of Lachnosipraceae (family):', str(taxonomy.getRank(186803))
 
-
     taxonomy.close()
+
 
 def test2():
     databaseFile = "/Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db"
     taxonomy = TaxonomyNcbi(databaseFile)
-
-
     ncbid = 1
     parent = taxonomy.getParentNcbid(ncbid)
     print ncbid, taxonomy.getScientificName(ncbid)
     print parent, taxonomy.getScientificName(parent)
     print parent, taxonomy.getRank(parent)
 
-
-
-
     taxonomy.close()
 
 
 if __name__ == "__main__":
-  test2()
+  pass
+  #test()
+  #test2()

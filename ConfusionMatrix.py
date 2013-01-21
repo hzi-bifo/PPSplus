@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
+"""
+This module is planned to replace the
+"""
 
 import sys
 import os

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import sys
 import os
 import argparse
@@ -9,9 +7,11 @@ import re
 import sqlite3
 import glob
 
-#-t ncbitax_sqlite.db -g genomesDir -i predictions.txt -f tw.fna
 
 def main():
+    """
+    usage: -t ncbitax_sqlite.db -g genomesDir -i predictions.txt -f tw.fna
+    """
     parser = argparse.ArgumentParser(description='''List clades that can be modeled by PhyloPythiaS''',
                                      epilog='''Format:#seq\t#kb\tNCBID_name;...;NCBID_name;\tNCBID''')
 
@@ -123,7 +123,6 @@ def readFasta(filePath):
     return seqIdToLen
 
 
-#ncbidToListOfSeqIds
 def readInput(inFile):
     ncbidToListOfSeqIds = dict([])
     try:
@@ -150,14 +149,15 @@ def lastNcbid(ncbids):
     return int(list[len(list)-2])
 
 
-#get the number of genomes/wgs available in the directory
-#
-#param threshold: it returns max. threshold genomes/wgs (after this threshold is reached, it returns)
-#param dir: directory that contains genomes/wgs in the form: "ncbid.[0-9]*.f[an][sa]"
-#
-#return: the number of genomes/wgs from different species that are subclades of the input ncbid
 def getGenomeWgsCount(ncbid, threshold, dir, databaseFile, taxonomicRanks):
+    """
+        Get the number of genomes/wgs available in the directory
 
+        @param threshold: it returns max. threshold genomes/wgs (after this threshold is reached, it returns)
+        @param dir: directory that contains genomes/wgs in the form: "ncbid.[0-9]*.f[an][sa]"
+
+        @return: the number of genomes/wgs from different species that are subclades of the input ncbid
+    """
     try:
         conn = sqlite3.connect(os.path.normpath(databaseFile))
         cursor = conn.cursor()
@@ -173,21 +173,24 @@ def getGenomeWgsCount(ncbid, threshold, dir, databaseFile, taxonomicRanks):
         conn.close()
 
 
-#get the first ncbid of species/subspecies from the input list that is contained in the directory
-#
-#param dir: directory that contain genomes/wgs files
-#
-#return None or the first ncbid for which there is a genome or a draft genome in the directory
 def genomeExists(listOfNcbids, dir):
+    """
+        Gets the first ncbid of species/subspecies from the input list that is contained in the directory
+
+        @param dir: directory that contain genomes/wgs files
+
+        @return None or the first ncbid for which there is a genome or a draft genome in the directory
+    """
     for ncbid in listOfNcbids:
         if glob.glob(os.path.join(os.path.normpath(dir), str(str(ncbid) + '.[0-9]*.f[an][sa]'))):
             return ncbid
     return None
 
 
-
-#param speciesIds: output list of ncbids (species or subspecies) for which there are genomes/wgs in the directory
 def collectSpecies(speciesIds, cursor, root, dir, threshold):
+    """
+        @param speciesIds: output list of ncbids (species or subspecies) for which there are genomes/wgs in the directory
+    """
     if len(speciesIds) >= threshold:
         return
     cursor.execute('SELECT node_rank FROM taxon T WHERE T.ncbi_taxon_id=?',(root,))
@@ -209,10 +212,12 @@ def collectSpecies(speciesIds, cursor, root, dir, threshold):
             collectSpecies(speciesIds, cursor, int(item[0]), dir, threshold)
 
 
-#get ncbids of all subspecies of the root
-#
-#list: output list with all ncbids of the subspecies
 def collectSubSpecies(list, cursor, root):
+    """
+        Gets ncbids of all subspecies of the root.
+
+        @param list: output list with all ncbids of the subspecies
+    """
     cursor.execute('SELECT ncbi_taxon_id FROM taxon T WHERE T.parent_taxon_id=?',(root,))
     result = cursor.fetchall()
     if len(result) > 0:

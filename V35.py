@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
-import string
 import re
 from sets import Set
-from Common import noNewLine
 
 from FastaFileFunctions import fastaFileToDict
 from FastaFileFunctions import filterOutSequences
@@ -51,6 +47,7 @@ def getLabelsCreateFasta():
     outLabels.close()
     print 'labels created'
 
+
 def getFirstLabelAtAllowedRank():
     rank='species'
 
@@ -95,8 +92,11 @@ def removeLines(mg):
     out.close()
     print mg, 'removeLines', removed
 
-#remove sequences from the marker gene files at the level from species, genus, family etc.
+
 def removeEntries(mg):
+    """
+        Removes sequences from the marker gene files at the level from species, genus, family etc.
+    """
     removeListPath = '/net/metagenomics/projects/PPSmg/data/V35/genome_ncbids_species.txt'
     srcFilePath = str('/net/metagenomics/projects/PPSmg/data/markerGenes2/db/' + mg + '_bact+arch_dnaV.tax')
     dstFilePath = str('/net/metagenomics/projects/PPSmg/data/V35/mgScenarios/speciesRemoved/db/' + mg + '_bact+arch_dnaV.tax')
@@ -164,8 +164,10 @@ def removeSequences(mg):
     print mg, 'removeSequences', removed
 
 
-#to filter sequences with a specific label
 def filterSequences():
+    """
+        To filter sequences with a specific label.
+    """
     inFileName = '/net/metagenomics/projects/PPSmg/data/V35/contigsMappedBlast1000.fna'
     outFileName = '/net/metagenomics/projects/PPSmg/data/V35/nostocRemoved/contigsMappedBlast1000NostocRm.fna'
     mapFileName = '/net/metagenomics/projects/PPSmg/data/V35/contigsMappedBlast1000Labels.txt'

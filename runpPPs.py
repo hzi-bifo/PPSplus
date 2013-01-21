@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
+"""
+    Master script of PPSplus.
+"""
 
 import sys
 import os
 import shutil
 import argparse
-import re
 import subprocess
 import datetime
 from Config import Config
@@ -17,7 +18,6 @@ from Taxonomy import Taxonomy
 from TrainingData import PPSInput
 from Johdro import Johdro
 import Common
-import MlTreeMap
 import PPS
 import SSDCrossVal
 import TrainingData
@@ -25,9 +25,9 @@ import TabSepFileFunctions
 import OutProc
 from MarkerGeneAnalysis import MarkerGeneAnalysis
 from Analysis16S import RRNA16S
-from Amphora import Amphora
 from Consistency import Consistency
 from TabSepFileFunctions import OutFileBuffer
+
 
 def main():
     parser = argparse.ArgumentParser(

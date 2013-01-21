@@ -1,23 +1,19 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import sys
 import os
-import re
 import argparse
 from sets import Set
 
 from TaxonomyNcbi import TaxonomyNcbi
 from FastaFileFunctions import getSequenceToBpDict
 from TabSepFileFunctions import getMapping
-from TabSepFileFunctions import forEachLine
-from TabSepFileFunctions import isComment
 from TabSepFileFunctions import predToDict
 
-
-#Wraps the taxonomy to buffer (speed up) calls
 class _TaxonomyWrapper():
+    """
+        Wraps the taxonomy to buffer (speed up) calls.
+    """
     def __init__(self, databaseFile):
         self._taxonomy = TaxonomyNcbi(databaseFile)
         self._ncbidToNcbidParent = dict([])
@@ -30,8 +26,10 @@ class _TaxonomyWrapper():
             self._ncbidToNcbidParent[ncbid] = parent
             return parent
 
-    #gets the distance between ncbid and the closest clade in the ncbidSet which represents a path from the root to a clade
     def getDist(self, ncbid, ncbidSet):
+        """
+            Gets the distance between ncbid and the closest clade in the ncbidSet which represents a path from the root to a clade.
+        """
         current = ncbid
         dist = 0
         while (current not in ncbidSet):
@@ -42,15 +40,19 @@ class _TaxonomyWrapper():
             dist += 1
         return dist
 
-    #gets parent of "ncbid" that is in distance intDist
     def getDistantParent(self, ncbid, intDist):
+        """
+            Gets parent of "ncbid" that is in distance intDist.
+        """
         parentNcbid = ncbid
         for i in range(int(intDist)):
             parentNcbid = self._taxonomy.getParentNcbid(parentNcbid)
         return parentNcbid
 
-    #gets the distance from ncbid to parentNcbid that is its parent and lies on the same path to the root
     def getDistTowardsRoot(self, ncbid, parentNcbid):
+        """
+            Gets the distance from ncbid to parentNcbid that is its parent and lies on the same path to the root.
+        """
         current = ncbid
         dist = 0
         while (current != parentNcbid) and (current != 1):
@@ -64,13 +66,14 @@ class _TaxonomyWrapper():
     def getScientificName(self,ncbid):
         return self._taxonomy.getScientificName(ncbid)
 
-    #to free resources
     def close(self):
+        """ To free resources. """
         self._taxonomy.close()
 
-
-#Represents one scaffold.
 class ScScaffold():
+    """
+        Represents one scaffold.
+    """
     def __init__(self, name, ncbid, pathSet, weightedDistToPath, contigsNameList, contigNameToNcbid,
                  ncbidToBp, ncbidToWeight, ncbidToDist, ncbidToLeafDist):
         self._name = name
@@ -88,42 +91,62 @@ class ScScaffold():
     def getName(self):
         return self._name
 
-    #Returns ncbid according to which the consistency of this Scaffold was computed
     def getNcbid(self):
+        """
+            Returns ncbid according to which the consistency of this Scaffold was computed.
+        """
         return self._ncbid
 
-    #Get the path from the root to the ncbid according to which this scaffold was assigned,
-    #the path is represented as a set.
+
     def getPathSet(self):
+        """
+            Get the path from the root to the ncbid according to which this scaffold was assigned,
+            the path is represented as a set.
+        """
         return self._pathSet
 
-    #Get the distance from the argument ncbid to the ncbid to which the scaffold was assigned
+
     def getToLeafDist(self, ncbid):
+        """
+            Get the distance from the argument ncbid to the ncbid to which the scaffold was assigned.
+        """
         if ncbid in self._ncbidToLeafDist:
             return self._ncbidToLeafDist[ncbid]
         else:
             return None
 
-    #Get the distance from the argument ncbid to the path according to which this scaffold was assigned
+
     def getToPathDist(self, ncbid):
+        """
+            Get the distance from the argument ncbid to the path according to which this scaffold was assigned.
+        """
         if ncbid in self._ncbidToDist:
             return self._ncbidToDist[ncbid]
         else:
             return None
 
-    #Get all contigs` names of this scaffold as a list.
+
     def getContigsNameList(self):
+        """
+            Gets all contigs` names of this scaffold as a list.
+        """
         return self._contigsNameList
 
-    #Get the sum of the lengths (in bp) of all constituent contigs.
+
     def getCollectiveLength(self):
+        """
+            Get the sum of the lengths (in bp) of all constituent contigs.
+        """
         length = 0.0
         for ncbid in self._ncbidToBp:
             length += self._ncbidToBp[ncbid]
         return length
 
-    #Consistency: def 1
+
     def getConsistencyTotal(self, asCount=False):
+        """
+            Consistency: def 1.
+        """
         consistentCount = 0.0
         for contigName in self._contigsNameList:
             ncbid = self._contigNameToNcbid[contigName]
@@ -134,8 +157,11 @@ class ScScaffold():
         else:
             return float(consistentCount)/len(self._contigsNameList)
 
-    #Consistency: def 2
+
     def getConsistencyTotalBp(self, asBpCount=False):
+        """
+            Consistency: def 2.
+        """
         consistentBp = 0.0
         sumBp = 0.0
         for ncbid in self._ncbidToBp:
@@ -148,8 +174,11 @@ class ScScaffold():
         else:
             return float(consistentBp)/sumBp
 
-    #Consistency: def3
+
     def getConsistencyAvgDist(self, asTotalCount=False):
+        """
+            Consistency: def3.
+        """
         sumDist = 0.0
         for contigName in self._contigsNameList:
             ncbid = self._contigNameToNcbid[contigName]
@@ -159,12 +188,18 @@ class ScScaffold():
         else:
             return float(sumDist)/len(self._contigsNameList)
 
-    #Consistency: def4
+
     def getConsistencyWeightedAvgDist(self):
+        """
+            Consistency: def4.
+        """
         return self._weightedDistToPath
 
-    #Consistency: def5
+
     def getConsistencyAvgDistLeaf(self, asTotalCount=False):
+        """
+            Consistency: def5.
+        """
         sumDist = 0.0
         for contigName in self._contigsNameList:
             ncbid = self._contigNameToNcbid[contigName]
@@ -174,25 +209,30 @@ class ScScaffold():
         else:
             return float(sumDist)/len(self._contigsNameList)
 
-    #Consistency: def6
+
     def getConsistencyAvgWeightedDistLeaf(self):
+        """
+            Consistency: def6.
+        """
         sumDist = 0.0
         for ncbid in self._ncbidToWeight:
             sumDist += float(self._ncbidToWeight[ncbid])*self._ncbidToLeafDist[ncbid]
         return float(sumDist)
 
-#--------------------------------------------------------------------------------------------------
 
-#Main class
 class Consistency():
+    """ Main class """
 
-    #@param minScaffContigCount: consider only scaffolds that contain at least this number of contigs
-    #@param minScaffBpLen: consider only scaffolds with at least this collective length (in bp)
-    #@param cladesSet: consider only scaffolds that contain at least one contig from this set
-    #@param considerContigWithNoScaff: consider also contigs that are not assigned to scaffolds (as artificial scaffolds)
     def __init__(self, fastaFilePath, predFilePath, mappingFilePath, databaseFile,
                  minScaffContigCount=None, minScaffBpLen=None, cladesSet=None, considerContigWithNoScaff=True):
+        """
+            Initializes the Consistency class.
 
+            @param minScaffContigCount: consider only scaffolds that contain at least this number of contigs
+            @param minScaffBpLen: consider only scaffolds with at least this collective length (in bp)
+            @param cladesSet: consider only scaffolds that contain at least one contig from this set
+            @param considerContigWithNoScaff: consider also contigs that are not assigned to scaffolds (as artificial scaffolds)
+        """
         #read data
         self._contigNameToBp = getSequenceToBpDict(fastaFilePath)
         self._contigToPred = predToDict(predFilePath)
@@ -282,16 +322,20 @@ class Consistency():
                 self._scaffolds[scaffName] = s
 
 
-    #get prediction for contig "contigName" or 1 if it wasn`t assigned
     def _getPred(self, contigName):
+        """
+            Gets prediction for contig "contigName" or 1 if it wasn`t assigned.
+        """
         if contigName in self._contigToPred:
             return self._contigToPred[contigName]
         else:
             return int(1)
 
 
-    #Get "Scaffold" - an object that contain pre-processed info.
     def _processScaffold(self, scaffName):
+        """
+            Gets "Scaffold" - an object that contain pre-processed info.
+        """
         allNcbidSet = Set([])
         for contigName in self._scaffToContigsList[scaffName]:
             allNcbidSet.add(self._getPred(contigName))
@@ -385,13 +429,17 @@ class Consistency():
                          contigNameToNcbid, ncbidToBp, ncbidToWeight, ncbidToDist, ncbidToLeafDist)
 
 
-    # Get all scaffolds (as a dict) that were filtered out according to the parameters
     def getScaffoldsDict(self):
+        """
+            Gets all scaffolds (as a dict) that were filtered out according to the parameters.
+        """
         return self._scaffolds
 
 
-    # Get a list of scaffolds to be printed out.
     def getScaffoldsPrint(self):
+        """
+            Gets a list of scaffolds to be printed out.
+        """
         buff = ''
         scaffList = []
         for scaffName in self._scaffolds:
@@ -441,9 +489,10 @@ class Consistency():
         return buff
 
 
-    # Get scaffolds grouped according to their ncbid
     def getGroupedScaffoldsPrint(self):
-
+        """
+            Gets scaffolds grouped according to their ncbid.
+        """
         #ncbid -> list of scaffolds
         ncbidToScaffList = dict([])
         for scaffName in self._scaffolds:
@@ -522,8 +571,10 @@ class Consistency():
         self._taxonomy.close()
 
 
-#For debugging purposes
 def test():
+    """
+        For debugging purposes.
+    """
     db = '/Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db'
 
     minScaffContigCount = 6
@@ -557,8 +608,10 @@ def test():
     cons.close()
 
 
-#Main function
 def main():
+    """
+        Main function.
+    """
     parser = argparse.ArgumentParser(description='''Computes the scaffold-contig consistency based on the "maximum support path".''',
                                      epilog='''
 

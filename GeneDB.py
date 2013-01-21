@@ -1,33 +1,20 @@
 #!/usr/bin/env python
 
-#/AM/home-0/shared/python/Python-2.7.1/python
-
 import os
 import sys
-import re
 import time
-import subprocess
 import operator
 import argparse
 from sets import Set
-import Common
 import random
 from xml.dom import minidom
-#from xml.dom.minidom import parse, parseString
 from xml.dom import Node
-from Config import Config
 from Taxonomy import Taxonomy
-from dnaToProt import dnaToProt
-from sets import Set
 
 from Bio import Entrez
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna
 #Entrez.email = 'A.N.Other@example.com'
-
-#import TabSepFileFunctions
-#import FastaFileFunctions
-
 
 
 def test():
@@ -48,17 +35,18 @@ def dnaNameEntryToGid(dnaEntry):
     return dnaEntry.split('|')[2].split(':')[1]
 
 
-#first X records in the annotation file are skipped
-#
-#@param relaxGeneNames: if True then don`t check if the gene names in the
 def createGeneDb(markerGeneName, annotationDir, outDir, taxonomy, relaxGeneNames = False, recSkipCount=0, firstErrorStop=False):
-    #DOCUMENTATION
-    #http://www.ncbi.nlm.nih.gov/gene?term=rpsK
-    #http://docs.python.org/library/xml.dom.minidom.html
-    #http://eutils.ncbi.nlm.nih.gov/corehtml/query/static/efetchseq_help.html
-    #http://biopython.org/wiki/Seq
+    """
+        First X records in the annotation file are skipped.
 
-    #---
+        DOCUMENTATION
+        http://www.ncbi.nlm.nih.gov/gene?term=rpsK
+        http://docs.python.org/library/xml.dom.minidom.html
+        http://eutils.ncbi.nlm.nih.gov/corehtml/query/static/efetchseq_help.html
+        http://biopython.org/wiki/Seq
+
+        @param relaxGeneNames: if True then don`t check if the gene names in the
+    """
     annotationXMLfile = os.path.join(annotationDir, str(markerGeneName + '.xml'))
 
     #get the new taxonomy file !!!
@@ -476,12 +464,10 @@ def createGeneDb(markerGeneName, annotationDir, outDir, taxonomy, relaxGeneNames
               + ' Record count: ' + str(recordCount))
 
 
-
-
-
-#parse a path in a xml document and return all corresponding entries
 def _getLeafNodeValueByPath(node, pathList, resultList, attrName, collectNodes = False):
-
+    """
+        Parse a path in a xml document and return all corresponding entries.
+    """
     try:
         if len(pathList) == 0:
             if collectNodes:
@@ -507,12 +493,12 @@ def _getLeafNodeValueByPath(node, pathList, resultList, attrName, collectNodes =
     except Exception:
         sys.stderr.write('Cannot parse path: ' + str(pathList) + ' at node: ' + str(node) + '\n')
         raise
-        #return None
 
 
-#xmlRoot,'GBSeq/GBSeq_feature-table/GBFeature/GBFeature_quals/GBQualifier','GBQualifier_name','translation','GBQualifier_value'
 def getValueByKey(node, path, keyTag, key, valueTag, valuePrefix = None):
-
+    """
+        #xmlRoot,'GBSeq/GBSeq_feature-table/GBFeature/GBFeature_quals/GBQualifier','GBQualifier_name','translation','GBQualifier_value'
+    """
     pathList = path.rsplit('/')
     resultList = []
     attrName = None
@@ -623,8 +609,10 @@ def getValueByKey2(node, path, keyTag, key, valueTag, valuePrefix, refKey, refVa
         return None
 
 
-#gets the element value or an attribute value or None if there is not one occurance of this element or attribute
 def getLeafNodeValueByPath(node, path, attrName=None):
+    """
+        Gets the element value or an attribute value or None if there is not one occurance of this element or attribute.
+    """
     pathList = path.rsplit('/')
     resultList = []
     _getLeafNodeValueByPath(node, pathList, resultList, attrName)
@@ -639,8 +627,10 @@ def getLeafNodeValueByPath(node, path, attrName=None):
         return None
 
 
-#to output a sequence to a file
 class OutputBuffer():
+    """
+        To output a sequence to a file.
+    """
     def __init__(self, outFilePath, seqType, fileType, taxonomy):
         try:
             self.outFile = open(outFilePath, 'w')

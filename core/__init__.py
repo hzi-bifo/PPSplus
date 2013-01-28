@@ -1,1 +1,4 @@
-__author__ = 'ivan'
+"""
+    Contains main scripts of the PhyloPythiaS+ pipeline.
+"""
+

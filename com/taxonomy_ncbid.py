@@ -7,14 +7,16 @@ import sqlite3
 
 class TaxonomyNcbi():
     """
-        Represents an interface to the sqlite3 database in which the NCBI database is stored.
+        Represents an interface to the sqlite3 database in which the NCBI taxonomy is stored.
         (NOTE that methods and variables starting with "_" are local and shouldn`t be used from the outside)
+
+        @author: Ivan
     """
 
-    def __init__(self, databaseFile, allowedRanks=['root','superkingdom','phylum','class','order','family','genus','species'],
+    def __init__(self, databaseFile,
+                 allowedRanks=['root','superkingdom','phylum','class','order','family','genus','species'],
                  considerNoRank=False):
         """
-            Constructor
             @param databaseFile: usually file named "ncbitax_sqlite.db"
             @param allowedRanks: taxonomic ranks that will be considered (where 'root' is the root of the taxonomy)
             @param considerNoRank: consider ranks 'no rank' if true
@@ -30,9 +32,10 @@ class TaxonomyNcbi():
             raise
 
 
-    def getScientificName(self, ncbid, checkRank = False):
+    def getScientificName(self, ncbid, checkRank=False):
         """
             @return: scientific name or None
+            @rtype: str
         """
         if ncbid == -1:
             ncbid = 1
@@ -53,7 +56,8 @@ class TaxonomyNcbi():
 
     def getNcbid(self, scientificName, checkRank = False):
         """
-            @return ncbid or None
+            @return: ncbid or None
+            @rtype: int
         """
         self.cursor.execute(str('SELECT T.ncbi_taxon_id FROM taxon_name TN, taxon T ' +
                                 'WHERE TN.name_class="scientific name" AND TN.name=? AND TN.taxon_id=T.taxon_id'),
@@ -74,7 +78,9 @@ class TaxonomyNcbi():
 
     def getNcbid2(self, name, checkRank = False):
         """
-            @return ncbid or None; name doesn`t have to be a scientific name.
+            @param name: doesn`t have to be a scientific name
+            @return: ncbid or None
+            @rtype: int
         """
         self.cursor.execute(str('SELECT T.ncbi_taxon_id FROM taxon_name TN, taxon T ' +
                                 'WHERE TN.name=? AND TN.taxon_id=T.taxon_id'),
@@ -108,6 +114,7 @@ class TaxonomyNcbi():
     def getParentNcbid(self, ncbid):
         """
             @return: ncbid or None
+            @rtype: int
         """
         if ncbid == 1:
             return None
@@ -126,7 +133,8 @@ class TaxonomyNcbi():
 
     def getParentsNcbidSet(self, ncbid):
         """
-            Returns set of parent ncbi taxon ids.
+            @return: set of parent ncbi taxon ids.
+            @rtype: set
         """
         s = set([])
         currentId = ncbid
@@ -142,6 +150,7 @@ class TaxonomyNcbi():
     def getRank(self, ncbid, checkRank = False):
         """
             @return: rank or None
+            @rtype: str
         """
         if checkRank and (not self.isRankNcbidAllowed(ncbid)):
             return None
@@ -150,7 +159,7 @@ class TaxonomyNcbi():
 
     def isRankNcbidAllowed(self, ncbid):
         """
-            @return: True or False
+            @rtype: bool
         """
         taxonId = self._getTaxonId(ncbid)
         rank = self._getRank(taxonId)
@@ -162,7 +171,7 @@ class TaxonomyNcbi():
 
     def isRankAllowed(self, rank):
         """
-            @return True or False
+            @rtype: bool
         """
         if rank in self._allowedRanks:
             return True

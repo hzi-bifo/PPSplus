@@ -1,1 +1,4 @@
-__author__ = 'ivan'
+"""
+    Contains modules that should not be used anymore.
+"""
+

@@ -1,1 +1,4 @@
-__author__ = 'ivan'
+"""
+    Contains modules to process the reference data.
+"""
+

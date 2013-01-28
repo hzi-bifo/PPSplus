@@ -29,10 +29,10 @@ class Accuracy():
             @param minFracPred: a clade is considered only if the corresponding predicted bins contain at least this
                          fraction of the overall sequences (None ~ this criteria is not considered and only
                          true "reference" bins are used for the comparison).
-            @param countAsBp: count it according to the sequence lengths
+            @param asBp: count it according to the sequence lengths
             @param weightAccordingBinSize: weight individual bins according to their bin size
 
-            @return [precision, recall, classPrecisionNum, classRecallNum]
+            @return: [precision, recall, classPrecisionNum, classRecallNum]
         """
         predAtRankDict = self._taxonomy.getPredDictAtRank(self._seqToPred, rank)
         trueAtRankDict = self._taxonomy.getPredDictAtRank(self._seqToTrue, rank)
@@ -71,7 +71,7 @@ class Accuracy():
                     p[j] += bp
 
             # match
-            if i == j and i != None:
+            if i == j and i is not None:
                 if i not in tp:
                     tp[i] =  bp
                 else:
@@ -92,7 +92,7 @@ class Accuracy():
             classesR.remove(i)
 
         #filter out least abundant PREDICTED clades
-        if minFracPred == None:
+        if minFracPred is None:
             classesP = classesR
         else:
             sum = 0
@@ -227,7 +227,7 @@ class _TaxonomyWrapperA():
                     else:
                         #get parent
                         current = self._taxonomy.getParentNcbid(ncbid)
-                        while self._taxonomy.getRank(current) != rank and current != None:
+                        while self._taxonomy.getRank(current) != rank and current is not None:
                             current = self._taxonomy.getParentNcbid(current)
                         if self._taxonomy.getRank(current) == rank:
                             outDict[seq] = current

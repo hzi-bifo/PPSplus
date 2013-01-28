@@ -3,7 +3,6 @@
 import os
 import sys
 import sqlite3
-from sets import Set
 
 
 class TaxonomyNcbi():
@@ -20,7 +19,7 @@ class TaxonomyNcbi():
             @param allowedRanks: taxonomic ranks that will be considered (where 'root' is the root of the taxonomy)
             @param considerNoRank: consider ranks 'no rank' if true
         """
-        self._allowedRanks = Set(allowedRanks)
+        self._allowedRanks = set(allowedRanks)
         if considerNoRank:
             self._allowedRanks.add('no rank')
         try:
@@ -125,6 +124,21 @@ class TaxonomyNcbi():
                 return ncbid
 
 
+    def getParentsNcbidSet(self, ncbid):
+        """
+            Returns set of parent ncbi taxon ids.
+        """
+        s = set([])
+        currentId = ncbid
+        while True:
+            currentId = self.getParentNcbid(currentId)
+            if currentId is None:
+                break
+            else:
+                s.add(currentId)
+        return s
+
+
     def getRank(self, ncbid, checkRank = False):
         """
             @return: rank or None
@@ -226,8 +240,14 @@ def test2():
 
     taxonomy.close()
 
+def test3():
+    databaseFile = "/Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db"
+    taxonomy = TaxonomyNcbi(databaseFile)
+    print taxonomy.getParentsNcbidSet(186803)
+
 
 if __name__ == "__main__":
-  pass
-  #test()
-  #test2()
+    pass
+    #test()
+    #test2()
+    #test3()

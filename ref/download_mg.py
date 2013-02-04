@@ -50,10 +50,10 @@ def createGeneDb(markerGeneName, annotationDir, outDir, taxonomy, relaxGeneNames
     #get the new taxonomy file !!!
     #taxonomy = Taxonomy(os.path.normpath('D:/A_Phylo/A_Metagenomic/data/ncbiTaxonomy20111007/ncbitax_sqlite.db'), ['superkingdom','phylum','class','order','family','genus','species'])
 
-    outBuffDnaFasta = OutputBuffer(os.path.join(outDir, str(markerGeneName + '_bact+arch_dna.noalign.fna')), 'dna', 'fasta', taxonomy)
+    outBuffDnaFasta = OutputBuffer(os.path.join(outDir, str(markerGeneName + '_bact+arch_dna.fna')), 'dna', 'fasta', taxonomy)
     outBuffDnaTax = OutputBuffer(os.path.join(outDir, str(markerGeneName + '_bact+arch_dna.tax')), 'dna', 'taxonomy', taxonomy)
 
-    outBuffProtFasta = OutputBuffer(os.path.join(outDir, str(markerGeneName + '_bact+arch_prot.noalign.fna')), 'prot', 'fasta', taxonomy)
+    outBuffProtFasta = OutputBuffer(os.path.join(outDir, str(markerGeneName + '_bact+arch_prot.fna')), 'prot', 'fasta', taxonomy)
     outBuffProtTax = OutputBuffer(os.path.join(outDir, str(markerGeneName + '_bact+arch_prot.tax')), 'prot', 'taxonomy', taxonomy)
 
     storedDNAEntries = 0
@@ -451,7 +451,7 @@ def createGeneDb(markerGeneName, annotationDir, outDir, taxonomy, relaxGeneNames
         #    pass
 
         #sleep for a while - don`t overload the server
-        time.sleep(float(random.random()/10))
+        time.sleep(float(random.random()/100))
 
     outBuffDnaFasta.close()
     outBuffDnaTax.close()
@@ -627,7 +627,7 @@ def getLeafNodeValueByPath(node, path, attrName=None):
 
 class OutputBuffer():
     """
-        To output a sequence to a file.
+        To output a sequence or a taxonomy record to a file.
     """
     def __init__(self, outFilePath, seqType, fileType, taxonomy):
         try:
@@ -682,9 +682,10 @@ class OutputBuffer():
         elif self.fileType == 'fna':
             entry = str('>' + name + '\n' + seq + '\n')
         elif self.fileType == 'tax':
-            pathToRoot = self.taxonomy.getPathToRootSemicolonSeparated(ncbid)
-            assert pathToRoot != None, str(name + ' ' + seq)
-            entry = str(name + '\t' + pathToRoot + '\n')
+            #pathToRoot = self.taxonomy.getPathToRootSemicolonSeparated(ncbid)
+            #assert pathToRoot != None, str(name + ' ' + seq)
+            #entry = str(name + '\t' + pathToRoot + '\n')
+            entry = str(name + '\t' + ncbid + '\n')
         else:
             assert False, str('The file type is of the wrong type' + self.fileType)
         try:

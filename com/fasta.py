@@ -126,7 +126,7 @@ def fastaFileToDict(fastaFilePath, formatName='fasta'):
     """
         Reads a fasta file and returns mapping: seqName -> sequence.
     """
-    return _forEachRecord(fastaFilePath, _RecordStorage(formatName),formatName=formatName).getSeqNameToSeq()
+    return _forEachRecord(fastaFilePath, _RecordStorage(formatName), formatName=formatName).getSeqNameToSeq()
 
 
 def fastaFileToDictWholeNames(filePath):

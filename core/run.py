@@ -66,7 +66,7 @@ def main():
                         help=str('process output of Taxator Blast LCA (jlcab), Taxator Last LCA (jlcal), '
                                  + ' 16S rRNA analysis (s16), marker gene Amphora analysis without (mg)' +
                                  ' push down predictions to more specific clades (sc) ' +
-                                 'build new OTUs (otu) '),
+                                 'build new OTUs (otu) '), choices=["s16", "mg"],
                         dest='o') #MlTreeMap (m); Amphora (ah); exclude some data from SSD (ex) place sequences;
                         #(exSSD) exclude defined contigs from SSD; create training data'
 
@@ -74,7 +74,7 @@ def main():
                         help='run PhyloPythiaS "train script"',
                         dest='t')
 
-    parser.add_argument('-p', '--pps-predict', action='store', nargs='+',
+    parser.add_argument('-p', '--pps-predict', action='store', nargs='+', choices=["c","s","v"],
                         help='run PhyloPythiaS "predict script" (c) for contigs, (s) for scaffolds, (v) run cross validation',
                         dest='p')
 
@@ -643,4 +643,4 @@ def getLogFileName(logDir, description):
     #print parser.print_help()
 
 if __name__ == "__main__":
-  main()
+    main()

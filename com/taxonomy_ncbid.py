@@ -99,7 +99,7 @@ class TaxonomyNcbi():
             return None
 
 
-    def childrenNcbids(self, ncbid): #SELECT T1.ncbi_taxon_id from taxon T1 where T1.parent_taxon_id=818;
+    def getChildrenNcbids(self, ncbid): #SELECT T1.ncbi_taxon_id from taxon T1 where T1.parent_taxon_id=818;
         self.cursor.execute(str('SELECT T1.ncbi_taxon_id from taxon T1 where T1.parent_taxon_id=?'),(ncbid,))
         result = self.cursor.fetchall()
         if len(result) == 0:
@@ -179,6 +179,13 @@ class TaxonomyNcbi():
             return False
 
 
+    def exists(self, ncbid):
+        if self._getTaxonId(ncbid) is None:
+            return False
+        else:
+            return True
+
+
     def close(self):
         """
             Close the database after you stop using it.
@@ -188,7 +195,7 @@ class TaxonomyNcbi():
 
 
     def _getTaxonId(self, ncbid):
-        if ncbid == None:
+        if ncbid is None:
             return None
         if ncbid == -1:
             ncbid = 1
@@ -202,7 +209,7 @@ class TaxonomyNcbi():
 
 
     def _getParentNcbid(self, taxonId):
-        if taxonId == None:
+        if taxonId is None:
             return None
         self.cursor.execute('SELECT parent_taxon_id FROM taxon T WHERE T.taxon_id=?', (taxonId,))
         result = self.cursor.fetchall()
@@ -213,7 +220,7 @@ class TaxonomyNcbi():
 
 
     def _getRank(self, taxonId):
-        if taxonId == None:
+        if taxonId is None:
             return None
         self.cursor.execute('SELECT node_rank FROM taxon T WHERE T.taxon_id=?', (taxonId,))
         result = self.cursor.fetchall()
@@ -254,9 +261,14 @@ def test3():
     taxonomy = TaxonomyNcbi(databaseFile)
     print taxonomy.getParentsNcbidSet(186803)
 
+def test4():
+    taxonomy = TaxonomyNcbi('/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db')
+    print taxonomy.childrenNcbids(83763)
+
 
 if __name__ == "__main__":
     pass
     #test()
     #test2()
     #test3()
+    #test4()

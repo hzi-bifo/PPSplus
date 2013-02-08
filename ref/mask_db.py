@@ -22,7 +22,7 @@ import glob
 
 from com import csv
 from com import fasta as fas
-from com.taxonomy_ncbid import TaxonomyNcbi
+from com.taxonomy_ncbid import TaxonomyNcbi as tax
 
 
 _STRAIN = 'strain'
@@ -34,7 +34,7 @@ class _TaxonomyWrap():
         """ A taxonomy wrapper.
             @type taxonomy TaxonomyNcbi
         """
-        self._taxonomy = TaxonomyNcbi(taxonomy, considerNoRank=True)
+        self._taxonomy = tax.TaxonomyNcbi(taxonomy, considerNoRank=True)
         self._existsTaxonIdSet = set([])
         self._taxonIdToDirectChildrenSet = dict([])
 
@@ -334,7 +334,7 @@ def getFirstLabelAtAllowedRank():
     seqIdToLabel = csv.getMapping(predFile1, 0, 1, sep='\t', comment = '#')
     outPred = csv.OutFileBuffer(predFile2)
 
-    taxonomy = TaxonomyNcbi('/net/metagenomics/projects/PPSmg/data/nobackup/NCBI20120828/ncbiTax/ncbitax_sqlite.db')
+    taxonomy = tax.TaxonomyNcbi('/net/metagenomics/projects/PPSmg/data/nobackup/NCBI20120828/ncbiTax/ncbitax_sqlite.db')
 
     for seqId in seqIdToLabel:
         ncbid = int(seqIdToLabel[seqId][0])

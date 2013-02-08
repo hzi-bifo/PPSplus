@@ -451,7 +451,7 @@ def createGeneDb(markerGeneName, annotationDir, outDir, taxonomy, relaxGeneNames
         #    pass
 
         #sleep for a while - don`t overload the server
-        time.sleep(float(random.random()/100))
+        time.sleep(float(random.random()/10))
 
     outBuffDnaFasta.close()
     outBuffDnaTax.close()

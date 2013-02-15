@@ -203,7 +203,7 @@ class TaxonomyNcbi():
         self.cursor.execute('SELECT taxon_id FROM taxon T WHERE T.ncbi_taxon_id=?',(ncbid,))
         result = self.cursor.fetchall()
         if len(result) != 1:
-            sys.stderr.write('TaxonomyNcbi: Cannot find taxon_id for ncbi:' + str(ncbid) + ' result:' + str(result) + ' \n')
+            #sys.stderr.write('TaxonomyNcbi: Cannot find taxon_id for ncbi:' + str(ncbid) + ' result:' + str(result) + ' \n')
             return None
         return int(result[0][0])
 

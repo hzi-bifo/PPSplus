@@ -35,8 +35,8 @@ class _TaxonomyWrap():
             @type taxonomy TaxonomyNcbi
         """
         self._taxonomy = tax.TaxonomyNcbi(taxonomy, considerNoRank=True)
-        self._existsTaxonIdSet = set([])
-        self._taxonIdToDirectChildrenSet = dict([])
+        self._existsTaxonIdSet = set()
+        self._taxonIdToDirectChildrenSet = {}
 
     def exists(self, taxonId):
         """ @type taxonId: int
@@ -83,7 +83,7 @@ class _TaxonomyWrap():
             @rtype: set of int
         """
         assert isinstance(taxonId, int)
-        return self._getAllChildren(taxonId, set([]))
+        return self._getAllChildren(taxonId, set())
 
     def close(self):
         self._taxonomy.close()
@@ -119,7 +119,7 @@ def _refFilePathToTaxonId(refFilePath):
         @return: taxonId
         @rtype: int
     """
-    assert refFilePath.endswith('.fna') or refFilePath.endswith('.fas'), str(
+    assert refFilePath.endswith(('.fna', '.fas')), str(
         'The fasta files can end either with .fna or .fas ' + refFilePath)
     return int(os.path.basename(refFilePath).rsplit('.', 2)[0])
 
@@ -136,7 +136,7 @@ def _mgSeqIdToTaxonId(seqId):
 
 def _main():
     """ Main function, see module description."""
-    toLowerRank = dict([])
+    toLowerRank = {}
     for i in range(1, len(_RANKS)):
         toLowerRank[_RANKS[i-1]] = _RANKS[i]
 
@@ -194,7 +194,7 @@ def _main():
     inCladesSet = set(map(int, csv.getColumnAsList(cladesFilePath)))
 
     # clades in the reference
-    refCladesSet = set([])
+    refCladesSet = set()
     if action in ['cl', 'mr']:
         # get the list of all taxon ids that appear in the directory (as PPS reference)
         for fastaFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.f[na][as]')): # *.fas or *.fna
@@ -222,7 +222,7 @@ def _main():
     print('Initial checks done.')
 
     # taxonIds that should be excluded
-    toExcludeSet = set([])
+    toExcludeSet = set()
     for taxonId in inCladesSet:
         taxonIdAtRank = taxonomy.getTaxonIdAtRank(taxonId, rank)
         if taxonIdAtRank is None: # the lineage is not defined at this rank ! try a lower rank !
@@ -380,8 +380,8 @@ def removeEntries(mg):
     dstFilePath = str('/net/metagenomics/projects/PPSmg/data/V35/mgScenarios/speciesRemoved/db/' + mg + '_bact+arch_dnaV.tax')
     out = csv.OutFileBuffer(dstFilePath)
     removeSet = set(csv.getColumnAsList(removeListPath, colNum=0, comment='#'))
-    removeSetInt = set([])
-    removeSetIds = set([])
+    removeSetInt = set()
+    removeSetIds = set()
     removed = 0
     for s in removeSet:
         if s != '':
@@ -389,7 +389,7 @@ def removeEntries(mg):
     col0 = csv.getColumnAsList(srcFilePath, colNum=0, sep='\t', comment='#')
     col1 = csv.getColumnAsList(srcFilePath, colNum=1, sep='\t', comment='#')
     for col0,col1 in zip(col0,col1):
-        lineSetInt = set([])
+        lineSetInt = set()
         for s in col1.split(';'):
             if s != '':
                 lineSetInt.add(int(s))
@@ -452,7 +452,7 @@ def filterSequences():
     labelRemove = 103690
     #seq id -> label
     labelToIdsDict = csv.getMapping(mapFileName, 1, 0, sep='\t', comment = '#')
-    allowedNamesSet = set([])
+    allowedNamesSet = set()
     for i in labelToIdsDict:
         if int(i) != int(labelRemove):
             for j in labelToIdsDict[i]:

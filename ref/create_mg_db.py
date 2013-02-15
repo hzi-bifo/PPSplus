@@ -25,8 +25,8 @@ class _TaxonomyWrap():
         """
         self._taxonomy = tax.TaxonomyNcbi(taxonomyFile, allowedRanks)
         self._allowedRanks = allowedRanks
-        self._parentDict = dict([]) # map: taxonId -> parent taxonId
-        self._rankDict = dict([]) # map: taxonId -> rank
+        self._parentDict = {} # map: taxonId -> parent taxonId
+        self._rankDict = {} # map: taxonId -> rank
 
     def _getParent(self, taxonId):
         if taxonId in self._parentDict:
@@ -57,7 +57,7 @@ class _TaxonomyWrap():
             @rtype: str
         """
         assert isinstance(taxonId, int)
-        rankToTaxonId = dict([])
+        rankToTaxonId = {}
         current = taxonId
         while current != 1:
             rank = self._getRank(current)
@@ -104,8 +104,10 @@ def _main():
         dest='taxonomy')
 
     parser.add_argument('-n', '--not-considered-taxonIds', action='store', nargs=1,
-        help='Comma separated taxonIds (as a string) what fill be filtered out. (optional)',
-        metavar='"77133,155900,408172,32644, 408170,433727,749907,556182,702656,410661,652676,410659,797283,408171,703336,256318,32630,433724,766747,488339,942017,1076179,717931,455559,527640,904678"',
+        help='Comma separated leaf level or top level taxonIds (as a string) what fill be filtered out. (optional)',
+        metavar='"2759,10239,77133,155900,408172,32644, 408170,433727,749907,556182,702656,410661,652676,410659,797283'\
+                ',408171,703336,256318,32630,433724,766747,488339,942017,1076179,717931,455559,527640,904678,552539,'\
+                '54395,198431,358574,415540,511564,369433,380357,81726,198834,271928,311313"',
         dest='filterOut')
 
     # parse arguments
@@ -113,7 +115,7 @@ def _main():
     inDir = args.inDir[0]
     outDir =  args.outDir[0]
     srcType = args.srcType[0]
-    filterOutTaxonIdsSet = set([])
+    filterOutTaxonIdsSet = set()
     try:
         if args.filterOut:
             filterOutTaxonIdsSet.update(set(map(int, str(args.filterOut[0]).split(','))))
@@ -126,18 +128,18 @@ def _main():
         assert os.path.isdir(dir), 'Path: "' + dir + '" does not exists!'
 
     # create db for each gene
-    mapDict = dict([])  # map: seqId -> ncbid
+    mapDict = {}  # map: seqId -> ncbid
     for mapFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.[ct][sa][vx]')): # *.csv or *.tax
 
-        assert mapFilePath.endswith('.csv') or mapFilePath.endswith('.tax'), str(
-            'The mapping files can either end with .csv or .tax ' + mapFilePath)
+        assert mapFilePath.endswith(('.csv', '.tax')), \
+            'The mapping files can either end with .csv or .tax ' + mapFilePath
 
         base = os.path.basename(mapFilePath).rsplit('.', 1)[0] # cut out dir path and suffix
         fastaDict = fas.fastaFileToDict(os.path.join(os.path.dirname(mapFilePath), (base + '.fna'))) # map: seqId -> seq
         print("Processing: %s seq count: %s" % (base, str(len(fastaDict))))
 
         if 'a' in srcType: # Amphora
-            mapDict = dict([])
+            mapDict = {}
             for k in csv.getColumnAsList(mapFilePath, colNum=0, sep='\t'):
                 v =  int(k.rsplit('|', 1)[1].split(':')[1]) # get ncbid
                 assert ((k not in mapDict) or (mapDict[k] == v)), str(
@@ -145,7 +147,7 @@ def _main():
                 mapDict[k] = v
         elif 's' in srcType: # Silva
             mapTmp = csv.getMapping(mapFilePath, 0, 2, '\t')
-            mapDict = dict([])
+            mapDict = {}
             for k, v in mapTmp.iteritems():
                 mapDict[k] = int(v[0])
         else:
@@ -167,25 +169,26 @@ def _main():
         outDna = csv.OutFileBuffer(os.path.join(outDir, str(base + '.fna')))
         outTax = csv.OutFileBuffer(os.path.join(outDir, str(base + '.tax')))
         count = 0
-        filtered = 0
+        filteredLeaf = 0
+        filteredSup = 0
         notMapped = 0
-        eukaryota = 0
-        viruses = 0
+        noBacArch = 0
         for seqId, taxonId in mapDict.iteritems():
             if taxonId in filterOutTaxonIdsSet:
-                filtered += 1
+                filteredLeaf += 1
                 continue
             path = taxonomy.getPathToRoot(taxonId)
             if path is None:
                 print('Could not find: %s for seqId: %s record skipped!' % (str(taxonId), seqId))
                 notMapped += 1
                 continue
-            else:
-                assert int(path.split(';', 1)[0]) in [2, 2157, 2759, 10239], str('Lineage is neither Bacteria nor Archaea: ' + path)
-                if int(path.split(';', 1)[0]) == 2759:
-                    eukaryota += 1
-                elif int(path.split(';', 1)[0]) == 10239:
-                    viruses += 1
+            topLevel = int(path.split(';', 1)[0])
+            if topLevel in filterOutTaxonIdsSet:
+                filteredSup += 1
+                continue
+            if  topLevel not in [2, 2157]: # Bacteria, Archaea
+                noBacArch += 1
+                print('NoBactArch: ', topLevel)
 
             seq = fastaDict[seqId]
             if 'a' in srcType: # Amphora
@@ -199,16 +202,18 @@ def _main():
 
         outDna.close()
         outTax.close()
-        print('Stored entries: %s filtered out: %s not mapped: %s' % (str(count), str(filtered), str(notMapped)))
-        print('eukaryota: ' + str(eukaryota) + ' viruses: ' + str(viruses))
+        print('Stored entries: %s filtered out: %s leaf, %s top level, not mapped: %s' %
+              (count, filteredLeaf, filteredSup, notMapped))
+        if noBacArch > 0:
+            print('WARN: stored %s of non Bacterial and non Archaeal sequences: ' % (noBacArch))
 
         # Silva:
         #-i /Users/ivan/Documents/work/binning/database/silva111/arbGenerated -s s -t /Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db
-        # -o /Users/ivan/Documents/work/binning/database/silva111/db -n "77133"
+        # -o /Users/ivan/Documents/work/binning/database/silva111/db -n ...
 
         # Amphora
         # -i /Users/ivan/Documents/work/binning/database/markerGenes3/mGenesExtracted -s a -t /Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db
-        # -o /Users/ivan/Documents/work/binning/database/markerGenes3/db -n "77133"
+        # -o /Users/ivan/Documents/work/binning/database/markerGenes3/db
 
     taxonomy.close()
     print 'done'

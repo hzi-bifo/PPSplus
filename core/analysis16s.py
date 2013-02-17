@@ -27,14 +27,14 @@ class RRNA16S():
         cmd = str('export PATH=' + hmmerBinDir + ':$PATH; time ' + os.path.join(hmmInstallDir,'rna_hmm3.py') +
                   ' -i ' + inputFastaFile + ' -o ' + regionsFile)
         if os.name == 'posix':
-            if outLog != None:
+            if outLog is not None:
                 stdoutLog = open(outLog,'w')
             else:
                 stdoutLog = subprocess.STDOUT #stdout=subprocess.STDOUT
             hmmProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self._configRRNA16S.get('rnaHmmInstallDir'), stdout=stdoutLog)
             print 'run cmd:', cmd
             hmmProc.wait()
-            if outLog != None:
+            if outLog is not None:
                 stdoutLog.close()
             print 'HMM return code:', hmmProc.returncode
         else:
@@ -106,8 +106,8 @@ class RRNA16S():
             templateFile = os.path.normpath(self._configRRNA16S.get('mothurClassifyParam16STemplate'))
             taxonomyFile = os.path.normpath(self._configRRNA16S.get('mothurClassifyParam16STaxonomy'))
             #mothurPredFileName = str(inputFastaFile + '.16S_rRNA.bacteria+archaea.taxonomy')
-            #mothurPredFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.16S_rRNA.bacteria+archaea.taxonomy'))
-            mothurPredFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.16S_rRNA.fasta.taxonomy'))
+            mothurPredFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.16S_rRNA.bacteria+archaea.taxonomy'))
+            #mothurPredFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.16S_rRNA.fasta.taxonomy'))
             #predFileName = str(inputFastaFile + '.16P')
             predFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.16P'))
         elif mode == 23:
@@ -116,8 +116,8 @@ class RRNA16S():
             templateFile = os.path.normpath(self._configRRNA16S.get('mothurClassifyParam23STemplate'))
             taxonomyFile = os.path.normpath(self._configRRNA16S.get('mothurClassifyParam23STaxonomy'))
             #mothurPredFileName = str(inputFastaFile + '.23S_rRNA.bacteria+archaea.taxonomy')
-            #mothurPredFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.23S_rRNA.bacteria+archaea.taxonomy'))
-            mothurPredFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.23S_rRNA.fasta.taxonomy'))
+            mothurPredFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.23S_rRNA.bacteria+archaea.taxonomy'))
+            #mothurPredFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.23S_rRNA.fasta.taxonomy'))
             #predFileName = str(inputFastaFile + '.23P')
             predFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.23P'))
         elif mode == 5:

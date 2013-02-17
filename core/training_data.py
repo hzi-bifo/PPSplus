@@ -40,17 +40,20 @@ class PPSInput():
 
         #transform forbiddenDict to forbidden sets
         forbiddenDictSet = dict([])
-        if forbiddenDict != None:
+        if forbiddenDict is not None:
             for ncbid in forbiddenDict:
                 forbiddenDictSet[ncbid] = set(forbiddenDict[ncbid])
 
         #transform the list into a set
-        exSSDContigNameSet = set(exSSDContigNameList)
+        if exSSDContigNameList is None:
+            exSSDContigNameSet = set()
+        else:
+            exSSDContigNameSet = set(exSSDContigNameList)
 
         for sequence in self.sequences.sequences:
 
             taxonomyPath = sequences.getTaxonomyPath(sequence.id)
-            if taxonomyPath == None:
+            if taxonomyPath is None:
                 continue #the sequence was not assigned
 
             if sequence.name in exSSDContigNameSet:
@@ -166,7 +169,7 @@ class PPSInput():
         sumEntry.sort(reverse=True)
 
         #write it to a file
-        if toFile != None:
+        if toFile is not None:
             try:
                 f = open(os.path.normpath(toFile),'w')
                 for e in sumEntry:
@@ -192,7 +195,7 @@ class PPSInput():
             @return: list of leaf ncbids
         """
         #for each ncbid: store a path from its parent to the root
-        parentsSet = set([])
+        parentsSet = set()
         for ncbid in ncbidList:
             id = ncbid
             while id in self.ncbidToParentNcbid:
@@ -232,10 +235,10 @@ class PPSInput():
         outNcbids = []
 
         #here also add all ncbids that were assigned with a very high weight, they will stay in the set if possible
-        outNcbidsStaySet = set([])
+        outNcbidsStaySet = set()
         for seq in self.sequences.sequences:
             weight = seq.getTaxonomyPathWeight()
-            if (weight != None) and (weight >= weightStayAll):
+            if (weight is not None) and (weight >= weightStayAll):
                 taxPathDict = seq.getTaxonomyPath()
                 for rankId in range(min(len(taxPathDict), (rankIdCut+1))):
                     ncbid = taxPathDict[taxonomicRanks[rankId]].ncbid
@@ -274,7 +277,7 @@ class PPSInput():
 
         #get leaf ncbids to which at least X% of the sample specific data (that is assigned to the leafs) is assigned
         #(except for ncbids that are in the "stay set" - outNcbidsStaySet)
-        while (True):
+        while True:
             #sums up the data in leafs
             bpInLeafs = 0
             for ncbid in outNcbids:
@@ -285,7 +288,7 @@ class PPSInput():
             minBpLeaf = (bpInLeafs/100.0)*minPercentInLeaf
 
             #for leaf ncbids that don`t contain enough data, put their parents to the candidate list
-            candidateSet = set([])
+            candidateSet = set()
             breakLoop = True
             for ncbid in outNcbids:
                 if self.ncbidToBp[ncbid] < minBpLeaf:
@@ -300,7 +303,7 @@ class PPSInput():
             #transform the candidate set to the ncbids list
             outNcbids = []
             for ncbid in candidateSet:
-                if ncbid != None:
+                if ncbid is not None:
                     outNcbids.append(ncbid)
             outNcbids = self.getLeafs(outNcbids)
 
@@ -309,7 +312,7 @@ class PPSInput():
 
 
         #take only the first X clades (defined by the maxLeafClades)
-        while (len(outNcbids) > maxLeafClades):
+        while len(outNcbids) > maxLeafClades:
             minBp = sys.maxint
             minBpNcbid = -1
             minIdx = -1
@@ -375,7 +378,7 @@ class PPSInput():
 
             @param SSDDir: directory to store the sample specific data
             @param ncbidList: list of all ncbids for which the SSD should be stored
-            @param ncbidToSeqDict: dictionary: ncbid -> list of sequences
+            @param ncbidToSeqDict: ncbid -> list of sequences
             @param forbiddenDict: is a dict of lists (map: ncbid -> list of sequence.id) that contain sequences that
             @param maxSSDfileSize: in bp maximum size of one file, short sequences are eliminated
             @param minSSDfileSize: in bp min size of a file, if there is less data the file won`t be created
@@ -413,10 +416,8 @@ class PPSInput():
                 continue
 
             #filter out short sequences
-            seqCount = None
             if countBp > maxSSDfileSize:
                 seqList.sort(cmp = seqWeightThenLenCmp, reverse=True)#reverse=True
-                #seqCount = 0
                 seqBpCount = 0
                 tmp = []
                 #this filters out only short sequences
@@ -424,7 +425,6 @@ class PPSInput():
                     if (seqBpCount + seq.seqBp) > maxSSDfileSize:
                         continue #was break
                     else:
-                        #seqCount += 1
                         seqBpCount += seq.seqBp
                         tmp.append(seq)
 
@@ -569,7 +569,7 @@ def updateForbiddenList(forbiddenList, filePath):
         if len(list) != len(set):
             print str('There are duplicates in the forbidden list: ' + str(ncbid) + ' ' + str(len(list)) + ' ' + str(len(set)))
             temp = []
-            set = set([])
+            set = set()
             for i in list:
                 if i not in set:
                     temp.append(i)

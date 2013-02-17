@@ -36,7 +36,7 @@ def filterOutLines(inFileName, outFileName, allowedEntriesSet, entryModifyFuncti
     forEachLine(inFileName, parser)
 
 
-def getMapping(inFileName, keyColNum, valColNum, sep=None, comment = '#'):
+def getMapping(inFileName, keyColNum, valColNum, sep=None, comment ='#'):
     """
         Transforms a tab separated file to a dictionary.
 
@@ -45,6 +45,45 @@ def getMapping(inFileName, keyColNum, valColNum, sep=None, comment = '#'):
         @param valColNum: the number of a column that represent values (starting from 0)
     """
     return forEachLine(inFileName, _MappingParser(keyColNum, valColNum, sep, comment)).getDict()
+
+
+def getMappingTuple(inFileName, keyColNumTuple, valColNumTuple, sep=None, comment='#'):
+    """
+        Get a mapping where the key and the the value are tuples that can consist of several columns.
+        E.g map: -> (col1, col2) -> (col5, col4, col3)
+
+        @param inFileName: csv file
+        @param keyColNumTuple: tuple of numbers that define key columns, e.g. (0,1)
+        @param valColNumTuple: tuple of numbers that define value columns, e.g. (4,3,2)
+        """
+    return forEachLine(inFileName,
+        _MappingTupleParser(keyColNumTuple, valColNumTuple, sep=None, comment='#')).getMapping()
+
+class _MappingTupleParser():
+    def __init__(self, keyColNumTuple, valColNumTuple, sep=None, comment='#'):
+        self._map = dict()
+        self._keyColNumTuple = keyColNumTuple
+        self._valColNumTuple = valColNumTuple
+        self._sep = sep
+        self._comment = comment
+
+    def parse(self, line):
+        if not isComment(line, self._comment):
+            tokens = line.split(self._sep)
+            k = []
+            v = []
+            for i in self._keyColNumTuple:
+                k.append(tokens[i])
+            for i in self._valColNumTuple:
+                v.append(tokens[i])
+            assert tuple(k) not in self._map, "Duplicate tuple keys."
+            self._map[tuple(k)] = tuple(v)
+
+    def finalize(self):
+        pass
+
+    def getMapping(self):
+        return self._map
 
 
 def forEachLine(filePath, parser):

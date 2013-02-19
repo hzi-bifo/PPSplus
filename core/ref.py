@@ -6,22 +6,120 @@ import glob
 import sqlite3
 
 from com.config import Config
+from com import taxonomy_ncbid
+
+class RefSequences():
+    def __init__(self, refDir, databaseFilePath):
+        """
+            Provides information about NCBI reference sequences.
+
+            @param refDir: directory that contains reference sequences, each file has format ncbi_taxon_id.[0-9]+.fna(fas)
+                for instance 382638.1.fna or 2110.1.fas
+            @param databaseFilePath: ncbi taxonomy file in sqlite3 format
+        """
+        self._taxonIdSet = set()
+        self._taxonIdToSize = {}
+        for fileName in os.listdir(refDir):
+            if fileName.endswith(('.fna', '.fas')):
+                taxonId = int(fileName[0:fileName.index('.')])
+                self._taxonIdSet.add(taxonId)
+                self._taxonIdToSize[taxonId] = int(os.path.getsize(os.path.join(refDir, fileName)))
+        self._taxonomy = taxonomy_ncbid.TaxonomyNcbi(databaseFilePath, considerNoRank=True)
+        self._childrenBuffer = {}
+        self._rankBuffer = {}
+
+    def _getChildren(self, taxonId):
+        """
+            Returns a set of taxonIds of child clades.
+            @rtype: set
+        """
+        if taxonId in self._childrenBuffer:
+            return self._childrenBuffer[taxonId]
+        else:
+            children = set(self._taxonomy.getChildrenNcbids(taxonId))
+            self._childrenBuffer[taxonId] = children
+            return children
+
+    def _getRank(self, taxonId):
+        """
+            Returns taxonomic rank
+            @param taxonId: ncbi taxon id
+            @rtype: str
+        """
+        if taxonId in self._rankBuffer:
+            return self._rankBuffer[taxonId]
+        else:
+            rank = self._taxonomy.getRank(taxonId)
+            self._rankBuffer[taxonId] = rank
+            return rank
+
+    def isRefSufficient(self, taxonId, minTotalCount, minBpPerSpeciesCount):
+        """
+            Returns true if the reference contains sufficient number of sequences to model a clade.
+            @param taxonId: a clade to be modelled
+            @param minTotalCount:
+            @param minBpPerSpeciesCount:
+            @rtype: bool
+        """
+        speciesToBpDict = {}
+        self._collectRef(taxonId, False, speciesToBpDict, minTotalCount, minBpPerSpeciesCount)
+        count = 0.001
+        for v in speciesToBpDict.itervalues():
+            if v >= minBpPerSpeciesCount:
+                count += 1.0
+            else:
+                count += float(v) / float(minBpPerSpeciesCount)
+        if count > minTotalCount:
+            return True
+        else:
+            return False
+
+    def _collectRef(self, taxonId, isUnderSpecies, speciesToBpDict, minTotalCount, minBpPerSpeciesCount):
+        if not isUnderSpecies:
+            isSpecies = bool(self._getRank(taxonId) == 'species')
+            if isSpecies:
+                speciesToBpDict[taxonId] = 0
+
+        #if (isSpecies or isSpeciesOrUnder) and (taxonId in self._taxonIdSet):
+        #    assert taxonId in speciesToBpDict
+        #    speciesToBpDict[taxonId] += self._taxonIdToSize[taxonId]
+
+        ####### continue !!!!!!!!!!
+
+
+
+
+        #else:
+        #    for i in self._getChildren(taxonId):
+        #        isSpecies = bool(self._getRank(taxonId) == 'species')
+        #        self._collectRef(i, )
+
+
+
+
+    def close(self):
+        self._taxonomy.close()
+
+
+
+
+
+
 
 
 class DBData():
 
     def __init__(self, ncbiProcessDir, databaseFile):
         self._databaseFile = databaseFile
-        #buffer genome/WGS info
+        # buffer genome/WGS info
         count = 0
-        self._ncbiBuffer = set([]) #set of ncbids for which there is a genome/WGS in the database
+        self._ncbiBuffer = set()  # set of ncbids for which there is a genome/WGS in the database
         for filePath in glob.glob(os.path.join(os.path.normpath(ncbiProcessDir),'*.[0-9]*.f[an][sa]')):
             count += 1
             ncbid = int(re.sub(os.path.join(r'.*[^0-9]([0-9]+).[0-9]+.f[an][sa]$'),r'\1' ,filePath))
             self._ncbiBuffer.add(ncbid)
             #print ncbid
-        print count, 'genomes/WGS found in directory ', os.path.normpath(ncbiProcessDir)
-
+        print('%s ref. sequences found in directory: %s' % (count, os.path.normpath(ncbiProcessDir)))
 
     def getGenomeWgsCount(self, ncbid, threshold):
         """
@@ -46,7 +144,6 @@ class DBData():
             cursor.close()
             conn.close()
 
-
     def _genomeExists(self, listOfNcbids):
         """
             Gets the first ncbid of species/subspecies from the input list that is contained in the directory.
@@ -63,10 +160,10 @@ class DBData():
                 return ncbid
         return None
 
-
     def _collectSpecies(self, speciesIds, cursor, root, threshold):
         """
-            @param speciesIds: output list of ncbids (species or subspecies) for which there are genomes/wgs in the directory
+            @param speciesIds: output list of ncbids (species or subspecies) for which there are genomes/wgs in
+                the directory
         """
         if len(speciesIds) >= threshold:
             return
@@ -79,8 +176,8 @@ class DBData():
             list = []
             list.append(root)
             self._collectSubSpecies(list, cursor, root)
-            ncbid = self._genomeExists(list) #now check if at least one genome exists from the list
-            if ncbid != None:
+            ncbid = self._genomeExists(list)  # now check if at least one genome exists from the list
+            if ncbid is not None:
                 speciesIds.append(ncbid)
         else:
             cursor.execute('SELECT ncbi_taxon_id FROM taxon T WHERE T.parent_taxon_id=?',(root,))

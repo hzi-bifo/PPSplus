@@ -26,20 +26,20 @@ class PPSInput():
         self.sequences = sequences
         self.taxonomicRanks = taxonomicRanks
 
-        self.ncbidToSequences = dict([])      #map: ncbid -> list of sequences
-        self.ncbidToBp = dict([])             #map: ncbid -> # of BP that map to this ncbi node and its children
-        self.ncbidToRankId = dict([])         #map: ncbid -> rankId
-        self.ncbidToName = dict([])           #map: ncbid -> name
-        self.ncbidToParentNcbid = dict([])    #map: ncbid -> parent_ncbid or None
-        self.ncbidToJumpedRanksNum = dict([]) #map: ncbid -> number of ranks that one has to be jumped to get to the next defined rank
-
-        #self.rankToNodesDict = dict([])
-        #self.ncbidToSequences = dict([])
+        self.ncbidToSequences = {}      # map: ncbid -> list of sequences
+        self.ncbidToBp = {}             # map: ncbid -> # of BP that map to this ncbi node and its children
+        self.ncbidToRankId = {}         # map: ncbid -> rankId
+        self.ncbidToName = {}           # map: ncbid -> name
+        self.ncbidToParentNcbid = {}    # map: ncbid -> parent_ncbid or None
+        self.ncbidToJumpedRanksNum = {} # map: ncbid -> number of ranks that one has to be jumped to get to the next
+                                        # defined rank
+        #self.rankToNodesDict = {}
+        #self.ncbidToSequences = {}
         #map: rank -> list of Nodes (ncbids)
         #map: rank -> set of ncbids
 
         #transform forbiddenDict to forbidden sets
-        forbiddenDictSet = dict([])
+        forbiddenDictSet = {}
         if forbiddenDict is not None:
             for ncbid in forbiddenDict:
                 forbiddenDictSet[ncbid] = set(forbiddenDict[ncbid])
@@ -70,7 +70,7 @@ class PPSInput():
                 else:
                     ignoreSeq = False
 
-                if taxonomyPath[self.taxonomicRanks[rankIdx]].isCopy(): #if this rank is not specified in the taxonomy
+                if taxonomyPath[self.taxonomicRanks[rankIdx]].isCopy():  # if this rank is not specified in the taxonomy
                     if ncbid not in self.ncbidToJumpedRanksNum:
                         #get down to a specified real node
                         idx = rankIdx
@@ -78,7 +78,7 @@ class PPSInput():
                             idx += 1
                             if not taxonomyPath[self.taxonomicRanks[idx]].isCopy():
                                 break
-                        #go up and count fake nodes (where there is not corresponding node in the taxonomy)
+                        # go up and count fake nodes (where there is not corresponding node in the taxonomy)
                         fn = 0
                         idx -=1
                         while idx >=0:
@@ -93,10 +93,10 @@ class PPSInput():
                 if not ignoreSeq:
                     if ncbid not in self.ncbidToSequences:
                         self.ncbidToSequences[ncbid] = []
-                    self.ncbidToSequences[ncbid].append(sequence) #ncbid -> list of sequences
+                    self.ncbidToSequences[ncbid].append(sequence)  # ncbid -> list of sequences
 
                 if ncbid not in self.ncbidToRankId:
-                    self.ncbidToRankId[ncbid] = rankIdx # one ncbid -> more ranks ids
+                    self.ncbidToRankId[ncbid] = rankIdx  # one ncbid -> more ranks ids
                 else:
                     assert self.ncbidToRankId[ncbid] == rankIdx
 
@@ -111,7 +111,7 @@ class PPSInput():
                     parentNcbid = None
                     while idx > 0:
                         if not taxonomyPath[self.taxonomicRanks[int(idx - 1)]].isCopy():
-                            parentNcbid = int(taxonomyPath[self.taxonomicRanks[int(idx - 1)]].ncbid) #parent !!!
+                            parentNcbid = int(taxonomyPath[self.taxonomicRanks[int(idx - 1)]].ncbid)  # parent !!!
                             break
                         idx -= 1
                 else:
@@ -122,7 +122,7 @@ class PPSInput():
                 else:
                     assert self.ncbidToParentNcbid[ncbid] == parentNcbid
 
-        for ncbid in self.ncbidToSequences: #sums up all sequences that can be used to model this clade
+        for ncbid in self.ncbidToSequences:  # sums up all sequences that can be used to model this clade
             seqList = self.ncbidToSequences[ncbid]
             sum = 0
             for seq in seqList:
@@ -136,11 +136,11 @@ class PPSInput():
         """
             Summary (e.g. which clades can be modeled)
 
-            @param ncbidList: list of all ncbids that are considered in the summary (e.g. all clades that can be modeled)
+            @param ncbidList: list of all ncbids that are considered in the summary
+                (e.g. all clades that can be modeled)
             @param toFile: the summary will be stored to this file (if != None)
             @param alsoPrint: whether the summary should be printed to the stdout
         """
-
         sumEntry = []
         for ncbid in ncbidList:
             seqNum = len(self.ncbidToSequences[ncbid])
@@ -344,7 +344,7 @@ class PPSInput():
 
 
         #Store the Clades to Model
-        print 'Nodes--------------------------------------------'
+        print('Nodes--------------------------------------------')
         for ncbid in outNcbids:
             print ncbid
 
@@ -363,7 +363,7 @@ class PPSInput():
         finally:
             f.close()
 
-        print 'Sample specific data------------------------------------'
+        print('Sample specific data------------------------------------')
 
         #Store the sample specific data
         self.storeSSD(outTrainDataDir, outNcbids, self.ncbidToSequences, fastaLineMaxChar, forbiddenDict, minSSDfileSize, maxSSDfileSize)
@@ -402,7 +402,7 @@ class PPSInput():
                     if seq.id not in forbiddenSet:
                         temp.append(seq)
                     else:
-                        print 'skip seq_id:', seq.id, ' for ncbid:', ncbid
+                        print('skip seq_id: %s for ncbid: %s' % (seq.id, ncbid))
                 if len(temp) == 0:
                     continue #no SSD will be stored for this ncbid
                 else:
@@ -417,7 +417,7 @@ class PPSInput():
 
             #filter out short sequences
             if countBp > maxSSDfileSize:
-                seqList.sort(cmp = seqWeightThenLenCmp, reverse=True)#reverse=True
+                seqList.sort(cmp=seqWeightThenLenCmp, reverse=True)#reverse=True
                 seqBpCount = 0
                 tmp = []
                 #this filters out only short sequences

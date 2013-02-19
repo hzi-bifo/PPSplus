@@ -3,12 +3,9 @@
 import os
 import re
 
-from com.common import noNewLine
-from com.taxonomy_ncbid import TaxonomyNcbi
-from com.csv import getColumnAsList
-from com.csv import OutFileBuffer
-from com.csv import forEachLine
 from com import csv
+from com import common
+from com import taxonomy_ncbid
 from core.taxonomy import Taxonomy
 
 
@@ -59,7 +56,7 @@ def readPPSOutput(sequences, taxonomy, inputFastaIdsPPSFile, overwriteAllPlaceme
     else:
         #i = 0
         for line in f:
-            line = noNewLine(line)
+            line = common.noNewLine(line)
             if re.match(r'^[0-9]+_[0-9]+.*[^0-9]+[0-9]+[^0-9]*$', line):
                 scaffoldId = int(re.sub(r'^([0-9]+)_[0-9]+.*[^0-9]+[0-9]+[^0-9]*$',r'\1' ,line))
                 contigId = int(re.sub(r'^[0-9]+_([0-9]+).*[^0-9]+[0-9]+[^0-9]*$',r'\1' ,line))
@@ -152,11 +149,11 @@ def ppOut2PPSout():
     inFile = '/Users/ivan/Documents/work/binning/data/HumanGut/PP/TS29_scaff.file.0.5.txt'
     outFile = '/Users/ivan/Documents/work/binning/data/HumanGut/PP/TS29_scaff.file.0.5.PPS.txt'
     dbFile = '/Users/ivan/Documents/work/binning/taxonomy/20120828/ncbitax_sqlite.db' #DB
-    taxonomy = TaxonomyNcbi(dbFile)
+    taxonomy = taxonomy_ncbid.TaxonomyNcbi(dbFile)
 
     out = csv.OutFileBuffer(outFile)
 
-    forEachLine(inFile, PP2PPSoutParser(taxonomy, out))
+    csv.forEachLine(inFile, PP2PPSoutParser(taxonomy, out))
 
     out.close()
 
@@ -223,11 +220,11 @@ def genomesToMask():
     #outFile2 = '/Users/ivan/Documents/work/binning/data/V35/genome_ncbids_species.txt' #output file
     #fileName='/Users/ivan/Documents/work/binning/data/V35/genome_ncbids.txt' #list of all genome ncbids
     dbFile = '/Users/ivan/Documents/work/binning/taxonomy/20120828/ncbitax_sqlite.db' #DB
-    out = OutFileBuffer(outFile)
-    out2 = OutFileBuffer(outFile2)
+    out = csv.OutFileBuffer(outFile)
+    out2 = csv.OutFileBuffer(outFile2)
 
-    genomeNcbids = getColumnAsList(fileName, entryModifyFunction=None, colNum=0, sep=None, comment='#')
-    taxonomy = TaxonomyNcbi(dbFile)
+    genomeNcbids = csv.getColumnAsList(fileName, entryModifyFunction=None, colNum=0, sep=None, comment='#')
+    taxonomy = taxonomy_ncbid.TaxonomyNcbi(dbFile)
 
     maskNcbids = []
     #print len(genomeNcbids), genomeNcbids

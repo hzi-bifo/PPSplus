@@ -57,11 +57,12 @@ def getMappingTuple(inFileName, keyColNumTuple, valColNumTuple, sep=None, commen
         @param valColNumTuple: tuple of numbers that define value columns, e.g. (4,3,2)
         """
     return forEachLine(inFileName,
-        _MappingTupleParser(keyColNumTuple, valColNumTuple, sep=None, comment='#')).getMapping()
+        _MappingTupleParser(keyColNumTuple, valColNumTuple, sep=sep, comment=comment)).getMapping()
+
 
 class _MappingTupleParser():
     def __init__(self, keyColNumTuple, valColNumTuple, sep=None, comment='#'):
-        self._map = dict()
+        self._map = {}
         self._keyColNumTuple = keyColNumTuple
         self._valColNumTuple = valColNumTuple
         self._sep = sep

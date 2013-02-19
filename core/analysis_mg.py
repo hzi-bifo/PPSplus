@@ -9,6 +9,7 @@ from Bio import SeqIO
 from com.csv import forEachLine
 from com.csv import isComment
 from com.csv import OutFileBuffer
+from com import common
 from core.dna_to_prot import dnaToProt
 
 
@@ -16,8 +17,9 @@ class _MgFiles():
     """
         Helper class to store all paths to the marker gene files.
     """
-    def __init__(self):
-        self.mgDict = dict([])
+    def __init__(self, mgDir):
+        self.mgDict = dict()
+        self.mgDir = mgDir # contains all marker genes
 
     def parse(self, line):
         val = line.split('\t')
@@ -26,8 +28,8 @@ class _MgFiles():
 
     def addFilePath(self, geneName, fileType, filePath):
         if geneName not in self.mgDict:
-            self.mgDict[geneName] = dict([])
-        self.mgDict[geneName][fileType] = os.path.normpath(filePath)
+            self.mgDict[geneName] = dict()
+        self.mgDict[geneName][fileType] = os.path.join(self.mgDir, os.path.normpath(filePath))
 
     def getFilePath(self, geneName, fileType):
         if (geneName in self.mgDict) and (fileType in self.mgDict[geneName]):
@@ -47,7 +49,7 @@ class _MgRegions():
         Helper class to read the hmmer dom? file to get the regions that correspond to the Amphora marker genes.
     """
     def __init__(self):
-        self.entryDict = dict([])
+        self.entryDict = dict()
 
     def parse(self, line):
         if not isComment(line, '#'):
@@ -113,7 +115,9 @@ class MarkerGeneAnalysis():
         Main class to perform the marker gene analysis based on the Amphora marker genes.
     """
     def __init__(self, config, configMG, configRRNA16S, mgWorkingDir):
-        self.markerGeneListFile = os.path.normpath(configMG.get('markerGeneListFile'))
+        self.markerGeneListFileDir = os.path.normpath(configMG.get('mgDatabase'))
+        self.markerGeneListFile = os.path.join(self.markerGeneListFileDir, 'content.csv')
+        #self.markerGeneListFile = os.path.normpath(configMG.get('markerGeneListFile'))
         self.markerGeneWorkingDir = mgWorkingDir #os.path.normpath(configMG.get('markerGeneWorkingDir'))
         self.hmmInstallDir = os.path.normpath(configRRNA16S.get('rnaHmmInstallDir'))
         self.hmmerBinDir = os.path.normpath(configRRNA16S.get('hmmerBinDir'))
@@ -128,7 +132,7 @@ class MarkerGeneAnalysis():
             Run hmmer HMM and mothur classify (bayesian), same param as for the 16S analysis.
         """
         #read list of marker genes
-        mgFiles = forEachLine(self.markerGeneListFile, _MgFiles())
+        mgFiles = forEachLine(self.markerGeneListFile, _MgFiles(self.markerGeneListFileDir))
 
         #translate DNA to protein sequences
         fastaFileProt = os.path.join(self.markerGeneWorkingDir, str(os.path.basename(fastaFileDNA) + '.PROT'))
@@ -151,7 +155,7 @@ class MarkerGeneAnalysis():
         #run HMM search
         mgList = mgFiles.getGeneNameList()
 
-        if outLog != None:
+        if outLog is not None:
             stdoutLog = open(outLog,'w')
         else:
             stdoutLog = subprocess.STDOUT
@@ -169,7 +173,7 @@ class MarkerGeneAnalysis():
 
             #define cmd
             for i in range(2):
-                if hmmFileArray[i] != None:
+                if hmmFileArray[i] is not None:
                     cmdArray.append(str(os.path.join(self.hmmerBinDir, 'hmmsearch') + ' --domtblout ' + domFileArray[i] + ' -E 0.01'
                                + ' -o ' + outFileArray[i] + ' ' + hmmFileArray[i] + ' ' + fastaFileProt))
                 else:
@@ -177,7 +181,7 @@ class MarkerGeneAnalysis():
 
             #run cmd
             for cmd in cmdArray:
-                if cmd != None and os.name == 'posix':
+                if cmd is not None and os.name == 'posix':
                     hmmProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self.hmmInstallDir, stdout=stdoutLog)
                     print 'run cmd:', cmd
                     hmmProc.wait()
@@ -188,7 +192,7 @@ class MarkerGeneAnalysis():
             #get regions that match to the HMM profile ()
             entryDictList = []
             for i in range(2):
-                if cmdArray[i] != None:
+                if cmdArray[i] is not None:
                     entryDictList.append(forEachLine(domFileArray[i], _MgRegions()).getEntryDict())
                 else:
                     entryDictList.append(None)
@@ -267,7 +271,7 @@ class MarkerGeneAnalysis():
             #run mothur classify (bayesian? the same as for the 16S analysis)
             templateFile = mgFiles.getFilePath(geneName, 'templateDNA')
             taxonomyFile = mgFiles.getFilePath(geneName, 'taxonomyDNA')
-            assert ((templateFile != None) and (taxonomyFile != None))
+            assert ((templateFile is not None) and (taxonomyFile is not None))
             cmd = str('time ' + self.mothur + ' "#classify.seqs(fasta=' + regionDnaFasta + ', template=' + templateFile
                 + ', taxonomy=' +  taxonomyFile + ', ' + self.mothurParam + ')"')
             if os.name == 'posix':
@@ -280,18 +284,20 @@ class MarkerGeneAnalysis():
 
             #transform the mothur output to a simple output (name, ncbid, weight)
 
-            mothurPredFileName = os.path.join(self.markerGeneWorkingDir,
-                                              str(geneName + '_dna.' + os.path.basename(taxonomyFile) + 'onomy'))  # taxonomy
+            #mothurPredFileName = os.path.join(self.markerGeneWorkingDir,
+            #                                  str(geneName + '_dna.' + os.path.basename(taxonomyFile) + 'onomy'))  # taxonomy
+            #!!!!!!!!!!!!!
+            mothurPredFileName = common.getMothurOutputFilePath(regionDnaFasta, taxonomyFile)
             outPredFileName = os.path.join(self.markerGeneWorkingDir,
                                            str(os.path.basename(fastaFileDNA) + '_' + geneName + '.mP'))
-            outBuffer = OutFileBuffer(outPredFileName, bufferText = True)
+            outBuffer = OutFileBuffer(outPredFileName, bufferText=True)
             forEachLine(mothurPredFileName, _MothurOutFileParser(outBuffer, geneName))
 
             if not outAllBuffer.isEmpty():
                 outAllBuffer.writeText('\n')
             outAllBuffer.writeText(outBuffer.getTextBuffer())
 
-        if outLog != None:
+        if outLog is not None:
             stdoutLog.close()
         outAllBuffer.close()
 

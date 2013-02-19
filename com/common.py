@@ -28,6 +28,22 @@ def createTagFilePath(dstDir, fileNameFromPath, tag):
                                                             + '.' + tag))))
 
 
+def getMothurOutputFilePath(inputFastaFilePath, refTaxonomyFilePath):
+    """
+        Returns mothur prediction file path that is generated based on the arguments of the Mothur classify command.
+    """
+    dirName = os.path.dirname(inputFastaFilePath)
+    fastaBaseName = os.path.basename(inputFastaFilePath)
+    fastaPart = fastaBaseName[0:fastaBaseName.rindex('.')] # without suffix
+    taxBaseName = os.path.basename(refTaxonomyFilePath)
+    taxPart = taxBaseName[0:taxBaseName.rindex('.')] # without suffix
+    if '.' in taxPart:
+        taxPart = taxPart[(taxPart.rindex('.') + 1):] # from last comma till the end
+
+    return os.path.join(dirName, str(fastaPart + '.' + taxPart + '.taxonomy'))
+
+
+
 def seqFileCmp(file1, file2):
     """
         Returns true if two files contain the same sequences regardless of their names (and empty spaces).
@@ -108,10 +124,14 @@ def seqFileToSeqList(file):
 
 
 if __name__ == "__main__":
+    inputFastaFilePath = '/net/metagenomics/projects/PPSmg/tests/V35/07/working/contigsMappedBlast1000.fna.ids.23S_rRNA.fna'
+    refTaxonomyFilePath = '/net/metagenomics/projects/PPSmg/data/silva/lsuparc_silva106_ncbitax.bacteria+archaea.tax'
+    print getMothurOutputFilePath(inputFastaFilePath, refTaxonomyFilePath)
+
     #file = "200643.1.fna"
-    file1="/Users/ivan/Documents/work/binning/database/silva/align/LSURef_106_tax_silva_trunc.fasta"
-    file2="/Users/ivan/Documents/work/binning/database/silva/lsuparc_silva106_ncbitax.bacteria+archaea.fna"
-    print seqFileCmp(file1, file2)
+    #file1="/Users/ivan/Documents/work/binning/database/silva/align/LSURef_106_tax_silva_trunc.fasta"
+    #file2="/Users/ivan/Documents/work/binning/database/silva/lsuparc_silva106_ncbitax.bacteria+archaea.fna"
+    #print seqFileCmp(file1, file2)
     #seqFileCmp(str("D:\\A_Phylo\\A_Metagenomic\\pPPS\\workspace\\pPPS\\toKaustubh\\variant01\\trainingData\\" + file),
     #           str("D:\\A_Phylo\\A_Metagenomic\\pPPS\\workspace\\pPPS\\toKaustubh\\variant02\\trainingData\\" + file))
     #filePath = "dir/input.n.fas"

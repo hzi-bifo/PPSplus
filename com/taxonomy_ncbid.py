@@ -12,7 +12,6 @@ class TaxonomyNcbi():
 
         @author: Ivan
     """
-
     def __init__(self, databaseFile,
                  allowedRanks=['root','superkingdom','phylum','class','order','family','genus','species'],
                  considerNoRank=False):
@@ -30,7 +29,6 @@ class TaxonomyNcbi():
         except Exception:
             sys.stderr.write(str('TaxonomyNcbi: Failed to create connection to database: ' + databaseFile))
             raise
-
 
     def getScientificName(self, ncbid, checkRank=False):
         """
@@ -53,7 +51,6 @@ class TaxonomyNcbi():
             sys.stderr.write(str('TaxonomyNcbi: Cannot find name for ncbi: ' + str(ncbid)))
             return None
 
-
     def getNcbid(self, scientificName, checkRank = False):
         """
             @return: ncbid or None
@@ -74,7 +71,6 @@ class TaxonomyNcbi():
             else:
                 sys.stderr.write(str('TaxonomyNcbi: scientific name "' + scientificName + '" is ambiguous!\n'))
             return None
-
 
     def getNcbid2(self, name, checkRank = False):
         """
@@ -98,8 +94,7 @@ class TaxonomyNcbi():
                 sys.stderr.write(str('TaxonomyNcbi: scientific name "' + name + '" is ambiguous!\n'))
             return None
 
-
-    def getChildrenNcbids(self, ncbid): #SELECT T1.ncbi_taxon_id from taxon T1 where T1.parent_taxon_id=818;
+    def getChildrenNcbids(self, ncbid):  # SELECT T1.ncbi_taxon_id from taxon T1 where T1.parent_taxon_id=818;
         self.cursor.execute(str('SELECT T1.ncbi_taxon_id from taxon T1 where T1.parent_taxon_id=?'),(ncbid,))
         result = self.cursor.fetchall()
         if len(result) == 0:
@@ -109,7 +104,6 @@ class TaxonomyNcbi():
             for i in result:
                 resultList.append(i[0])
             return resultList
-
 
     def getParentNcbid(self, ncbid):
         """
@@ -130,7 +124,6 @@ class TaxonomyNcbi():
             if (rank in self._allowedRanks) or (ncbid == 1 and 'root' in self._allowedRanks):
                 return ncbid
 
-
     def getParentsNcbidSet(self, ncbid):
         """
             @return: set of parent ncbi taxon ids.
@@ -146,7 +139,6 @@ class TaxonomyNcbi():
                 s.add(currentId)
         return s
 
-
     def getRank(self, ncbid, checkRank = False):
         """
             @return: rank or None
@@ -155,7 +147,6 @@ class TaxonomyNcbi():
         if checkRank and (not self.isRankNcbidAllowed(ncbid)):
             return None
         return self._getRank(self._getTaxonId(ncbid))
-
 
     def isRankNcbidAllowed(self, ncbid):
         """
@@ -168,7 +159,6 @@ class TaxonomyNcbi():
         else:
             return False
 
-
     def isRankAllowed(self, rank):
         """
             @rtype: bool
@@ -178,13 +168,11 @@ class TaxonomyNcbi():
         else:
             return False
 
-
     def exists(self, ncbid):
         if self._getTaxonId(ncbid) is None:
             return False
         else:
             return True
-
 
     def close(self):
         """
@@ -192,7 +180,6 @@ class TaxonomyNcbi():
         """
         self.cursor.close()
         self.conn.close()
-
 
     def _getTaxonId(self, ncbid):
         if ncbid is None:
@@ -207,7 +194,6 @@ class TaxonomyNcbi():
             return None
         return int(result[0][0])
 
-
     def _getParentNcbid(self, taxonId):
         if taxonId is None:
             return None
@@ -217,7 +203,6 @@ class TaxonomyNcbi():
             sys.stderr.write(str('TaxonomyNcbi: Cannot find parent for taxon_id' + str(taxonId)))
             return None
         return int(result[0][0])
-
 
     def _getRank(self, taxonId):
         if taxonId is None:

@@ -1,6 +1,7 @@
 from Bio.Seq import Seq
 from com.taxonomy_ncbid import TaxonomyNcbi
 import com.fasta as fas
+import os
 
 __author__ = 'ivan'
 
@@ -23,7 +24,9 @@ def sayHi(uu, ss, bb):
     print a
 
     b='jkgh'
-    b=[]
+    b.replace
+
+
 
     print(uu + ss + bb)
 
@@ -35,11 +38,20 @@ def taxPlay(db):
         @param db: taxonomy
             @type db: TaxonomyNcbi
     """
-    #db.getScientificName()
+
+
     pass
 
+def test2():
+    s = 'lsuparc_silva106_ncbitax.bacteria+archaea.tax'
+    print s[(s.rindex('.', 0, s.rindex('.')) + 1):s.rindex('.')]
+    print 'done'
+
 def stat():
-    file = '/Volumes/hera - net/metagenomics/projects/PPSmg/data/mercier50/nobackup/seed0/soap_.contig'
+    file = '/Volumes/hhu-hera/PPSmg/data/mercier50/nobackup/seed0/soap_.contig'
+    #file = '/Volumes/hhu-hera/PPSmg/data/mercier50/nobackup/seed5/soap_.contig'
+    #file = '/Volumes/hhu-hera/PPSmg/data/mercier50/nobackup/seed5_63mer/soap_.contig'
+    #file = '/Volumes/hhu-hera/PPSmg/data/mercier50/nobackup/seed5_127/soap_seed5_127.contig'
     #fas.fastaFileToDict(file)
     c = 0
     bp = 0
@@ -54,3 +66,4 @@ def stat():
 
 if __name__ == "__main__":
     stat()
+    #test2()

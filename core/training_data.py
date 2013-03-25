@@ -8,7 +8,8 @@ import glob
 from core.sequences import Sequences
 from core.sequences import seqWeightThenLenCmp
 from core.taxonomy import Taxonomy
-from core.ref import DBData
+#from core.ref import DBData
+from core.ref import RefSequences
 from com import common
 from com.config import Config
 from com.config import Config2
@@ -212,7 +213,7 @@ class PPSInput():
 
 
     def createPPSInputFiles(self, outFilePath, outTrainDataDir, rankIdAll, rankIdCut, rankIdCutMinBp, minPercentInLeaf,
-                            maxLeafClades, minBpToModel, minGenomesWgs, wgsGenomesDir, forbiddenDict, dbFile, taxonomicRanks,
+                            maxLeafClades, minBpToModel, minGenomesWgs, minBpPerSpecies, wgsGenomesDir, forbiddenDict, dbFile, taxonomicRanks,
                             fastaLineMaxChar, minSSDfileSize, maxSSDfileSize, weightStayAll, summaryTrainFile=None):
         """
             Create the input of PhyloPythiaS: a list of clades (ncbids) that will be modeled and corresponding sample specific data
@@ -226,6 +227,7 @@ class PPSInput():
             @param maxLeafClades: this is the maximum number of leaf clades that will be considered
             @param minBpToModel: a clade can be modeled if there is at least this amount of the sample specific data assigned to it
             @param minGenomesWgs: a clade can be modeled if there is at least this number of genomes/draft genomes in the public DB
+            @param minBpPerSpecies: all reference sequences must sum up to at least this number, otherwise the species won't be counted (or partly?)
             @param wgsGenomesDir: a directory where the genomes/draft genomes are stored (ncbid.1.fas/fna)
             @param forbiddenDict: a dict (ncbid -> list of seq.ids) of data that can`t be used as the sample specific data
         """
@@ -261,16 +263,19 @@ class PPSInput():
 
         #delete all ncbids for which there is not enough training data, i.e. sample specific data or genomes/draft genomes
         temp = []
-        dbData = DBData(wgsGenomesDir, dbFile)
+        # dbData = DBData(wgsGenomesDir, dbFile)
+        refData = RefSequences(wgsGenomesDir, dbFile)
         for ncbid in outNcbids:
             if self.ncbidToBp[ncbid] >= minBpToModel:
                 temp.append(ncbid)
                 continue
-            if dbData.getGenomeWgsCount(ncbid, minGenomesWgs) >= minGenomesWgs:
+            #if dbData.getGenomeWgsCount(ncbid, minGenomesWgs) >= minGenomesWgs:
+            if refData.isRefSufficient(ncbid, minGenomesWgs, minBpPerSpecies):
                 temp.append(ncbid)
                 continue
             print 'There is not enough data to model: ', ncbid
         outNcbids = temp
+        refData.close()
 
         #delete all ncbids that are not leafs
         outNcbids = self.getLeafs(outNcbids)
@@ -581,6 +586,9 @@ def updateForbiddenList(forbiddenList, filePath):
 
 
 def test():
+    """
+        @deprecated: old test
+    """
 
     config = Config(open(os.path.normpath('D:\\A_Phylo\\A_Metagenomic\\pPPS\\workspace\\pPPS\\config01.cfg')), 'pPPS')
     configMl = Config2(config, 'MLTreeMap')

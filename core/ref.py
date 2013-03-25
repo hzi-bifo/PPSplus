@@ -8,25 +8,33 @@ import sqlite3
 from com.config import Config
 from com import taxonomy_ncbid
 
+
 class RefSequences():
     def __init__(self, refDir, databaseFilePath):
         """
-            Provides information about NCBI reference sequences.
+            Provides information about NCBI reference sequences (genomes or draft genomes).
 
-            @param refDir: directory that contains reference sequences, each file has format ncbi_taxon_id.[0-9]+.fna(fas)
-                for instance 382638.1.fna or 2110.1.fas
+            @param refDir: directory that contains reference sequences,
+                each file has format ncbi_taxon_id.[0-9]+.fna(fas), for instance 382638.1.fna or 2110.1.fas
             @param databaseFilePath: ncbi taxonomy file in sqlite3 format
         """
-        self._taxonIdSet = set()
-        self._taxonIdToSize = {}
+        assert os.path.isdir(refDir)
+        assert os.path.isfile(databaseFilePath)
+        self._taxonIdSet = set()  # taxonIds in the reference
+        self._taxonIdToSize = {}  # taxonId -> cumulative file size
         for fileName in os.listdir(refDir):
             if fileName.endswith(('.fna', '.fas')):
                 taxonId = int(fileName[0:fileName.index('.')])
                 self._taxonIdSet.add(taxonId)
-                self._taxonIdToSize[taxonId] = int(os.path.getsize(os.path.join(refDir, fileName)))
+                fileSize = int(os.path.getsize(os.path.join(refDir, fileName)))
+                if taxonId in self._taxonIdToSize:
+                    self._taxonIdToSize[taxonId] += fileSize
+                else:
+                    self._taxonIdToSize[taxonId] = fileSize
         self._taxonomy = taxonomy_ncbid.TaxonomyNcbi(databaseFilePath, considerNoRank=True)
-        self._childrenBuffer = {}
-        self._rankBuffer = {}
+        self._childrenBuffer = {}  # taxonId -> set of children taxon Ids
+        self._rankBuffer = {}  # taxonId -> rank
+
 
     def _getChildren(self, taxonId):
         """
@@ -36,14 +44,17 @@ class RefSequences():
         if taxonId in self._childrenBuffer:
             return self._childrenBuffer[taxonId]
         else:
-            children = set(self._taxonomy.getChildrenNcbids(taxonId))
+            childrenList = self._taxonomy.getChildrenNcbids(taxonId)
+            if childrenList is None:
+                children = None
+            else:
+                children = set(childrenList)
             self._childrenBuffer[taxonId] = children
             return children
 
     def _getRank(self, taxonId):
         """
-            Returns taxonomic rank
-            @param taxonId: ncbi taxon id
+            Returns taxonomic rank of given taxonId.
             @rtype: str
         """
         if taxonId in self._rankBuffer:
@@ -56,58 +67,157 @@ class RefSequences():
     def isRefSufficient(self, taxonId, minTotalCount, minBpPerSpeciesCount):
         """
             Returns true if the reference contains sufficient number of sequences to model a clade.
-            @param taxonId: a clade to be modelled
-            @param minTotalCount:
-            @param minBpPerSpeciesCount:
+
+            @param taxonId: search reference for this clade
+            @param minTotalCount: minimum number of reference sequences for this clade
+            @param minBpPerSpeciesCount: a sequence file will be counted only proportionally if it contains less
+                than this number of bp
             @rtype: bool
         """
-        speciesToBpDict = {}
-        self._collectRef(taxonId, False, speciesToBpDict, minTotalCount, minBpPerSpeciesCount)
-        count = 0.001
-        for v in speciesToBpDict.itervalues():
-            if v >= minBpPerSpeciesCount:
-                count += 1.0
+        assert isinstance(taxonId, int)
+        assert isinstance(minTotalCount, int)
+        assert isinstance(minBpPerSpeciesCount, int)
+        info = self._Info(taxonId, minTotalCount, minBpPerSpeciesCount)
+        self._collectSpecies(taxonId, info)
+        #print info.inspectedSpecTaxonId, info.collected  # debug !!!
+        return info.isSufficient()
+
+    class _Info():
+        def __init__(self, taxonId, minTotalCount, minBpPerSpeciesCount):
+            """
+                Helper class that contains the current state of the search.
+            """
+            self.taxonId = taxonId
+            self.minTotalCount = minTotalCount
+            self.minBpPerSpeciesCount = minBpPerSpeciesCount
+            self.collected = 0.0001  # number of sequences collected so far
+            self.specTaxonIdToCount = {}
+            self.inspectedSpecTaxonId = set()  # species taxonIds for which there is enough reference data
+
+        def isSufficient(self):
+            """"  Returns true if enough data has been found so far. """
+            if self.collected > self.minTotalCount:
+                return True
             else:
-                count += float(v) / float(minBpPerSpeciesCount)
-        if count > minTotalCount:
-            return True
+                return False
+
+        def isSpecSufficient(self, specTaxonId):
+            """ Returns true if enough data has been found for this species. """
+            return specTaxonId in self.inspectedSpecTaxonId
+
+        def update(self, specTaxonId, size):
+            """"
+                Updates the current state.
+
+                @param specTaxonId: species taxon id for which some data was found
+                @param size: file size of a subspecies
+            """
+            if specTaxonId in self.inspectedSpecTaxonId:  # this species has already been inspected
+                return
+
+            if size < self.minBpPerSpeciesCount:
+                count = float(size) / float(self.minBpPerSpeciesCount)
+            else:
+                count = 1.0001
+
+            if specTaxonId in self.specTaxonIdToCount:
+                if self.specTaxonIdToCount[specTaxonId] < 1.0:
+                    self.specTaxonIdToCount[specTaxonId] += count
+            else:
+                self.specTaxonIdToCount[specTaxonId] = count
+
+            if self.specTaxonIdToCount[specTaxonId] > 1.0:
+                self.collected += 1.0
+                self.inspectedSpecTaxonId.add(specTaxonId)
+
+    def _collectSpecies(self, taxonId, info):
+        """
+            @param taxonId: taxon id of species or higher ranks (or any if species not defined)
+            @type info: _Info
+        """
+        if info.isSufficient():
+            return
+
+        if self._getRank(taxonId) == "species":
+            self._collectStrains(taxonId, taxonId, info)
         else:
-            return False
+            children = self._getChildren(taxonId)
+            if children is None:
+                self._collectStrains(taxonId, taxonId, info)
+            else:
+                for id in children:
+                    self._collectSpecies(id, info)
+                    if info.isSufficient():
+                        break
 
-    def _collectRef(self, taxonId, isUnderSpecies, speciesToBpDict, minTotalCount, minBpPerSpeciesCount):
-        if not isUnderSpecies:
-            isSpecies = bool(self._getRank(taxonId) == 'species')
-            if isSpecies:
-                speciesToBpDict[taxonId] = 0
+    def _collectStrains(self, specTaxonId, currentTaxonId, info):
+        """
+            @param specTaxonId: species taxonId (or lower if species not defined)
+            @param currentTaxonId: current taxon id is at species rank or lower
+            @type info: _Info
+        """
+        if info.isSpecSufficient(specTaxonId) or info.isSufficient():
+            return
 
-        #if (isSpecies or isSpeciesOrUnder) and (taxonId in self._taxonIdSet):
-        #    assert taxonId in speciesToBpDict
-        #    speciesToBpDict[taxonId] += self._taxonIdToSize[taxonId]
+        if currentTaxonId in self._taxonIdSet:  # there is a reference
+            size = self._taxonIdToSize[currentTaxonId]
+            # print currentTaxonId, size  # debug
+            info.update(specTaxonId, size)
 
-        ####### continue !!!!!!!!!!
+        if info.isSpecSufficient(specTaxonId):
+            return
 
+        children = self._getChildren(currentTaxonId)
+        if children is not None:
+            for id in children:
+                self._collectStrains(specTaxonId, id, info)
 
-
-
-        #else:
-        #    for i in self._getChildren(taxonId):
-        #        isSpecies = bool(self._getRank(taxonId) == 'species')
-        #        self._collectRef(i, )
-
-
-
+    def getNonBacterialNonArchaeal(self):
+        """ Returns a list of non Bacterial or non Archaeal ncbi taxon ids that are in the reference. """
+        returnList = []
+        for taxonId in self._taxonIdSet:
+            parentSet = self._taxonomy.getParentsNcbidSet(taxonId)
+            if (2 not in parentSet) and (2157 not in parentSet):
+                returnList.append(taxonId)
+        return 'count:', len(returnList), 'list of ncbi taxon ids: ', returnList
 
     def close(self):
         self._taxonomy.close()
 
 
+def testBacteriaArchaea():
+    refDir = '/Users/ivan/Documents/nobackup/sequences'
+    databaseFilePath = '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db'
+    r = RefSequences(refDir, databaseFilePath)
+    print r.getNonBacterialNonArchaeal()
+    r.close()
+    #('count:', 7, 'list: ', [117575, 1051631, 396359, 683735, 977801, 1126885, 658056])
 
 
+def testRefSequences():
+    refDir = '/Users/ivan/Documents/nobackup/sequences'
+    databaseFilePath = '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db'
+    taxonId = 119066  # 2130  # 186803
+    minTotalCount = 3  # 43
+    minBpPerSpeciesCount = 280000
+    r = RefSequences(refDir, databaseFilePath)
+    print r. isRefSufficient(taxonId, minTotalCount, minBpPerSpeciesCount)
+    r.close()
+
+    # next to check: 658089
+    # set([237576, 658088, 796942, 33039, 712976, 796945, 936594, 33043, 45851, 658081, 658082, 658083, 658085, 658086, 658087, 652712, 658089, 1322, 29360, 177972, 712414, 658655, 39486, 168384, 742723, 40520, 552395, 652706, 665937, 33038, 166486, 410072, 43995, 665950, 665951, 796943, 796944, 53443, 360807, 88431, 105841, 301301, 43305])
+    # True
 
 
+if __name__ == "__main__":
+    # testBacteriaArchaea()
+    testRefSequences()
 
 
 class DBData():
+    """
+        @deprecated: use class RefSequences instead
+    """
 
     def __init__(self, ncbiProcessDir, databaseFile):
         self._databaseFile = databaseFile
@@ -222,7 +332,7 @@ def test(ncbid):
     #print count, 'genomes/wgs for ncbid:', ncbid
 
 
-if __name__ == "__main__":
+#if __name__ == "__main__":
   #test(122)
   #haveData(126)
   #haveData(84999) #Coriobacteriales
@@ -231,7 +341,7 @@ if __name__ == "__main__":
   #haveData(171551) #Porphyromonadaceae
   #haveData(171552) #Prevotellaceae
   #haveData(171550) #Rikenellaceae
-  test(976) #Bacteroidetes
+  ###test(976) #Bacteroidetes
   #haveData(200666) #Sphingobacteriales
   #haveData(768503) #Cytophagia
   #haveData(117743) #Flavobacteria
@@ -267,4 +377,3 @@ if __name__ == "__main__":
 
   #haveData(278082) #Victivallales
   #haveData(256845) #Lentisphaerae
-

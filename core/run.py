@@ -314,6 +314,7 @@ def main():
             int(config.get('maxLeafClades')),
             int(config.get('minBpToModel')),
             int(config.get('minGenomesWgs')),
+            int(config.get('minBpPerSpecies')),
             os.path.normpath(config.get('genomesWGS')),
             None, #forbiddenDict
             databaseFile,

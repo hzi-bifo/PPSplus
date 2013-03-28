@@ -114,17 +114,17 @@ class MarkerGeneAnalysis():
     """
         Main class to perform the marker gene analysis based on the Amphora marker genes.
     """
-    def __init__(self, config, configMG, configRRNA16S, mgWorkingDir):
-        self.markerGeneListFileDir = os.path.normpath(configMG.get('mgDatabase'))
+    def __init__(self, config, workingDir, mgWorkingDir):
+        self.markerGeneListFileDir = os.path.normpath(config.get('mgDatabase'))
         self.markerGeneListFile = os.path.join(self.markerGeneListFileDir, 'content.csv')
         #self.markerGeneListFile = os.path.normpath(configMG.get('markerGeneListFile'))
         self.markerGeneWorkingDir = mgWorkingDir #os.path.normpath(configMG.get('markerGeneWorkingDir'))
-        self.hmmInstallDir = os.path.normpath(configRRNA16S.get('rnaHmmInstallDir'))
-        self.hmmerBinDir = os.path.normpath(configRRNA16S.get('hmmerBinDir'))
-        self.mothurParam = configRRNA16S.get('mothurClassifyParamOther')
-        self.workingDir = os.path.normpath(config.get('workingDir'))
-        self.hmmerBinDir = os.path.normpath(configRRNA16S.get('hmmerBinDir'))
-        self.mothur = os.path.join(os.path.normpath(configRRNA16S.get('mothurInstallDir')), 'mothur')
+        self.hmmInstallDir = os.path.normpath(config.get('rnaHmmInstallDir'))
+        self.hmmerBinDir = os.path.normpath(config.get('hmmerBinDir'))
+        self.mothurParam = config.get('mothurClassifyParamOther')
+        self.workingDir = workingDir
+        self.hmmerBinDir = os.path.normpath(config.get('hmmerBinDir'))
+        self.mothur = os.path.join(os.path.normpath(config.get('mothurInstallDir')), 'mothur')
 
 
     def runMarkerGeneAnalysis(self, fastaFileDNA, outLog=None):

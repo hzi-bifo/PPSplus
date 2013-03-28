@@ -12,7 +12,6 @@ from core.taxonomy import Taxonomy
 from core.ref import RefSequences
 from com import common
 from com.config import Config
-from com.config import Config2
 from old.ml_tree_map import placeSequences
 
 
@@ -591,8 +590,6 @@ def test():
     """
 
     config = Config(open(os.path.normpath('D:\\A_Phylo\\A_Metagenomic\\pPPS\\workspace\\pPPS\\config01.cfg')), 'pPPS')
-    configMl = Config2(config, 'MLTreeMap')
-    configPPS = Config2(config, 'PPS')
 
     #read sequences
     sequences = Sequences(config) #!!!
@@ -603,7 +600,7 @@ def test():
     #taxonomy
     taxonomy = Taxonomy(config.get('databaseFile'), config.get('taxonomicRanks').split(','))
 
-    placeSequences(sequences, taxonomy, configMl.get('final_RAxML_outputs'))
+    placeSequences(sequences, taxonomy, config.get('final_RAxML_outputs'))
 
     if eval(config.get('placeContigsFromTheSameScaffold')):
         sequences.placeContigsFromTheSameScaffold(taxonomy)
@@ -612,7 +609,7 @@ def test():
 
     pps = PPSInput(sequences, config.get('taxonomicRanks').split(','), config.get('summaryAllFile'))
 
-    pps.createPPSInputFiles(configPPS.get('nodesFile'), configPPS.get('trainingDataDir'),
+    pps.createPPSInputFiles(config.get('nodesFile'), config.get('trainingDataDir'),
                         int(config.get('rankIdAll')), int(config.get('rankIdCut')), int(config.get('rankIdCutMinBp')),
                         int(config.get('minTrainingBp')),
                         int(config.get('fastaLineMaxChar')), config.get('summaryTrainFile'))

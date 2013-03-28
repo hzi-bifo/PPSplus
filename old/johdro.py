@@ -6,7 +6,6 @@ import subprocess
 
 from com import common
 from com.config import Config
-from com.config import Config2
 
 class Johdro():
     def __init__(self, config, configJoh):
@@ -178,8 +177,7 @@ class Johdro():
 def test():
 
     config = Config(open(os.path.normpath('D:\\A_Phylo\\A_Metagenomic\\pPPS\\workspace\\pPPS\\config01.cfg')), 'pPPS')
-    configJoh = Config2(config, 'Johdro')
-    johdro = Johdro(configJoh)
+    johdro = Johdro(config)
     #sequences = Sequences(config)
     #sequences.writeSequences(config.get('inputIdsFastaFile'))
     #taxonomy = Taxonomy(config.get('databaseFile'), config.get('taxonomicRanks').split(','))

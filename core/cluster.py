@@ -7,7 +7,6 @@ import subprocess
 import glob
 
 from com.config import Config
-from com.config import Config2
 from com.csv import forEachLine
 from com.csv import OutFileBuffer
 from com.csv import getMapping
@@ -17,10 +16,8 @@ from com.fasta import fastaFileToDict
 class MGCluster():
     """ Main class """
 
-    def __init__(self, config, configRRNA16S, configMG, mgWorkingDir, s16Prefix, sequences, taxonomy, sampleName):
+    def __init__(self, config, mgWorkingDir, s16Prefix, sequences, taxonomy, sampleName):
         self._config = config
-        self._configRRNA16S = configRRNA16S
-        self._configMG = configMG
         self._mgWorkingDir = mgWorkingDir
         self._taxonomicRanks = config.get('taxonomicRanks').split(',')
         self._minBpToModel = int(config.get('minBpToModel'))
@@ -663,11 +660,9 @@ class TCluster():
 
 def test():
     config = Config(open('/Users/ivan/Documents/work/binning/tests/CowRumen/03/config.cfg'), 'pPPS')
-    configRRNA16S = Config2(config, 'RRNA16S')
-    configMG = Config2(config, 'MarkerGenes')
     mgWorkingDir = '/Users/ivan/Documents/work/binning/tests/CowRumen/03/working/mgWorking'
     s16Prefix = '/Users/ivan/Documents/work/binning/tests/CowRumen/03/working/cow_rumen_fragmented_velvet_assembly_scaffolds.fas.ids'
-    clust = MGCluster(config, configRRNA16S, configMG, mgWorkingDir, s16Prefix)
+    clust = MGCluster(config, mgWorkingDir, s16Prefix)
     clust.preprocess(align=False, dm=False, cluster=False, readData=True)
     #clust.buildSpecificPred()
 

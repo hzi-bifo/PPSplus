@@ -2,30 +2,129 @@
 
 import argparse
 
-from com.csv import predToDict
-from com.fasta import getSequenceToBpDict
-from com.taxonomy_ncbid import TaxonomyNcbi
+from com import csv
+from com import fasta
+from com import taxonomy_ncbid
+
+
+class _TaxonomyWrapperA():
+    """
+        Wraps the functionality of the database.
+    """
+
+    def __init__(self, databaseFile):
+        self._taxonomy = taxonomy_ncbid.TaxonomyNcbi(databaseFile)
+        self._rankToId = dict()
+        self._ncbidToRankId = dict()
+        self._predAtRankId = dict()  # rankId -> ncbid -> ncbid at given rank
+        self._noDefAtRankId = dict()  # rankId -> set of ncbids for which the ncbid at given rank is not defined
+        self._ncbidToNcbidParent = dict()  # ncbid -> parent ncbid
+
+        id = 0
+        for rank in taxonomy_ncbid.TAXONOMIC_RANKS:
+            self._rankToId[rank] = id
+            self._predAtRankId[id] = dict()
+            self._noDefAtRankId[id] = set()
+            id += 1
+
+    def _getRankId(self, ncbid):
+        """
+            Gets a rankId given an ncbi taxon id
+            @rtype: int
+        """
+        rankId = self._ncbidToRankId.get(ncbid, None)
+        if rankId is not None:
+            return rankId
+        else:
+            rank = self._taxonomy.getRank(ncbid)
+            if rank is None:
+                return None
+            else:
+                rankId = self._rankToId.get(rank, None)
+                self._ncbidToRankId[ncbid] = rankId
+                return rankId
+
+    def _getParent(self, ncbid):
+        """
+            Gets direct parent ncbi taxon id.
+        """
+        parent = self._ncbidToNcbidParent.get(ncbid, None)
+        if parent is None:
+            parent = self._taxonomy.getParentNcbid(ncbid)
+            self._ncbidToNcbidParent[ncbid] = parent
+        return parent
+
+    def getPredDictAtRank(self, seqToNcbid, rank):
+        """
+            Gets predictions at the given rank as a dictionary.
+
+            @param seqToNcbid: contain mapping, sequence name -> ncbi taxon id
+            @type seqToNcbid: dict
+            @param rank: the resulting dictionary will contain predictions a this rank
+            @type rank: str
+            @return: mapping, sequence name -> ncbi taxon id at given rank
+            @rtype: dict
+        """
+        rankId = self._rankToId[rank]
+        retDict = dict()
+        predAtRankBuff = self._predAtRankId[rankId]
+        noDefAtRankBuff = self._noDefAtRankId[rankId]
+
+        for seq, ncbid in seqToNcbid.iteritems():
+
+            pred = predAtRankBuff.get(ncbid, None)
+            if pred is not None:
+                retDict[seq] = pred  # we already know the ncbid at given rank
+                continue
+
+            if ncbid in noDefAtRankBuff:
+                continue  # the ncbid is not defined at this rank (we already know)
+
+            ncbidRankId = self._getRankId(ncbid)
+            if ncbidRankId is None:
+                noDefAtRankBuff.add(ncbid)
+                continue  # we have just found out that the ncbid is not defined at this rank
+
+            if ncbidRankId == rankId:  # the ncbid is defined already at the right rank
+                predAtRankBuff[ncbid] = ncbid
+                retDict[seq] = ncbid
+
+            if ncbidRankId > rankId:  # the right ncbid is defined at a higher rank
+                current = self._getParent(ncbid)
+                while current is not None:
+                    currentRankId = self._getRankId(current)
+                    if currentRankId == rankId:
+                        retDict[seq] = current
+                        predAtRankBuff[ncbid] = current
+                        break
+                    current = self._getParent(current)
+
+        return retDict
+
+    def close(self):
+        self._taxonomy.close()
 
 
 class Accuracy():
     """
         Implements computation of the "precision" and "recall" according to different definitions.
     """
-    def __init__(self, fastaFilePath, predFilePath, trueFilePath, databaseFile, ranks):
-        self._seqToBp = getSequenceToBpDict(fastaFilePath)
-        self._seqToPred = predToDict(predFilePath)
-        self._seqToTrue = predToDict(trueFilePath)
-        self._taxonomy = _TaxonomyWrapperA(databaseFile, ranks)
 
-    def getAccuracy(self, rank, minFracClade, minFracPred=None, asBp=False, weightAccordingBinSize=False):
+    def __init__(self, fastaFilePath, predFilePath, trueFilePath, databaseFile):
+        self._seqToBp = fasta.getSequenceToBpDict(fastaFilePath)
+        self._seqToPred = csv.predToDict(predFilePath)
+        self._seqToTrue = csv.predToDict(trueFilePath)
+        self._taxonomy = _TaxonomyWrapperA(databaseFile)
+
+    def getAccuracy(self, rank, minFracClade=None, minFracPred=None, asBp=True, weightAccordingBinSize=True):
         """
             Precision (specificity) and Recall (sensitivity) according to PhyloPythiaS and PhyloPythia papers.
 
             The number of classes correspond to the number of classes in the true reference and param "minFracClades".
 
-            @param rank: on which taxonomic ranks the predictions are made
+            @param rank: on which taxonomic rank the predictions should be considered
             @param minFracClade: a clade is considered only if the dataset (true predictions) contain at least this
-                          fraction of sequences that belong to the clade.
+                          fraction of sequences that belong to the clade
             @param minFracPred: a clade is considered only if the corresponding predicted bins contain at least this
                          fraction of the overall sequences (None ~ this criteria is not considered and only
                          true "reference" bins are used for the comparison).
@@ -36,15 +135,17 @@ class Accuracy():
         """
         predAtRankDict = self._taxonomy.getPredDictAtRank(self._seqToPred, rank)
         trueAtRankDict = self._taxonomy.getPredDictAtRank(self._seqToTrue, rank)
-        tp = dict([]) # class label -> count of sequences correctly assigned to clade i
-        t = dict([])  # class label -> true count of sequences of clade i
-        p = dict([])  # class label -> count of sequences assigned to clade i
-        tpOther = 0   # count of sequences correctly unassigned
-        tOther = 0    # true count of sequences that are unassigned at given rank
+        tp = dict()  # class label -> count of sequences correctly assigned to clade i
+        t = dict()  # class label -> true count of sequences of clade i
+        p = dict()  # class label -> count of sequences assigned to clade i
+        tpOther = 0  # count of sequences correctly unassigned
+        tOther = 0  # true count of sequences that are unassigned at given rank
 
-        for seq in self._seqToPred:
+        # iterate over all sequences
+        for seq, seqLen in self._seqToBp.iteritems():
+            # bp
             if asBp:
-                bp = self._seqToBp[seq]
+                bp = seqLen
             else:
                 bp = 1
 
@@ -66,46 +167,47 @@ class Accuracy():
             if seq in predAtRankDict:
                 j = predAtRankDict[seq]
                 if j not in p:
-                    p[j] =  bp
+                    p[j] = bp
                 else:
                     p[j] += bp
 
             # match
             if i == j and i is not None:
                 if i not in tp:
-                    tp[i] =  bp
+                    tp[i] = bp
                 else:
                     tp[i] += bp
 
-        classesR = t.keys()
-        classesP = p.keys()
+        classesP = p.keys()  # classes for precision
+        classesR = t.keys()  # classes for recall
 
-        #filter out least abundant TRUE clades
-        sum = 0
-        for i in classesR:
-            sum += t[i]
-        rmList = []
-        for i in classesR:
-            if float(t[i])/float(sum) < minFracClade:
-                rmList.append(i)
-        for i in rmList:
-            classesR.remove(i)
+        # filter out least abundant TRUE clades
+        if minFracClade is not None:
+            sum = tOther  # true bin containing all sequences undefined at this rank
+            for i in classesR:
+                sum += t[i]
+            rmList = []
+            for i in classesR:
+                if float(t[i]) / float(sum) < minFracClade:
+                    rmList.append(i)
+            for i in rmList:
+                classesR.remove(i)
+            if float(tOther) / float(sum) < minFracClade:
+                tOther = 0
 
-        #filter out least abundant PREDICTED clades
-        if minFracPred is None:
-            classesP = classesR
-        else:
+        # filter out least abundant PREDICTED clades
+        if minFracPred is not None:
             sum = 0
             for i in classesP:
                 sum += p[i]
             rmList = []
             for i in classesP:
-                if float(p[i])/float(sum) < minFracPred:
+                if float(p[i]) / float(sum) < minFracPred:
                     rmList.append(i)
             for i in rmList:
                 classesP.remove(i)
 
-        #null null elements
+        # zero missing entries
         for i in classesR:
             if i not in tp:
                 tp[i] = 0
@@ -117,11 +219,11 @@ class Accuracy():
             if i not in t:
                 t[i] = 0
 
-        #compute weights of individual bins
-        wp = dict([]) #weights for precision
-        wr = dict([]) #weights for recall
+        wp = dict()  # weights for precision
+        wr = dict()  # weights for recall
         if weightAccordingBinSize:
-            #weights correspond to the number of sequences/bp assigned to individual bins (differ for precision and recall!)
+            # compute weights of individual bins that correspond to the number of bp/sequences
+            # assigned to individual bins
             sumP = 0.0
             sumR = 0.0
             for i in classesP:
@@ -131,256 +233,169 @@ class Accuracy():
             sumR += tOther
 
             for i in classesP:
-                wp[i] = float(p[i])/sumP
+                wp[i] = float(p[i]) / sumP
             for i in classesR:
-                wr[i] = float(t[i])/sumR
+                wr[i] = float(t[i]) / sumR
             if tOther > 0:
-                wrOther = float(tOther)/sumR
+                wrOther = float(tOther) / sumR
         else:
-            #all bins are equally important!
-            for i in classesP: # precision
-                wp[i] = 1.0/float(len(classesP))
+            # all bins are equally important
+            for i in classesP:
+                wp[i] = 1.0 / float(len(classesP))
 
-            for i in classesR: # recall
+            for i in classesR:
                 if tOther > 0:
-                    w = 1.0/float(len(classesR)+1)
+                    w = 1.0 / float(len(classesR) + 1)
                     wr[i] = w
                     wrOther = w
                 else:
-                    wr[i] = 1.0/float(len(classesR))
+                    wr[i] = 1.0 / float(len(classesR))
+        if len(classesR) == 0 and tOther > 0:
+            wrOther = 1.0
 
-        #sch = 0.0
-        #for i in classesP:
-        #    sch += wp[i]
-        #print 'sch P', str(sch)
-        #sch = 0.0
-        #for i in classesR:
-        #    sch += wr[i]
-        #if tOther > 0:
-        #    sch += wrOther
-        #print 'sch R', str(sch)
-
-        #precision
+        # precision
         precision = 0.0
         for i in classesP:
             if p[i] > 0:
-                precision += (float(tp[i])/float(p[i]))*wp[i]
+                precision += (float(tp[i]) / float(p[i])) * wp[i]
 
-        #recall
+        # recall
         recall = 0.0
+        classesRCount = len(classesR)
         for i in classesR:
-            recall += (float(tp[i])/float(t[i]))*wr[i]
-        if tOther != 0:
-            recall += (float(tpOther)/float(tOther))*wrOther
-        #
-        return [precision, recall, len(classesP), len(classesR)]
+            recall += (float(tp[i]) / float(t[i])) * wr[i]
+        if tOther > 0:
+            recall += (float(tpOther) / float(tOther)) * wrOther
+            classesRCount += 1
+            #
+        return [precision, recall, len(classesP), classesRCount]
 
+    def getAccuracyPrint(self, ranks, minFracClade, minFracPred, overview=True, asBp=True, weightAccordingBinSize=True):
+        """
+            Gets the precision and recall values printed as a string
 
-    def test(self):
-        pass
+            @param ranks: compute the precision and recall at these ranks
 
-    def close(self):
-        self._taxonomy.close()
-
-
-class _TaxonomyWrapperA():
-    """ Wraps the functionality of the database. """
-    def __init__(self, databaseFile, ranks):
-        self._taxonomy = TaxonomyNcbi(databaseFile)
-        self._rankToId = dict([])
-        self._ncbidToRankId = dict([])
-        self._parentBuff = dict([]) # rank -> ncbid -> parent ncbid at rank
-        id = 0
+            @rtype: str
+        """
+        buff = '# precision, recall, #classes precision, #classes recall, seq. count/bp, weighted bins\n'
         for rank in ranks:
-            self._rankToId[rank] = id
-            self._parentBuff[id] = dict([])
-            id += 1
+            if overview:  # overview
+                buff += str(rank + ',--,--,--,----------,----------\n')
+                buff += self.getAccuracyPrintEntry(rank, minFracClade, minFracPred, False, False)  # asBp, weighted
+                buff += self.getAccuracyPrintEntry(rank, minFracClade, minFracPred, True, False)
+                buff += self.getAccuracyPrintEntry(rank, minFracClade, minFracPred, False, True)
+                buff += self.getAccuracyPrintEntry(rank, minFracClade, minFracPred, True, True)
+            else:  # custom
+                buff += self.getAccuracyPrintEntry(rank, minFracClade, minFracPred,
+                                                   asBp=asBp, weightAccordingBinSize=weightAccordingBinSize)
+        return buff
 
-    def _getRankId(self, ncbid):
-        if ncbid in self._ncbidToRankId:
-            return self._ncbidToRankId[ncbid]
+    def getAccuracyPrintEntry(self, rank, minFracClade, minFracPred, asBp=True, weightAccordingBinSize=True):
+        p, r, cp, cr = self.getAccuracy(rank, minFracClade, minFracPred, asBp, weightAccordingBinSize)
+        if asBp:
+            c = 'bp'
         else:
-            rank = self._taxonomy.getRank(ncbid)
-            if rank == None:
-                return None
-            else:
-                self._ncbidToRankId[ncbid] = self._rankToId[rank]
-                return self._ncbidToRankId[ncbid]
-
-    def getPredDictAtRank(self, seqToDict, rank):
-        """
-            Gets predictions at the given rank as dict based on the argument dict.
-        """
-        rankId = self._rankToId[rank]
-        outDict = dict([])
-        parentBuff = self._parentBuff[rankId]
-        for seq in seqToDict:
-            ncbid = seqToDict[seq]
-            if ncbid in parentBuff:
-                assert seq not in outDict
-                outDict[seq] = parentBuff[ncbid]
-            else:
-                ncbidRank = self._taxonomy.getRank(ncbid)
-                if ncbidRank != None and self._rankToId[ncbidRank] >= rankId:
-                    if ncbidRank == rank:
-                        outDict[seq] = ncbid
-                    else:
-                        #get parent
-                        current = self._taxonomy.getParentNcbid(ncbid)
-                        while self._taxonomy.getRank(current) != rank and current is not None:
-                            current = self._taxonomy.getParentNcbid(current)
-                        if self._taxonomy.getRank(current) == rank:
-                            outDict[seq] = current
-                            parentBuff[ncbid] = current
-        return outDict
+            c = 'count'
+        if weightAccordingBinSize:
+            w = 'weighted'
+        else:
+            w = 'not weighted'
+        return str('%s, %s, %s, %s, "%s", "%s"\n' % (round(p * 100.0, 1), round(r * 100.0, 1), cp, cr, c, w))
 
     def close(self):
         self._taxonomy.close()
 
 
-def test():
-    fastaFilePath = '/Users/ivan/Documents/work/binning/data/simMC/AMGN_AMD.Arachne.contigs.fna'
-    predFilePath = '/Users/ivan/Documents/work/binning/tests/simMC/AMD05/output/AMGN_AMD.Arachne.contigs.fna.pOUT' #just marker genes
-    #predFilePath = '/Users/ivan/Documents/work/binning/tests/simMC/AMD06/output/AMGN_AMD.Arachne.contigs.fna.pOUT' #with taxator
-    trueFilePath = '/Users/ivan/Documents/work/binning/data/simMC/AMD.Arachne.genus'
-    databaseFile = '/Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db'
-    ranks = ['root','superkingdom','phylum','class','order','family','genus','species']
-    acc = Accuracy(fastaFilePath, predFilePath, trueFilePath, databaseFile, ranks)
-    #acc.test()
-    print 'precision, recall, #classes precision, #classes recall, comment'
-    for rank in ['superkingdom','phylum','class','order','family','genus']:
-        print rank, '--------------------------'
-        #p, r, cp, cr = acc.getAccuracy(rank, minFracClade=0.01, minFracPred=None, asBp=False, weightAccordingBinSize=False)
-        #print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', ~PP paper')
+def _main():
+    parser = argparse.ArgumentParser(
+        description='Computes precision and recall measures according to different definitions.', epilog='')
 
-        #p, r, cp, cr = acc.getAccuracy(rank, minFracClade=0.01, minFracPred=None, asBp=True, weightAccordingBinSize=False)
-        #print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', ~PP paper; in "bp"')
-
-        p, r, cp, cr = acc.getAccuracy(rank, minFracClade=0.001, minFracPred=0.001, asBp=False, weightAccordingBinSize=False)
-        print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', ~PP paper; in "seq"; P~pred classes')
-
-        p, r, cp, cr = acc.getAccuracy(rank, minFracClade=0.001, minFracPred=0.001, asBp=True, weightAccordingBinSize=False)
-        print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', ~PP paper; in "bp"; P~pred classes')
-
-        p, r, cp, cr = acc.getAccuracy(rank, minFracClade=0.001, minFracPred=0.001, asBp=False, weightAccordingBinSize=True)
-        print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', ~PP paper; in "seq. count"; P~pred classes; weighted bins')
-
-        p, r, cp, cr = acc.getAccuracy(rank, minFracClade=0.001, minFracPred=0.001, asBp=True, weightAccordingBinSize=True)
-        print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', ~PP paper; in "bp"; P~pred classes; weighted bins')
-
-    acc.close()
-
-
-def main():
-    parser = argparse.ArgumentParser(description='''Computes precision and recall measures according to different definitions".''',
-                                     epilog='''
-                                     ''')
-
-    parser.add_argument('-f', '--fasta', nargs=1, type=file, required=True,
-                        help='Fasta file.', metavar='contigs.fna',
+    parser.add_argument('-f', '--fasta', nargs=1, type=file, required=True, help='Fasta file.', metavar='contigs.fna',
                         dest='f')
 
     parser.add_argument('-p', '--predictions', nargs=1, type=file, required=True,
-                        help='Tab separated prediction file (first column sequence name, last column predicted ncbid.', metavar='pred.csv',
-                        dest='p')
+                        help='Tab separated prediction file (first column sequence name, last column predicted ncbid).',
+                        metavar='pred.csv', dest='p')
 
     parser.add_argument('-t', '--true-assignments', nargs=1, type=file, required=True,
-                        help='Tab separated true assignments file (first column sequence name, last column predicted ncbid.', metavar='true_assignments.csv',
-                        dest='t')
+                        help='Tab separated true assignments file (first column sequence name, '
+                             'last column predicted ncbid.', metavar='true_assignments.csv', dest='t')
 
     parser.add_argument('-d', '--database', nargs=1, type=file, required=True,
-                        help='Database file in the sqlite3 format.', metavar='ncbitax_sqlite.db',
-                        dest='d')
+                        help='Database file containing the NCBI taxonomy in the sqlite3 format.',
+                        metavar='ncbitax_sqlite.db', dest='d')
 
-    parser.add_argument('-r', '--ranks', nargs=1,
-                        help='Compute the measures only for these ranks (given as comma separated strings) Default ~ consider all ranks.',
-                        metavar='order,family,genus',
-                        dest='r')
+    parser.add_argument('-r', '--ranks', nargs=1, help='Compute the measures only for these ranks (given as comma '
+                                                       'separated strings) Default ~ consider all ranks.',
+                        metavar='order,family,genus', dest='r')
 
     parser.add_argument('-c', '--min-frac-clade', nargs=1,
-                        help=str('A clade is considered only if the dataset (true predictions) contain at least this ' +
-                        'fraction of sequences that belong to the corresponding clade at the corresponding rank. '  +
-                        '(e.g. value 0.01 means that all clades that are considered in the statistics represent at ' +
-                        'least 1%% of the overall dataset) Default ~ 0.01'),
-                        metavar='0.01',
-                        dest='c')
+                        help='A clade is considered in the computation of "Recall" only if the reference (the true '
+                             'assignments) contain at least this fraction of sequences that belong to the '
+                             'corresponding clade at the corresponding rank. (e.g. value 0.01 means that all clades '
+                             'that are considered in the computations of recall represent at least 1%% of the overall '
+                             'dataset) Default ~ 0.01', metavar='0.01', dest='c')
 
     parser.add_argument('-b', '--min-frac-bin', nargs=1,
-                        help='In the computation of precision. A clade is considered only if the corresponding predicted bins contain at least this' +
-                        ' fraction of the overall predicted sequences at the corresponding rank (Default ~ this condition is not considered and only' +
-                        ' true "reference" bins are used for the computation). ' +
-                        ' Default ~ None',
-                        metavar='0.01',
-                        dest='b')
+                        help='In the computation of "Precision". A clade is considered only if the corresponding '
+                             'predicted bins contain at least this fraction of the overall predicted sequences at the '
+                             'corresponding rank (Default ~ 0.01)', metavar='0.01', dest='b')
 
     parser.add_argument('-s', '--consider-seq-len', action='store_true',
-                        help='Compute measures based on the sequence lengths (in bp). Default ~ consider sequence counts.',
-                        dest='s')
+                        help='Compute the measures based on the sequence lengths (in bp). '
+                             '(Default ~ based on sequence counts)', dest='s')
 
     parser.add_argument('-w', '--weight-bins', action='store_true',
-                        help='The measures are computed using weighted averages over bin sizes.' +
-                        ' Size of true bins is used to compute "Recall". Size of predicted bins (if min-frac-bin is used) is used to compute "Precision". ' +
-                        '(Default ~ consider all bins as equal)',
-                        dest='w')
+                        help='The measures are computed using weighted averages over bin sizes. Size of true bins is '
+                             'used to compute "Recall". Size of predicted bins is used to compute "Precision". '
+                             '(Default ~ not weighted)', dest='w')
 
     parser.add_argument('-o', '--overview', action='store_true',
-                        help='Compute the measures according to several default settings. You can still set the (-c) and (-b) options.',
-                        dest='o')
-
+                        help='Compute the measures according to several default settings. '
+                             'You can still set the (-c) and (-b) options.', dest='o')
     args = parser.parse_args()
-
-    ranksAll = ['superkingdom','phylum','class','order','family','genus','species']
 
     if args.r:
         ranks = str(args.r[0].name).split(',')
     else:
-        ranks = ranksAll
+        ranks = taxonomy_ncbid.TAXONOMIC_RANKS[1:]
 
-    #print args.f[0].name
-    #print args.p[0].name
-    #print args.t[0].name
-    #print args.d[0].name
-    #print ranksAll
-
-    #minFracClade
     if args.c:
-        mfc = float(args.c[0])
+        minFracClade = float(args.c[0])
     else:
-        mfc = 0.01
+        minFracClade = 0.01
 
-    #minFracPred (bin)
     if args.b:
-        mfp = float(args.b[0])
+        minFracPred = float(args.b[0])
     else:
-        mfp = 0.01
+        minFracPred = 0.01
 
-    acc = Accuracy(args.f[0].name, args.p[0].name, args.t[0].name, args.d[0].name, ['root','superkingdom','phylum','class','order','family','genus','species'])
+    acc = Accuracy(args.f[0].name, args.p[0].name, args.t[0].name, args.d[0].name)
 
-    print 'precision, recall, #classes precision, #classes recall, comment'
-    for rank in ranks:
-        if args.o: # overview
-            print rank, '--------------------------'
-            p, r, cp, cr = acc.getAccuracy(rank, minFracClade=mfc, minFracPred=mfp, asBp=False, weightAccordingBinSize=False)
-            print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', "in seq count, not weighted"')
+    print(acc.getAccuracyPrint(ranks, minFracClade, minFracPred,
+                               overview=bool(args.o), asBp=bool(args.s), weightAccordingBinSize=bool(args.w)))
+    acc.close()
 
-            p, r, cp, cr = acc.getAccuracy(rank, minFracClade=mfc, minFracPred=mfp, asBp=True, weightAccordingBinSize=False)
-            print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', "in bp, not weighted"')
 
-            p, r, cp, cr = acc.getAccuracy(rank, minFracClade=mfc, minFracPred=mfp, asBp=False, weightAccordingBinSize=True)
-            print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', in sec count"; weighted bins')
-
-            p, r, cp, cr = acc.getAccuracy(rank, minFracClade=mfc, minFracPred=mfp, asBp=True, weightAccordingBinSize=True)
-            print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr) + ', in "bp"; weighted bins')
-
-        else: #custom
-            p, r, cp, cr = acc.getAccuracy(rank, minFracClade=mfc, minFracPred=mfp, asBp=bool(args.s), weightAccordingBinSize=bool(args.w))
-            print str(str(round(p*100.0, 1)) + '%, ' + str(round(r*100.0, 1)) + '%, ' + str(cp) + ', ' + str(cr))
-
+def _test():
+    # -f /Users/ivan/Documents/work/binning/data/simMC/AMGN_AMD.Arachne.contigs.fna
+    # -p /Users/ivan/Documents/work/binning/tests/simMC/AMD05/output/AMGN_AMD.Arachne.contigs.fna.pOUT
+    # -t /Users/ivan/Documents/work/binning/data/simMC/AMD.Arachne.genus
+    # -d /Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db
+    fastaFilePath = '/Users/ivan/Documents/work/binning/data/simMC/AMGN_AMD.Arachne.contigs.fna'
+    # just marker genes
+    predFilePath = '/Users/ivan/Documents/work/binning/tests/simMC/AMD05/output/AMGN_AMD.Arachne.contigs.fna.pOUT'
+    # with taxator
+    #predFilePath = '/Users/ivan/Documents/work/binning/tests/simMC/AMD06/output/AMGN_AMD.Arachne.contigs.fna.pOUT'
+    trueFilePath = '/Users/ivan/Documents/work/binning/data/simMC/AMD.Arachne.genus'
+    databaseFile = '/Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db'
+    ranks = ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
+    acc = Accuracy(fastaFilePath, predFilePath, trueFilePath, databaseFile)
+    print(acc.getAccuracyPrint(ranks, minFracClade=0.01, minFracPred=0.01, overview=True))
     acc.close()
 
 
 if __name__ == "__main__":
-    #if os.getcwd() == '/Users/ivan/Documents/work/python/workspace/pPPS/src':
-    #    test()
-    #else:
-        main()
+    _main()
+    #_test()

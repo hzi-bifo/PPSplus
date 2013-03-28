@@ -273,7 +273,7 @@ class _ColumnEntryListBuffer():
             lineList = line.split(self.sep)
             if len(lineList) > self.colNum:
                 entry = lineList[self.colNum]
-                if self.entryModifyFunction != None:
+                if self.entryModifyFunction is not None:
                     entry = self.entryModifyFunction(entry)
                 self.list.append(entry)
 

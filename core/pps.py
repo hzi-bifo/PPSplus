@@ -80,14 +80,31 @@ def readPPSOutput(sequences, taxonomy, inputFastaIdsPPSFile, overwriteAllPlaceme
         f.close()
 
 
-#!!!set the colNum accordingly (may be 0 and 3???
-def ppsOut2ppOut(inFile, outFile, taxonomy, taxaRanks):
+def ppsOut2ppOut(inFile, outFile, taxonomicRanks, databaseFile):
+    """
+        Transforms a PPS output file into a file in the PP format.
+
+        @param inFile: input file in the PPS format (first column: seq name, last column: ncbi taxon id)
+        @param outFile: output file in the PP format
+        @param taxonomicRanks: taxonomic ranks (starting from superkingdom)
+        @param databaseFile: database file in the sqlite3 format
+    """
+    taxonomy = Taxonomy(databaseFile, taxonomicRanks)
     outBuff = csv.OutFileBuffer(outFile)
     namesList = csv.getColumnAsList(inFile, entryModifyFunction=None, colNum=0, sep='\t', comment='#')
-    ncbidsList = csv.getColumnAsList(inFile, entryModifyFunction=None, colNum=1, sep='\t', comment='#')
+    valCol = 1
+    ncbidsList = csv.getColumnAsList(inFile, entryModifyFunction=None, colNum=valCol, sep='\t', comment='#')
 
-    header = str('#Script ppsOut2ppOut\n#ID' + '\t' + 'root')
-    for rank in taxaRanks:
+    while True:  # this is not efficient!
+        valCol += 1
+        tmpList = csv.getColumnAsList(inFile, entryModifyFunction=None, colNum=valCol, sep='\t', comment='#')
+        if len(tmpList) == len(namesList):
+            ncbidsList = tmpList
+        else:
+            break
+
+    header = str('#PPS file transformed to PP format, input file: ' + str(inFile) + '\n#ID' + '\t' + 'root')
+    for rank in taxonomicRanks:
         header += str('\t' + rank)
     outBuff.writeText(str(header + '\n'))
 
@@ -96,18 +113,20 @@ def ppsOut2ppOut(inFile, outFile, taxonomy, taxaRanks):
         ncbid = ncbidsList[i]
         taxPathDict = taxonomy.getPathToRoot(int(ncbid))
         buff = str(name)
-        if taxPathDict == None:
+        if taxPathDict is None:
             buff += str('\t')
         else:
             buff += str('\t' + 'root')
 
-        for rank in taxaRanks:
-            if (taxPathDict != None) and (rank in taxPathDict) and (not taxPathDict[rank].isCopy()):
+        for rank in taxonomicRanks:
+            if (taxPathDict is not None) and (rank in taxPathDict) and (not taxPathDict[rank].isCopy()):
                 buff += str('\t' + taxPathDict[rank].name)
             else:
                 buff += '\t'
         outBuff.writeText(str(buff + '\n'))
     outBuff.close()
+    taxonomy.close()
+
 
 class PP2PPSoutParser():
 

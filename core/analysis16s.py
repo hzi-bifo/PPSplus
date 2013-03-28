@@ -9,23 +9,23 @@ from Bio import SeqIO
 from com import common
 from com import csv
 
+
 class RRNA16S():
     """
         A class that handels the rRNA 16S analysis.
     """
-    def __init__(self, config, configRRNA16S):
+    def __init__(self, config, workingDir):
         self._config = config
-        self._configRRNA16S = configRRNA16S
-        self._workingDir = os.path.normpath(self._config.get('workingDir'))
-        self._refDir = os.path.normpath(self._configRRNA16S.get('s16Database'))
+        self._workingDir = workingDir
+        self._refDir = os.path.normpath(self._config.get('s16Database'))
         self._refDict = csv.getMappingTuple(os.path.join(self._refDir, 'content.csv'), (0,1), (2,), '\t')
 
     def runHMM(self, inputFastaFile, outLog=None):
         """
             Run the hidden markov model to get regions in the input sequences where the 16S and 23S genes are located.
         """
-        hmmInstallDir = os.path.normpath(self._configRRNA16S.get('rnaHmmInstallDir'))
-        hmmerBinDir = os.path.normpath(self._configRRNA16S.get('hmmerBinDir'))
+        hmmInstallDir = os.path.normpath(self._config.get('rnaHmmInstallDir'))
+        hmmerBinDir = os.path.normpath(self._config.get('hmmerBinDir'))
         regionsFile = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.gff'))
         cmd = str('export PATH=' + hmmerBinDir + ':$PATH; time ' + os.path.join(hmmInstallDir,'rna_hmm3.py') +
                   ' -i ' + inputFastaFile + ' -o ' + regionsFile)
@@ -33,8 +33,8 @@ class RRNA16S():
             if outLog is not None:
                 stdoutLog = open(outLog,'w')
             else:
-                stdoutLog = subprocess.STDOUT #stdout=subprocess.STDOUT
-            hmmProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self._configRRNA16S.get('rnaHmmInstallDir'), stdout=stdoutLog)
+                stdoutLog = subprocess.STDOUT  # stdout=subprocess.STDOUT
+            hmmProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self._config.get('rnaHmmInstallDir'), stdout=stdoutLog)
             print 'run cmd:', cmd
             hmmProc.wait()
             if outLog is not None:
@@ -101,7 +101,7 @@ class RRNA16S():
 
     def _classify(self, mode, inputFastaFile, outLog=None):
 
-        mothur = os.path.join(os.path.normpath(self._configRRNA16S.get('mothurInstallDir')), 'mothur')
+        mothur = os.path.join(os.path.normpath(self._config.get('mothurInstallDir')), 'mothur')
 
         if mode == 16:
             extractedRegionsFasta = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.16S_rRNA.fna'))
@@ -150,7 +150,7 @@ class RRNA16S():
         else:
             raise Exception('Wrong branch')
 
-        param = self._configRRNA16S.get('mothurClassifyParamOther')
+        param = self._config.get('mothurClassifyParamOther')
 
         cmd = str('time ' + mothur + ' "#classify.seqs(fasta=' + extractedRegionsFasta + ', template=' + templateFile
                 + ', taxonomy=' + taxonomyFile + ', ' + param + ')"')

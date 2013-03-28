@@ -10,31 +10,30 @@ from com.common import noNewLine
 
 
 class Sequences():
-    """Represents a set of contigs/sequences
 
-    Attributes:
-        sequences -- list of contigs/sequences
-        scaffolds -- list of corresponding scaffolds
-        sequencesDict -- map: sequence.id -> sequence
-        scaffoldsDict -- map: scaffold.id -> scaffold
-        placedSeqSet -- set of sequence.id to which a taxonomy path was assigned
-        ...
-    """
-    def __init__(self, config, inputFastaFile, inputFastaScaffoldsFile, scaffoldsToContigsMapFile):
+    def __init__(self, inputFastaFile, inputFastaScaffoldsFile, scaffoldsToContigsMapFile, taxonomicRanks, minSeqLen):
+        """
+            Represents a set of contigs/sequences and scaffolds.
 
-        self.sequences = []
-        self.scaffolds = []
-        self.scaffoldsDict = dict([])
-        self.sequencesDict = dict([])
-        self.placedSeqSet = set([])
+            @param config: configuration file.
+            @param inputFastaFile: fasta file with contigs/sequences
+            @param inputFastaScaffoldsFile: fasta file with scaffolds
+            @param scaffoldsToContigsMapFile: mapping file
+            @raise:
+        """
+        self.sequences = []  # list of contigs/sequences
+        self.scaffolds = []  # list of corresponding scaffolds
+        self.scaffoldsDict = {}  # map: sequence.id -> sequence
+        self.sequencesDict = {}  # map: sequence.id -> sequence
+        self.placedSeqSet = set()  # set of sequence.id to which a taxonomy path was assigned
 
-        self.scaffNameToScaff = dict([])
+        self.scaffNameToScaff = {}
 
-        self._scaffoldPattern = config.get('scaffoldPattern')
-        self._taxonomicRanks = config.get('taxonomicRanks').split(',')
-        self._fastaLineMaxChar = int(config.get('fastaLineMaxChar'))
-        self._minSeqLen = int(config.get('minSeqLen'))
-        self._minScaffLen = int(config.get('minScaffLen'))
+        self._scaffoldPattern = '^(.*)'  # config.get('scaffoldPattern')
+        self._taxonomicRanks = taxonomicRanks  # config.get('taxonomicRanks').split(',')
+        self._fastaLineMaxChar = 80  # int(config.get('fastaLineMaxChar'))
+        self._minSeqLen = minSeqLen  # int(config.get('minSeqLen'))
+        self._minScaffLen = self._minSeqLen  # int(config.get('minScaffLen'))
         self._inputFastaFile = inputFastaFile
         self._inputFastaScaffoldsFile = inputFastaScaffoldsFile
         self._scaffoldsToContigsMapFile = scaffoldsToContigsMapFile
@@ -47,7 +46,7 @@ class Sequences():
         self._readContigsScaffolds(self._inputFastaFile, True) # True ~ read contigs
 
         #read scaffolds if available
-        if self._inputFastaScaffoldsFile != None:
+        if self._inputFastaScaffoldsFile is not None:
             self._readContigsScaffolds(self._inputFastaScaffoldsFile, False) #False ~ read scaffolds
             scaffRead = True
         else:
@@ -55,7 +54,7 @@ class Sequences():
 
         #read scaffold-contigs mapping if available (scaff_name tab contig_name)
         #@return: (map: scaff_name -> list of contig names)
-        if self._scaffoldsToContigsMapFile != None:
+        if self._scaffoldsToContigsMapFile is not None:
             scaffToContigListDict = toScafContigMap(self._scaffoldsToContigsMapFile)
             scaffContigMapRead = True
         else:
@@ -65,7 +64,7 @@ class Sequences():
         if (not scaffRead) and (not scaffContigMapRead):
 
             #assigns scaffolds
-            scaffoldDict = dict([])
+            scaffoldDict = dict()
             for s in self.sequences:
                 sn = re.findall(self._scaffoldPattern, s.name);
                 if len(sn) != 1:
@@ -95,15 +94,15 @@ class Sequences():
             #    bind the scaffold and the contig
 
 
-            assSet = set([]) #temp
+            assSet = set()  # temp
 
             count = 0
             for s in self.sequences:
 
                 #got the scaffold name that is not in the mapping!
                 if s.name not in contigToScaffDict:
-                    count += 1 #str('There is no mapping for contig: ' + s.name + ' to the corresponding scaffold')
-                    scaffold = self._addScaff(s.name, None, None) #name the corresponding scaffold as the contig name !!!
+                    count += 1  # str('There is no mapping for contig: ' + s.name + ' to the corresponding scaffold')
+                    scaffold = self._addScaff(s.name, None, None)  # name the corresponding scaffold as the contig name !!!
                 else:
                     scaffoldName = contigToScaffDict[s.name]
                     assSet.add(s.name)
@@ -149,9 +148,9 @@ class Sequences():
 
         #check for duplicate scaffolds
         if scaffRead:
-            hashToSeqIdDict = dict([]) #map: hash -> list of scaff ids
+            hashToSeqIdDict = dict()  # map: hash -> list of scaff ids
             for s in self.scaffolds:
-                if not s.getScaffSeqDef(): #the sequence for this scaffold is not defined
+                if not s.getScaffSeqDef():  # the sequence for this scaffold is not defined
                     continue
                 h = s.getHash()
                 if h in hashToSeqIdDict:
@@ -160,7 +159,7 @@ class Sequences():
                         sh = self.scaffoldsDict[id]
                         s1 = s.getScaff()
                         s2 = sh.getScaff()
-                        assert ((s1 != None) and (s2 != None)), 'The scaffold sequence must be defined'
+                        assert ((s1 is not None) and (s2 is not None)), 'The scaffold sequence must be defined'
                         if s.getSeq() == sh.getSeq():
                             print str('Sequences "' + s.name + '" (' + str(s.id) + ') and "' + sh.name + '" (' + str(sh.id) + ') are identical!')
                     list.append(s.id)
@@ -188,7 +187,7 @@ class Sequences():
                     if seq != '':
                         assert name != ''
                         if readContigs:
-                            self._addSeq(name, seq) #store seq
+                            self._addSeq(name, seq)  # store seq
                         else:
                             self._addScaff(name, None, seq)
                         seq = ''
@@ -276,7 +275,7 @@ class Sequences():
         if len(placementList) >= 1:
 
             for e in weightsList:
-                if e == None:
+                if e is None:
                     cWeights.append(50.0) # if a weight is not known, it is considered to be 50.0
                 else:
                     cWeights.append(e)
@@ -382,7 +381,7 @@ class Sequences():
             #place all not placed sequences based on one placed sequence
             if (len(placedSeqList) == 1) and (len(notPlacedSeqList) > 0) and assignNotAssigned:
                 taxPathDict = placedSeqList[0].getTaxonomyPath()
-                assert (taxPathDict != None) and (len(taxPathDict) > 0)
+                assert (taxPathDict is not None) and (len(taxPathDict) > 0)
                 for seq in notPlacedSeqList:
                     t = taxonomy.replicateTaxPathDict(taxPathDict)
                     self.setTaxonomyPath(seq.id, scaffold.id, t, placedSeqList[0].getTaxonomyPathWeight())
@@ -394,7 +393,7 @@ class Sequences():
                 weightsList = []
                 for seq in placedSeqList:
                     tp = seq.getTaxonomyPath()
-                    assert (tp != None) and (len(tp) > 0)
+                    assert (tp is not None) and (len(tp) > 0)
                     taxPathDictList.append(tp)
                     weightsList.append(seq.getTaxonomyPathWeight())
 
@@ -405,7 +404,7 @@ class Sequences():
 
                 taxPathDict = taxonomy.getLongestCommonPathFromMultipleAssignments2(assignmentsA, agThreshold)
 
-                if taxPathDict != None:
+                if taxPathDict is not None:
 
                     for seq in placedSeqList:
                         t = taxonomy.replicateTaxPathDict(taxPathDict)
@@ -435,9 +434,9 @@ class Sequences():
             f = open(os.path.normpath(outFile), 'w')
             k = 0
             if writeSeq:
-                list = self.sequences #write sequences
+                list = self.sequences  # write sequences
             else:
-                list = self.scaffolds # write scaffolds
+                list = self.scaffolds  # write scaffolds
 
             for seq in list:
                 if seq.seqBp == 0:
@@ -445,11 +444,11 @@ class Sequences():
 
                 if writeIds:
                     if writeSeq:
-                        name = str(str(seq.scaffold.id) + '_' + str(seq.id)) #sequence
+                        name = str(str(seq.scaffold.id) + '_' + str(seq.id))  # sequence
                     else:
-                        name = str(seq.id) #scaffold
+                        name = str(seq.id)  # scaffold
                 else:
-                    if outputFileContigSubPattern == None:
+                    if outputFileContigSubPattern is None:
                         name = seq.name
                     else:
                         name = re.sub(outputFileContigSubPattern, r'\1' , seq.name)
@@ -496,9 +495,9 @@ class Sequences():
             f = open(os.path.normpath(mapFilePath), 'w')
             k = 0
             if forSequences:
-                list = self.sequences #for sequences
+                list = self.sequences  #for sequences
             else:
-                list = self.scaffolds #for scaffolds
+                list = self.scaffolds  #for scaffolds
 
             for seq in list:
                 if k == 0:
@@ -549,12 +548,12 @@ class Sequences():
             for seq in self.sequences:
                 entry = str('\n' + re.sub(outputFileContigSubPattern, r'\1' , seq.name))
                 taxPathDict = seq.getTaxonomyPath()
-                if taxPathDict == None:
+                if taxPathDict is None:
                     entry += str('\t')
                 else:
                     entry += str('\t' + 'root')
                 for rank in taxaRanks:
-                    if (taxPathDict != None) and (rank in taxPathDict) and (not taxPathDict[rank].isCopy()):
+                    if (taxPathDict is not None) and (rank in taxPathDict) and (not taxPathDict[rank].isCopy()):
                         entry += str('\t' + taxPathDict[rank].name)
                     else:
                         entry += '\t'
@@ -577,7 +576,7 @@ class Sequences():
                 taxPathDict = seq.getTaxonomyPath()
                 ncbid = 1
                 for rank in taxaRanks:
-                    if ((taxPathDict != None) and (rank in taxPathDict)):
+                    if ((taxPathDict is not None) and (rank in taxPathDict)):
                         ncbid = taxPathDict[rank].ncbid
                     else:
                         break
@@ -610,7 +609,7 @@ class Sequences():
             #what is the deapest assignment of a contig
             depth = 0
             for contig in scaff.contigs:
-                if contig.getTaxonomyPath() != None:
+                if contig.getTaxonomyPath() is not None:
                     d = len(contig.getTaxonomyPath())
                     if d > depth:
                         depth = d
@@ -618,7 +617,7 @@ class Sequences():
             length = 0
             deapest = None
             for contig in scaff.contigs:
-                if contig.getTaxonomyPath() != None:
+                if contig.getTaxonomyPath() is not None:
                     if len(contig.getTaxonomyPath()) == depth:
                         if contig.seqBp > length:
                             deapest = contig
@@ -672,7 +671,7 @@ def toScafContigMap(scafContigFile):
 
         @return: map: scaffold -> list of contigs
     """
-    scafToContigs = dict([])
+    scafToContigs = dict()
     try:
         f = open(os.path.normpath(scafContigFile),'r')
     except Exception:
@@ -702,7 +701,7 @@ def toContigScafMap(scaffToContigListDict):
 
         @return: map: contig name -> scaffold name
     """
-    contigToScaffDict = dict([])
+    contigToScaffDict = dict()
     for scaff in scaffToContigListDict:
         for contig in scaffToContigListDict[scaff]:
             assert contig not in contigToScaffDict, str('Contig: ' + contig + ' is not allowed to be twice in the directory!')
@@ -712,7 +711,7 @@ def toContigScafMap(scaffToContigListDict):
 
 def replaceIdsWithNames(outputFileContigSubPattern, nameToIDsFile, targetFile, outFile):
     """
-        NOT IMPLEMENTED YET!!!
+        @deprecated: NOT IMPLEMENTED YET!!!
         replace ids with names
         @param nameToIdsFile: file that contains lines: contigName tab contigID
         @param targetFile: file that contain in the first column scaffoldID_contigID which will be replaced by its name
@@ -753,7 +752,7 @@ def seqWeightThenLenCmp(seq1, seq2):
     """
     weight1 = seq1.getTaxonomyPathWeight()
     weight2 = seq2.getTaxonomyPathWeight()
-    if (weight1 != None) and (weight2 != None):
+    if (weight1 is not None) and (weight2 is not None):
         if (weight1 - weight2) < 0:
             return -1
         else:
@@ -764,7 +763,7 @@ def seqWeightThenLenCmp(seq1, seq2):
 
 
 #---------------------------------------------------
-def test():
+def _test():
 #s = Sequence(1, 'seqName','AATTGGCCC\n\rAAA\n')
 #print 'sequence name: ', s.seqName
 #print 'sequence:', s.getSeq()
@@ -795,4 +794,4 @@ def test():
 
 
 if __name__ == "__main__":
-  test()
+    _test()

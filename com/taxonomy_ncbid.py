@@ -4,6 +4,7 @@ import os
 import sys
 import sqlite3
 
+TAXONOMIC_RANKS = ['root','superkingdom','phylum','class','order','family','genus','species']
 
 class TaxonomyNcbi():
     """
@@ -12,9 +13,7 @@ class TaxonomyNcbi():
 
         @author: Ivan
     """
-    def __init__(self, databaseFile,
-                 allowedRanks=['root','superkingdom','phylum','class','order','family','genus','species'],
-                 considerNoRank=False):
+    def __init__(self, databaseFile, allowedRanks=TAXONOMIC_RANKS, considerNoRank=False):
         """
             @param databaseFile: usually file named "ncbitax_sqlite.db"
             @param allowedRanks: taxonomic ranks that will be considered (where 'root' is the root of the taxonomy)

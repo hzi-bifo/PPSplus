@@ -6,7 +6,6 @@ import re
 import glob
 
 from com.config import Config
-from com.config import Config2
 from core.taxonomy import Taxonomy
 from core.sequences import Sequences
 
@@ -70,10 +69,8 @@ def test():
     taxonomicRanks = config.get('taxonomicRanks').split(',')
     taxonomy = Taxonomy(databaseFile, taxonomicRanks)
 
-    config2 = Config2(config, 'MLTreeMap')
-
     #place sequences
-    placeSequences(sequences, taxonomy, config2.get('final_RAxML_outputs'))
+    placeSequences(sequences, taxonomy, config.get('final_RAxML_outputs'))
     print 'Placed sequences:', len(sequences.placedSeqSet)
 
     #assign not placed contigs of one scaffold to the lowest common ancestor of assigned contigs

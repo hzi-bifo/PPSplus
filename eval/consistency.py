@@ -13,7 +13,7 @@ import argparse
 from com.csv import predToDict
 from com.csv import getMapping
 from com.fasta import getSequenceToBpDict
-from com.taxonomy_ncbid import TaxonomyNcbi
+from com.taxonomy_ncbi import TaxonomyNcbi
 
 
 class _TaxonomyWrapper():

@@ -1,5 +1,5 @@
 from Bio.Seq import Seq
-from com.taxonomy_ncbid import TaxonomyNcbi
+from com.taxonomy_ncbi import TaxonomyNcbi
 import com.fasta as fas
 import re
 import os
@@ -39,7 +39,8 @@ def taxPlay(db):
         @param db: taxonomy
             @type db: TaxonomyNcbi
     """
-
+    a='asdf'
+    a.strip()
 
     pass
 

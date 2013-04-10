@@ -6,11 +6,39 @@ import os
 from com import common
 from com.config import Config
 from core.taxonomy import Taxonomy
+from com import csv
 
 
-def scafToContigOutput(scafContigFile, scafPPSOutFile, contigPPSOutFile):
+def scafToContigOutput(scaffContigMapFile, scaffPPSOutFile, contigPPSOutFile):
     """
-        Takes scaffold-contigs mapping and scaffold placement, outputs contigs placement
+        Takes scaffold-contigs mapping and scaffold placement (.out file), outputs contigs placement (.out file)
+
+        @param scaffContigMapFile: tab sepparated scaffold-contigs mapping (scaffoldName \t contigName)
+        @param scaffPPSOutFile: scaffold predictions (PPS output file)
+        @param contigPPSOutFile: contigs predictions (as if it was a PPS output file)
+    """
+    # init output
+    out = csv.OutFileBuffer(contigPPSOutFile)
+
+    # read scaffold predictions
+    scaffNameToTaxonId = csv.predToDict(scaffPPSOutFile)
+
+    # read mapping: scaffName -> contigNameList
+    scaffNameToContigNameList = csv.getMapping(scaffContigMapFile, 0, 1, sep='\t')
+
+    # store contigs' predictions (according to scaffolds' predictions)
+    for scaffName, contigNameList in scaffNameToContigNameList.iteritems():
+        taxonId = scaffNameToTaxonId.get(scaffName, None)
+        if taxonId is None:
+            taxonId = 1
+        for contigName in contigNameList:
+            out.writeText(contigName + '\t' + str(taxonId) + '\n')
+    out.close()
+
+
+def scafToContigOutputPPFormat(scafContigFile, scafPPSOutFile, contigPPSOutFile):
+    """
+        Takes scaffold-contigs mapping and scaffold placement (PP.out), outputs contigs placement (PP.out)
 
         @param scafContigFile: tab sepparated scaffold-contigs mapping (scaffold \t contig)
         @param scafPPSOutFile: scaffold predictions (PPS output file)

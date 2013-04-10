@@ -172,7 +172,7 @@ class OutFileBuffer():
 
 class _MappingParser():
     def __init__(self, keyColNum, valColNum, sep, comment):
-        self._dict = dict([])
+        self._dict = dict()
         self._keyColNum = keyColNum
         self._valColNum = valColNum
         self._sep = sep
@@ -241,7 +241,7 @@ class _PredParser():
         To parse the prediction file.
     """
     def __init__(self):
-        self._dict = dict([])
+        self._dict = dict()
 
     def parse(self, line):
         if not isComment(line, '#'):

@@ -13,7 +13,7 @@ import datetime
 
 from com import common
 from com import csv
-from com import taxonomy_ncbid
+from com import taxonomy_ncbi
 from com.config import Config
 from core import ssd_eval
 from core.pps import ppsOut2ppOut
@@ -24,9 +24,9 @@ from core.cluster import MGCluster
 from core.taxonomy import Taxonomy
 from core.sequences import Sequences
 from core.analysis16s import RRNA16S
-
 from eval import consistency
 from eval import accuracy
+from eval import confusion_matrix
 from misc import out_proc
 
 # hera:
@@ -140,7 +140,7 @@ def main():
     summaryTrainFile = os.path.join(outputDir, 'summaryTrain.txt')
     ppsConfigFilePath = os.path.join(workingDir, 'PPS_config_generated.txt')
 
-    taxonomicRanks = taxonomy_ncbid.TAXONOMIC_RANKS[1:]  # without root
+    taxonomicRanks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]  # without root
     minSeqLen = int(config.get('minSeqLen'))
     databaseFile = os.path.join(os.path.normpath(config.get('databaseFile')), 'ncbitax_sqlite.db')
     if not os.path.isfile(databaseFile):
@@ -149,13 +149,13 @@ def main():
 
     # reference predictions
     referencePlacementFileOut = config.get('referencePlacementFileOut')
-    referencePlacementFilePPOut = config.get('referencePlacementFilePPOut')
+    referencePlacementFilePPOut = None  # config.get('referencePlacementFilePPOut')
     if (referencePlacementFileOut is not None) and (not os.path.isfile(referencePlacementFileOut)):
         print("The reference file doesn't exist: ", referencePlacementFileOut)
         return
-    if (referencePlacementFilePPOut is not None) and (not os.path.isfile(referencePlacementFilePPOut)):
-        print("The reference file doesn't exist: ", referencePlacementFilePPOut)
-        return
+    #if (referencePlacementFilePPOut is not None) and (not os.path.isfile(referencePlacementFilePPOut)):
+    #    print("The reference file doesn't exist: ", referencePlacementFilePPOut)
+    #    return
     if (referencePlacementFilePPOut is None) and (referencePlacementFileOut is not None):
         # generate PP placement file
         referencePlacementFilePPOut = os.path.join(workingDir, os.path.basename(referencePlacementFileOut) + '_.PP.out')
@@ -377,32 +377,39 @@ def main():
 
         # compare prediction of scaffolds and contigs
         if 'v' in args.p:
-            contigPred = str(fastaFileIds + '.PP.out')
-            scaffPred = str(scaffoldsIdsNewPath + '.PP.out')
+            contigPred = str(fastaFileIds + '.out')
+            scaffPred = str(scaffoldsIdsNewPath + '.out')
             if not os.path.isfile(scaffPred):
                 print('Comparison of contig/scaffold predictions: scaffolds were not predicted!')
+            elif not os.path.isfile(contigPred):
+                print('Comparison of contig/scaffold predictions: contigs were not predicted!')
             else:
-                if not os.path.isfile(contigPred):
-                    print('Comparison of contig/scaffold predictions: contigs were not predicted!')
-                else:
-                    # create prediction file for contigs from a prediction file for scaffolds
-                    scaffPredAsContigs = os.path.join(workingDir, 'crossVal', 'scaffPredAsContigs.PP.out')
-                    out_proc.scafToContigOutput(scaffoldContigMapIdsFile, scaffPred, scaffPredAsContigs)
-                    i = 0
-                    for rank in taxonomicRanks:
-                        if i > (len(taxonomy_ncbid.TAXONOMIC_RANKS) - 2):
-                            break
-                        i += 1
-                        # do comparison: contigs' prediction vs scaffolds' prediction
-                        vCmd = str('java -jar tables.jar ' + fastaFileIds + ' ' + contigPred + ' ' +
-                                    scaffPredAsContigs + ' ' + os.path.normpath(os.path.join(
-                                    os.path.dirname(scaffPredAsContigs), str('crossVal_' + str(rank) + '.csv'))) + ' ' +
-                                    str(rank) + ' ' + 'unassigned' + ' ' + str(config.get('taxonomicRanks')))
-                        vProc = subprocess.Popen(vCmd, shell=True, bufsize=-1, cwd=config.get('tablesGeneratorDir'),
-                                                  stdout=subprocess.STDOUT, stderr=subprocess.STDOUT)
-                        vProc.wait()
-                        print('Comparison of contig/scaffold predictions: %s return code: %s' %
-                              (vCmd, vProc.returncode))
+                # create prediction file for contigs from a prediction file for scaffolds
+                scaffPredAsContigs = os.path.join(workingDir, 'crossVal', 'scaffPredAsContigs.PP.out')
+                out_proc.scafToContigOutput(scaffoldContigMapIdsFile, scaffPred, scaffPredAsContigs)
+
+                ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
+                cm = confusion_matrix.ConfusionMatrix(fastaFileIds, contigPred,
+                                                      scaffPredAsContigs, databaseFile, ranks)
+                for rank in ranks:
+                    cm.generateConfusionMatrix(rank,
+                                               os.path.join(os.path.dirname(scaffPredAsContigs), 'contigs_vs_scaff'))
+                cm.close()
+                #i = 0
+                #for rank in taxonomicRanks:
+                #    if i > (len(taxonomy_ncbi.TAXONOMIC_RANKS) - 2):
+                #        break
+                #    i += 1
+                #    # do comparison: contigs' prediction vs scaffolds' prediction
+                #    vCmd = str('java -jar tables.jar ' + fastaFileIds + ' ' + contigPred + ' ' +
+                #                scaffPredAsContigs + ' ' + os.path.normpath(os.path.join(
+                #                os.path.dirname(scaffPredAsContigs), str('crossVal_' + str(rank) + '.csv'))) + ' ' +
+                #                str(rank) + ' ' + 'unassigned' + ' ' + str(config.get('taxonomicRanks')))
+                #    vProc = subprocess.Popen(vCmd, shell=True, bufsize=-1, cwd=config.get('tablesGeneratorDir'),
+                #                              stdout=subprocess.STDOUT, stderr=subprocess.STDOUT)
+                #    vProc.wait()
+                #    print('Comparison of contig/scaffold predictions: %s return code: %s' %
+                #          (vCmd, vProc.returncode))
 
     # Read output from PPS predict and place sequences
     if args.r:
@@ -429,23 +436,29 @@ def main():
                                  writeIds=False, outputFileContigSubPattern=config.get('outputFileContigSubPattern'))
 
         # generate comparison tables
-        i = 0
-        if os.path.isfile(referencePlacementFilePPOut):
-            for rank in taxonomicRanks:
-                if i > (len(taxonomy_ncbid.TAXONOMIC_RANKS) - 2):
-                    break
-                i += 1
-                cmpCmd = str('java -jar tables.jar ' +
-                             str(common.createTagFilePath(workingDir, inputFastaFile, 'pOUT.fas')) + ' ' +
-                             str(referencePlacementFilePPOut) + ' ' + predPPOutFilePath + ' ' +
-                             str(common.createTagFilePath(outputDir, inputFastaFile,
-                                                          str('table.' + str(rank) + '.csv'))) + ' ' +
-                             str(rank) + ' ' + 'unassigned' + ' ' + ",".join(taxonomy_ncbid.TAXONOMIC_RANKS[1:]))
-                cmpProc = subprocess.Popen(cmpCmd, shell=True, bufsize=-1, cwd=config.get('tablesGeneratorDir'))
-                # stdout=subprocess.STDOUT, stderr=subprocess.STDOUT)
-                cmpProc.wait()
-                if cmpProc.returncode != 0:
-                    print('Command', cmpCmd, 'ended with non-zero return code', cmpProc.returncode)
+        if os.path.isfile(referencePlacementFileOut):
+            ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
+            cm = confusion_matrix.ConfusionMatrix(inputFastaFile, predOutFilePath,
+                                                  referencePlacementFileOut, databaseFile, ranks)
+            for rank in ranks:
+                cm.generateConfusionMatrix(rank, os.path.join(outputDir, os.path.basename(inputFastaFile)))
+            cm.close()
+        #i = 0
+        #if os.path.isfile(referencePlacementFilePPOut):
+        #    for rank in taxonomicRanks:
+        #        if i > (len(taxonomy_ncbi.TAXONOMIC_RANKS) - 2):
+        #            break
+        #        i += 1
+        #        cmpCmd = str('java -jar tables.jar ' +
+        #                     str(common.createTagFilePath(workingDir, inputFastaFile, 'pOUT.fas')) + ' ' +
+        #                     str(referencePlacementFilePPOut) + ' ' + predPPOutFilePath + ' ' +
+        #                     str(common.createTagFilePath(outputDir, inputFastaFile,
+        #                                                  str('table.' + str(rank) + '.csv'))) + ' ' +
+        #                     str(rank) + ' ' + 'unassigned' + ' ' + ",".join(taxonomy_ncbi.TAXONOMIC_RANKS[1:]))
+        #        cmpProc = subprocess.Popen(cmpCmd, shell=True, bufsize=-1, cwd=config.get('tablesGeneratorDir'))
+        #        cmpProc.wait()
+        #        if cmpProc.returncode != 0:
+        #            print('Command', cmpCmd, 'ended with non-zero return code', cmpProc.returncode)
 
         # compute scaffold-contig consistency
         consOutBuff = csv.OutFileBuffer(common.createTagFilePath(outputDir, inputFastaFile, 'cons'))
@@ -497,7 +510,7 @@ def main():
             buff = csv.OutFileBuffer(os.path.join(outputDir, 'precision_recall.csv'))
             acc = accuracy.Accuracy(inputFastaFile, common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'),
                                     referencePlacementFileOut, databaseFile)
-            buff.writeText(acc.getAccuracyPrint(taxonomy_ncbid.TAXONOMIC_RANKS[1:],
+            buff.writeText(acc.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
                                                 minFracClade=0.01, minFracPred=0.01, overview=True))
             buff.close()
             acc.close()

@@ -12,7 +12,7 @@ import argparse
 
 from com import csv
 from com import fasta as fas
-from com import taxonomy_ncbid as tax
+from com import taxonomy_ncbi as tax
 
 
 class _TaxonomyWrap():

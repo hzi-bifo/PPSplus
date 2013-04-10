@@ -4,7 +4,7 @@ import argparse
 
 from com import csv
 from com import fasta
-from com import taxonomy_ncbid
+from com import taxonomy_ncbi
 
 
 class _TaxonomyWrapperA():
@@ -13,7 +13,7 @@ class _TaxonomyWrapperA():
     """
 
     def __init__(self, databaseFile):
-        self._taxonomy = taxonomy_ncbid.TaxonomyNcbi(databaseFile)
+        self._taxonomy = taxonomy_ncbi.TaxonomyNcbi(databaseFile)
         self._rankToId = dict()
         self._ncbidToRankId = dict()
         self._predAtRankId = dict()  # rankId -> ncbid -> ncbid at given rank
@@ -21,7 +21,7 @@ class _TaxonomyWrapperA():
         self._ncbidToNcbidParent = dict()  # ncbid -> parent ncbid
 
         id = 0
-        for rank in taxonomy_ncbid.TAXONOMIC_RANKS:
+        for rank in taxonomy_ncbi.TAXONOMIC_RANKS:
             self._rankToId[rank] = id
             self._predAtRankId[id] = dict()
             self._noDefAtRankId[id] = set()
@@ -357,9 +357,9 @@ def _main():
     args = parser.parse_args()
 
     if args.r:
-        ranks = str(args.r[0].name).split(',')
+        ranks = str(args.r[0].name).strip("'").strip('"').split(',')
     else:
-        ranks = taxonomy_ncbid.TAXONOMIC_RANKS[1:]
+        ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
 
     if args.c:
         minFracClade = float(args.c[0])

@@ -6,7 +6,7 @@ import glob
 import sqlite3
 
 from com.config import Config
-from com import taxonomy_ncbid
+from com import taxonomy_ncbi
 
 
 class RefSequences():
@@ -31,7 +31,7 @@ class RefSequences():
                     self._taxonIdToSize[taxonId] += fileSize
                 else:
                     self._taxonIdToSize[taxonId] = fileSize
-        self._taxonomy = taxonomy_ncbid.TaxonomyNcbi(databaseFilePath, considerNoRank=True)
+        self._taxonomy = taxonomy_ncbi.TaxonomyNcbi(databaseFilePath, considerNoRank=True)
         self._childrenBuffer = {}  # taxonId -> set of children taxon Ids
         self._rankBuffer = {}  # taxonId -> rank
 

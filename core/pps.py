@@ -5,7 +5,7 @@ import re
 
 from com import csv
 from com import common
-from com import taxonomy_ncbid
+from com import taxonomy_ncbi
 from core.taxonomy import Taxonomy
 
 
@@ -168,7 +168,7 @@ def ppOut2PPSout():
     inFile = '/Users/ivan/Documents/work/binning/data/HumanGut/PP/TS29_scaff.file.0.5.txt'
     outFile = '/Users/ivan/Documents/work/binning/data/HumanGut/PP/TS29_scaff.file.0.5.PPS.txt'
     dbFile = '/Users/ivan/Documents/work/binning/taxonomy/20120828/ncbitax_sqlite.db' #DB
-    taxonomy = taxonomy_ncbid.TaxonomyNcbi(dbFile)
+    taxonomy = taxonomy_ncbi.TaxonomyNcbi(dbFile)
 
     out = csv.OutFileBuffer(outFile)
 
@@ -243,7 +243,7 @@ def genomesToMask():
     out2 = csv.OutFileBuffer(outFile2)
 
     genomeNcbids = csv.getColumnAsList(fileName, entryModifyFunction=None, colNum=0, sep=None, comment='#')
-    taxonomy = taxonomy_ncbid.TaxonomyNcbi(dbFile)
+    taxonomy = taxonomy_ncbi.TaxonomyNcbi(dbFile)
 
     maskNcbids = []
     #print len(genomeNcbids), genomeNcbids

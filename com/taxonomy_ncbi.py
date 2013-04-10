@@ -138,7 +138,7 @@ class TaxonomyNcbi():
                 s.add(currentId)
         return s
 
-    def getRank(self, ncbid, checkRank = False):
+    def getRank(self, ncbid, checkRank=False):
         """
             @return: rank or None
             @rtype: str

@@ -5,7 +5,7 @@ import os
 from com.csv import getMapping
 from com.csv import OutFileBuffer
 from com.fasta import fastaFileToDict
-from com.taxonomy_ncbid import TaxonomyNcbi
+from com.taxonomy_ncbi import TaxonomyNcbi
 
 
 class DummyOutBuffer():

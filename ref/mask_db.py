@@ -22,7 +22,7 @@ import glob
 
 from com import csv
 from com import fasta as fas
-from com.taxonomy_ncbid import TaxonomyNcbi as tax
+from com.taxonomy_ncbi import TaxonomyNcbi as tax
 
 
 _STRAIN = 'strain'

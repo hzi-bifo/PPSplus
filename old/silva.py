@@ -11,7 +11,7 @@ from com.csv import OutFileBuffer
 from com.csv import getMapping
 from com.csv import getColumnAsList
 from com.fasta import fastaFileToDictWholeNames
-from com.taxonomy_ncbid import TaxonomyNcbi
+from com.taxonomy_ncbi import TaxonomyNcbi
 from core.taxonomy import Taxonomy
 
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import argparse
 
 from com import csv
@@ -14,16 +15,16 @@ class _TaxonomyWrapperA():
 
     def __init__(self, databaseFile):
         self._taxonomy = taxonomy_ncbi.TaxonomyNcbi(databaseFile)
-        self._rankToId = dict()
-        self._ncbidToRankId = dict()
-        self._predAtRankId = dict()  # rankId -> ncbid -> ncbid at given rank
-        self._noDefAtRankId = dict()  # rankId -> set of ncbids for which the ncbid at given rank is not defined
-        self._ncbidToNcbidParent = dict()  # ncbid -> parent ncbid
+        self._rankToId = {}
+        self._ncbidToRankId = {}
+        self._predAtRankId = {}  # rankId -> ncbid -> ncbid at given rank
+        self._noDefAtRankId = {}  # rankId -> set of ncbids for which the ncbid at given rank is not defined
+        self._ncbidToNcbidParent = {}  # ncbid -> parent ncbid
 
         id = 0
         for rank in taxonomy_ncbi.TAXONOMIC_RANKS:
             self._rankToId[rank] = id
-            self._predAtRankId[id] = dict()
+            self._predAtRankId[id] = {}
             self._noDefAtRankId[id] = set()
             id += 1
 
@@ -66,7 +67,7 @@ class _TaxonomyWrapperA():
             @rtype: dict
         """
         rankId = self._rankToId[rank]
-        retDict = dict()
+        retDict = {}
         predAtRankBuff = self._predAtRankId[rankId]
         noDefAtRankBuff = self._noDefAtRankId[rankId]
 
@@ -81,15 +82,16 @@ class _TaxonomyWrapperA():
                 continue  # the ncbid is not defined at this rank (we already know)
 
             ncbidRankId = self._getRankId(ncbid)
-            if ncbidRankId is None:
-                noDefAtRankBuff.add(ncbid)
-                continue  # we have just found out that the ncbid is not defined at this rank
+            #if ncbidRankId is None:
+            #    noDefAtRankBuff.add(ncbid)
+            #    continue  # we have just found out that the ncbid is not defined at this rank
 
             if ncbidRankId == rankId:  # the ncbid is defined already at the right rank
                 predAtRankBuff[ncbid] = ncbid
                 retDict[seq] = ncbid
+                continue
 
-            if ncbidRankId > rankId:  # the right ncbid is defined at a higher rank
+            if (ncbidRankId is None) or (ncbidRankId > rankId):  # the right ncbid may be defined at a higher rank
                 current = self._getParent(ncbid)
                 while current is not None:
                     currentRankId = self._getRankId(current)
@@ -98,6 +100,8 @@ class _TaxonomyWrapperA():
                         predAtRankBuff[ncbid] = current
                         break
                     current = self._getParent(current)
+                if current is None:
+                    noDefAtRankBuff.add(ncbid)  # we have just found out that the ncbid is not defined at this rank
 
         return retDict
 
@@ -110,11 +114,37 @@ class Accuracy():
         Implements computation of the "precision" and "recall" according to different definitions.
     """
 
-    def __init__(self, fastaFilePath, predFilePath, trueFilePath, databaseFile):
-        self._seqToBp = fasta.getSequenceToBpDict(fastaFilePath)
-        self._seqToPred = csv.predToDict(predFilePath)
-        self._seqToTrue = csv.predToDict(trueFilePath)
-        self._taxonomy = _TaxonomyWrapperA(databaseFile)
+    def __init__(self, seqIdToBp, seqIdToPred, seqIdToTruePred, taxonomy):
+        """
+            Initializes the accuracy object.
+            @param seqIdToBp: dictionary or a fasta file
+            @param seqIdToPred: dictionary or a prediction file
+            @param seqIdToTruePred: dictionary or a true prediction file
+            @param taxonomy: database file in the sqlite3 format, or taxonomy object retrieved from not closed Accuracy
+        """
+        if isinstance(seqIdToBp, dict):
+            self._seqToBp = seqIdToBp
+        else:
+            assert os.path.isfile(seqIdToBp)
+            self._seqToBp = fasta.getSequenceToBpDict(seqIdToBp)
+
+        if isinstance(seqIdToPred, dict):
+            self._seqToPred = seqIdToPred
+        else:
+            assert os.path.isfile(seqIdToPred)
+            self._seqToPred = csv.predToDict(seqIdToPred)
+
+        if isinstance(seqIdToTruePred, dict):
+            self._seqToTrue = seqIdToTruePred
+        else:
+            assert os.path.isfile(seqIdToTruePred)
+            self._seqToTrue = csv.predToDict(seqIdToTruePred)
+
+        if isinstance(taxonomy, _TaxonomyWrapperA):
+            self._taxonomy = taxonomy
+        else:
+            assert os.path.isfile(taxonomy)
+            self._taxonomy = _TaxonomyWrapperA(taxonomy)
 
     def getAccuracy(self, rank, minFracClade=None, minFracPred=None, asBp=True, weightAccordingBinSize=True):
         """
@@ -303,8 +333,12 @@ class Accuracy():
             w = 'not weighted'
         return str('%s, %s, %s, %s, "%s", "%s"\n' % (round(p * 100.0, 1), round(r * 100.0, 1), cp, cr, c, w))
 
-    def close(self):
-        self._taxonomy.close()
+    def getTaxonomy(self):
+        return self._taxonomy
+
+    def close(self, closeTaxonomy=True):
+        if closeTaxonomy:
+            self._taxonomy.close()
 
 
 def _main():

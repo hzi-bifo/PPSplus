@@ -13,6 +13,7 @@ from com import taxonomy_ncbi
 from com import fasta as fas
 from com import csv
 
+
 class _TaxonomyWrapCM():
     def __init__(self, databaseFile):
         """
@@ -109,7 +110,7 @@ class _TaxonomyWrapCM():
 
 
 class ConfusionMatrix():
-    def __init__(self, seqNameToBp, seqNameToPred, seqNameToRefPred, databaseFile, ranksList=None):
+    def __init__(self, seqNameToBp, seqNameToPred, seqNameToRefPred, taxonomy, ranksList=None):
         """
             Initializes the main class that computes the confusion matrices.
 
@@ -121,7 +122,7 @@ class ConfusionMatrix():
                 @type seqNameToRefPred: dict; or a tab separated file, first column ~ sequence name, last column taxonId
             @param ranksList: list of ranks for which the confusion matrices will be computed (None ~ all default ranks)
                 @type ranksList: list of str
-            @param databaseFile: database file in the sqlite3 format
+            @param taxonomy: database file in the sqlite3 format; or taxonomy returned by function "getTaxonomy"
         """
         # Check input options and read in the data (if appropriate)
         self._initFailed = False  # replace this with exceptions!
@@ -149,10 +150,12 @@ class ConfusionMatrix():
             print("Can't get reference prediction info from:", seqNameToRefPred)
             self._initFailed = True
             return
-        if isinstance(databaseFile, str) and os.path.isfile(databaseFile):
-            self._taxonomy = _TaxonomyWrapCM(databaseFile)
+        if isinstance(taxonomy, str) and os.path.isfile(taxonomy):
+            self._taxonomy = _TaxonomyWrapCM(taxonomy)
+        elif isinstance(taxonomy, _TaxonomyWrapCM):
+            self._taxonomy = taxonomy
         else:
-            print("Can't use taxonomy: ", databaseFile)
+            print("Can't use taxonomy: ", taxonomy)
         if ranksList is None:
             ranksList = taxonomy_ncbi.TAXONOMIC_RANKS[1:]  # default ranks
         else:
@@ -360,8 +363,12 @@ class ConfusionMatrix():
         else:
             return str(round(100.0 * (float(dividend) / float(divisor)), roundNDigits))
 
-    def close(self):
-        self._taxonomy.close()
+    def getTaxonomy(self):
+        return self._taxonomy
+
+    def close(self, closeTaxonomy=True):
+        if closeTaxonomy:
+            self._taxonomy.close()
 
 
 def _main():

@@ -12,8 +12,8 @@ from com.config import Config
 from com import common
 from core.taxonomy import Taxonomy
 from core.dna_to_prot import dnaToProt
-from ref.download_mg import protNameEntryToGid
-from ref.download_mg import dnaNameEntryToGid
+from ref_seq.download_mg import protNameEntryToGid
+from ref_seq.download_mg import dnaNameEntryToGid
 
 
 class Amphora():

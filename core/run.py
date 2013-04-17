@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 """
-    Master script of PPSplus.
+    Master script of the PPSplus.
 """
 
-import sys
 import os
 import shutil
 import argparse
@@ -18,6 +17,7 @@ from com.config import Config
 from core import ssd_eval
 from core.pps import ppsOut2ppOut
 from core.pps import readPPSOutput
+from core.pps import computeTrainingAccuracy
 from core.training_data import PPSInput
 from core.analysis_mg import MarkerGeneAnalysis
 from core.cluster import MGCluster
@@ -28,11 +28,12 @@ from eval import consistency
 from eval import accuracy
 from eval import confusion_matrix
 from misc import out_proc
+from ref import mask_db
 
-# hera:
-# export PATH=/net/programs/Debian-6.0.3-x86_64/python-2.7joh/bin:/net/programs/Debian-6.0.3-x86_64/jdk-1.7.0.07/bin:$PATH
-# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR13
-#
+
+# paths on hera/gaia:
+# export PATH=/net/programs/Debian-6.0.3-x86_64/python-2.7joh/bin:$PATH
+# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR19
 #
 def main():
     # external commands will be executed in Shell in Unix/Linux
@@ -40,7 +41,7 @@ def main():
                                    'Your system is "' + os.name + '"')
 
     parser = argparse.ArgumentParser(
-        description='''PhyloPythiaS+ is an extension of PhyloPythiaS''',
+        description='''PhyloPythiaS Plus is an extension of PhyloPythiaS.''',
         epilog='''Read the user documentation for more details.''')
 
     parser.add_argument('-c', '--config', nargs=1, type=file, required=True, help='configuration file of the pipeline',
@@ -51,11 +52,11 @@ def main():
                         dest='n')
 
     parser.add_argument('-g', '--run-marker-gene-analysis', action='store_true',
-                        help='run hidden markov model and classify according to the marker genes (from Amphora)',
+                        help='run hidden markov model and classify according to the "31" marker genes',
                         dest='g')
 
     parser.add_argument('-o', '--process-preprocessed-output', action='store', nargs='+',
-                        help='process output from the 16S rRNA analysis (s16), marker gene Amphora analysis (mg)',
+                        help='process output from the 16S rRNA analysis (s16), marker gene "31" analysis (mg)',
                         choices=["s16", "mg"],
                         dest='o')
     # push down predictions to more specific clades (sc)
@@ -64,22 +65,26 @@ def main():
     # MlTreeMap (m); Amphora (ah); exclude some data from SSD (ex) place sequences;
     # (exSSD) exclude defined contigs from SSD; create training data'
 
-    parser.add_argument('-t', '--pps-train', action='store_true',
-                        help='run PhyloPythiaS "training phase"',
+    parser.add_argument('-t', '--pps-train', action='store_true', help='run the PhyloPythiaS "training phase"',
                         dest='t')
 
+    parser.add_argument('-a', '--train-accuracy', action='store_true', help='Compute the training accuracy.',
+                        dest='a')
+
     parser.add_argument('-p', '--pps-predict', action='store', nargs='+', choices=["c", "s", "v"],
-                        help="""run PhyloPythiaS "predict phase" (c) for contigs, (s) for scaffolds,
+                        help="""run the PhyloPythiaS "predict phase" (c) for contigs, (s) for scaffolds,
                         (v) compare predictions of contigs and scaffolds""",
                         dest='p')
 
     parser.add_argument('-r', '--read-pps-out', action='store_true',
                         help="""Reads the output placements of PhyloPythiaS (otherwise just predictions based on the
-                        marker gene analysis will appear in the results)""",
+                        marker gene analysis will appear in the results if run with option '-o' as well.)""",
                         dest='r')
 
     parser.add_argument('-s', '--summary', action='store_true',
-                        help='Summary, output the results.',
+                        help='Summary, outputs the results, compute precision and recall, compute comparison tables '
+                             '(if reference placement is available), compute scaffold-contig consistency '
+                             '(if the mapping between scaffold and contigs is available)',
                         dest='s')
 
     args = parser.parse_args()
@@ -109,6 +114,10 @@ def main():
 
     # read input fasta: contigs, scaffolds, mapping
     inputFastaFile = os.path.normpath(config.get('inputFastaFile'))
+    if ('-' in inputFastaFile) or ('+' in inputFastaFile):
+        print('The input fasta file path is not allowed to contain "+" or "-" characters ' +
+              'due to the "Mothur" software, given path:\n' + inputFastaFile)
+        return
     if not os.path.isfile(inputFastaFile):
         print("The given input fasta file doesn't exist: ", inputFastaFile)
         return
@@ -136,9 +145,12 @@ def main():
     scaffoldContigMapIdsFile = common.createTagFilePath(workingDir, inputFastaFile, 'mapSCIds')
 
     # output files
-    summaryAllFile = os.path.join(outputDir, 'summaryAll.txt')
-    summaryTrainFile = os.path.join(outputDir, 'summaryTrain.txt')
-    ppsConfigFilePath = os.path.join(workingDir, 'PPS_config_generated.txt')
+    summaryAllFile = os.path.join(outputDir, 'summary_all.txt')
+    summaryTrainFile = os.path.join(outputDir, 'summary_train.txt')
+    if config.get('configPPS') is None:
+        ppsConfigFilePath = os.path.join(workingDir, 'PPS_config_generated.txt')  # config will be generated
+    else:
+        ppsConfigFilePath = os.path.normpath(config.get('configPPS'))  # use custom config file
 
     taxonomicRanks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]  # without root
     minSeqLen = int(config.get('minSeqLen'))
@@ -149,6 +161,12 @@ def main():
 
     # reference predictions
     referencePlacementFileOut = config.get('referencePlacementFileOut')
+
+    # leaf clades contained in the reference
+    if (referencePlacementFileOut is not None) and os.path.isfile(referencePlacementFileOut):
+        refLeafCladesSet = set(map(int, csv.predToDict(referencePlacementFileOut).values()))
+    else:
+        refLeafCladesSet = None
     referencePlacementFilePPOut = None  # config.get('referencePlacementFilePPOut')
     if (referencePlacementFileOut is not None) and (not os.path.isfile(referencePlacementFileOut)):
         print("The reference file doesn't exist: ", referencePlacementFileOut)
@@ -195,13 +213,61 @@ def main():
     parallelPPSmodels = eval(config.get('parallelPPSmodels'))
 
     # is it specified what to do?
-    if not (args.n or args.g or args.o or args.t or args.p or args.r or args.s):
+    if not (args.n or args.g or args.o or args.t or args.p or args.r or args.s or args.a):
         print('Choose what do you want to do!')
         print(parser.print_help())
+        return
+
+    # exclude mg from the reference ?
+    excludeRefMgRank = config.get('excludeRefMgRank')
+    s16Database = os.path.normpath(config.get('s16Database'))
+    mgDatabase = os.path.normpath(config.get('mgDatabase'))
+    if (excludeRefMgRank is not None) and (args.n or args.g):
+        if not mask_db.isRankAllowed(excludeRefMgRank):
+            print("It's not allowed to exclude rank '%s' from the reference sequence database" % excludeRefMgRank)
+        else:
+            maskRefMgS16Dir = os.path.join(workingDir, str('ref_mg_16S_mask_' + excludeRefMgRank))  # mask dir
+            maskRefMgDir = os.path.join(workingDir, str('ref_mg_mask_' + excludeRefMgRank))  # mask dir
+            maskRefOk = True
+            if ((not os.path.isdir(maskRefMgS16Dir)) or (not os.path.isdir(maskRefMgDir)) or
+                    (min(os.path.getmtime(maskRefMgS16Dir), os.path.getmtime(maskRefMgDir)) < mtimeConfig)):
+                if refLeafCladesSet is None:
+                    print("Can't exclude reference sequences since the reference file doesn't exist.")
+                    maskRefOk = False
+                else:
+                    # remove the mask directories if they already exist
+                    if os.path.isdir(maskRefMgS16Dir):
+                        shutil.rmtree(maskRefMgS16Dir)
+                    if os.path.isdir(maskRefMgDir):
+                        shutil.rmtree(maskRefMgDir)
+                    # create the directories
+                    try:
+                        os.mkdir(maskRefMgS16Dir)
+                        os.mkdir(os.path.join(maskRefMgS16Dir, 'db'))
+                        os.mkdir(maskRefMgDir)
+                        os.mkdir(os.path.join(maskRefMgDir, 'db'))
+                    except OSError:
+                        print("Can't create one of the directories (%s, %s, 'db') for the masked reference marker gene "
+                              "sequences." % (maskRefMgS16Dir, maskRefMgDir))
+                        maskRefOk = False
+                    else:
+                        mask_db.maskDb('mg', os.path.join(s16Database, 'db'), os.path.join(maskRefMgS16Dir, 'db'),
+                                       excludeRefMgRank, refLeafCladesSet, databaseFile)
+                        mask_db.maskDb('mg', os.path.join(mgDatabase, 'db'), os.path.join(maskRefMgDir, 'db'),
+                                       excludeRefMgRank, refLeafCladesSet, databaseFile)
+                        shutil.copy2(os.path.join(s16Database, 'content.csv'), maskRefMgS16Dir)
+                        shutil.copy2(os.path.join(mgDatabase, 'content.csv'), maskRefMgDir)
+                        shutil.copytree(os.path.join(mgDatabase, 'hmmAmphora'),
+                                        os.path.join(maskRefMgDir, 'hmmAmphora'))
+            if maskRefOk:
+                s16Database = maskRefMgS16Dir
+                mgDatabase = maskRefMgDir
+            else:
+                print("Couldn't mask reference at rank '%s'." % excludeRefMgRank)
 
     # run 16S analysis
     if args.n:
-        rrna = RRNA16S(config, workingDir)
+        rrna = RRNA16S(config, s16Database, workingDir)
         print('run Hidden Markov Model for (16S, 23S, 5S)')
         rrna.runHMM(fastaFileIds, outLog=getLogFileName(logDir, 'hmm16S'))
         print('run (16S, 23S, 5S) classification')
@@ -211,7 +277,7 @@ def main():
 
     # marker gene analysis (Amphora)
     if args.g:
-        mg = MarkerGeneAnalysis(config, workingDir, mgWorkingDir)
+        mg = MarkerGeneAnalysis(config, mgDatabase, workingDir, mgWorkingDir)
         print 'run 31 marker gene analysis'
         mg.runMarkerGeneAnalysis(fastaFileIds, outLog=getLogFileName(logDir, 'amphoraMG'))
 
@@ -226,6 +292,28 @@ def main():
         sequences.writeScaffolds(fastaFileScaffoldsIds)
         print('Working scaffolds input fasta file without non-DNA chars created: %s' % fastaFileScaffoldsIds)
 
+    # exclude ref. sequences from the reference ?
+    refSeq = os.path.normpath(config.get('refSeq'))  # reference sequences
+    excludeRefSeqRank = config.get('excludeRefSeqRank')  # rank
+    if (excludeRefSeqRank is not None) and (args.o or args.p or args.t):  # exclude rank ?
+        if not mask_db.isRankAllowed(excludeRefSeqRank):  # check rank
+            print("It's not allowed to exclude rank '%s' from the reference sequence database!" % excludeRefSeqRank)
+        else:
+            maskRefSeqDir = os.path.join(workingDir, str('ref_seq_mask_' + excludeRefSeqRank))  # mask dir
+            if (not os.path.isdir(maskRefSeqDir)) or (os.path.getmtime(maskRefSeqDir) < mtimeConfig):  # create mask dir
+                if refLeafCladesSet is None:
+                    print("Can't exclude reference sequences since the reference file doesn't exist.")
+                else:
+                    if os.path.isdir(maskRefSeqDir):  # remove the mask dir if it already exists
+                        shutil.rmtree(maskRefSeqDir)
+                    try:
+                        os.mkdir(maskRefSeqDir)
+                    except OSError:
+                        print("Can't create directory %s for the masked reference sequences." % maskRefSeqDir)
+                    else:
+                        mask_db.maskDb('mr', refSeq, maskRefSeqDir, excludeRefSeqRank, refLeafCladesSet, databaseFile)
+                        refSeq = maskRefSeqDir
+
     # process output of the marker gene (31 and 16, 23, 5) analysis and create output for PPS
     if args.o:
         if sequences is None:
@@ -235,14 +323,14 @@ def main():
 
         # place sequences according to the 16S analysis
         if 's16' in args.o:
-            rrna = RRNA16S(config, workingDir)
+            rrna = RRNA16S(config, s16Database, workingDir)
             countList = rrna.setCandidatePlacementFrom16S23S5S(sequences, taxonomy, fastaFileIds)
             print(str('Candidate placement of sequences by the\n16S:' +
                       str(countList[0]) + '\n23S:' + str(countList[1]) + '\n5S:' + str(countList[2]) +
                       '\nall 16S, 23S, and 5S:' + str(countList[3])))
 
         if 'mg' in args.o:
-            mg = MarkerGeneAnalysis(config, workingDir, mgWorkingDir)
+            mg = MarkerGeneAnalysis(config, mgDatabase, workingDir, mgWorkingDir)
             num = mg.setCandidatePlacement(sequences, taxonomy, fastaFileIds)
             print('Candidate placement of sequences by the marker gene analysis (31): %s' % num)
 
@@ -298,8 +386,8 @@ def main():
             int(config.get('minBpToModel')),
             int(config.get('minGenomesWgs')),
             int(config.get('minBpPerSpecies')),
-            os.path.normpath(config.get('genomesWGS')),
-            None, #forbiddenDict
+            refSeq,
+            None,  # forbiddenDict
             databaseFile,
             taxonomicRanks,
             100,  # fastaLineMaxChar
@@ -308,13 +396,13 @@ def main():
             float(config.get('weightStayAll')),
             summaryTrainFile)
 
-    # generate PPS configuration file (before train or predict)
-    if args.t or args.p:
+    # generate PPS configuration file (before train or predict) if custom configuration file is not available !
+    if (args.t or args.p) and (config.get('configPPS') is None):
         if parallelPPSmodels:
             pm = 'TRUE'
         else:
             pm = 'FALSE'
-        keyDict = {'NCBI_PROCESSED_DIR': str(os.path.normpath(config.get('genomesWGS'))),
+        keyDict = {'NCBI_PROCESSED_DIR': str(refSeq),
                    'NCBI_TAX_DIR': os.path.dirname(databaseFile),
                    'PROJECT_DIR': os.path.join(workingDir, 'projectDir'),
                    'TREE_FILE': os.path.join(workingDir, 'ncbids.txt'),
@@ -323,9 +411,10 @@ def main():
                    'GENOMES_EXCLUDE': ''}  # optional
         createPPSConfig(ppsConfigFilePath, keyDict)
 
-    # run PhyloPythiaS train
+    # run PhyloPythiaS train (optionally compute training accuracy)
     ppsScripts = os.path.normpath(os.path.join(config.get('ppsInstallDir'), 'scripts'))
     if args.t:
+
         trainCmd = str(os.path.join(ppsScripts, 'train.rb') + ' ' + ppsConfigFilePath)
         logOut = open(getLogFileName(logDir, 'PPS_train'), 'w')
         trainProc = subprocess.Popen(trainCmd, shell=True, bufsize=-1, cwd=config.get('ppsInstallDir'),
@@ -333,6 +422,33 @@ def main():
         trainProc.wait()
         logOut.close()
         print('PPS "train" return code: %s' % trainProc.returncode)
+
+        # compute training accuracy (precision and recall) and confusion matrices
+    if args.a:
+        if not os.path.isdir(os.path.join(workingDir, 'projectDir', 'sampled_fasta')):
+            print("Train accuracy: Can't compute the training accuracy since the training phase hasn't been run yet.")
+        else:
+            taDir = os.path.join(workingDir, 'train_accuracy')
+            if os.path.isdir(taDir):
+                shutil.rmtree(taDir)
+            try:
+                os.mkdir(taDir)
+            except IOError:
+                print("Train accuracy: Can't create directory: " + taDir)
+            else:
+                taOutDir = os.path.join(outputDir, 'train_accuracy')
+                try:
+                    if not os.path.isdir(taOutDir):
+                        os.mkdir(taOutDir)
+                except IOError:
+                    print("Train accuracy: Can't create directory: " + taDir)
+                else:
+                    computeTrainingAccuracy(workingDir, taDir, os.path.join(workingDir, 'sampleSpecificDir'),
+                                            os.path.join(workingDir, 'projectDir', 'sampled_fasta'), taOutDir,
+                                            config.get('ppsInstallDir'), ppsScripts, ppsConfigFilePath,
+                                            getLogFileName(logDir, 'PPS_predict_train_data'),
+                                            os.path.join(workingDir, 'ncbids.txt'), databaseFile)
+                    print("Train accuracy: done")
 
     # run PhyloPythiaS predict
     if args.p:
@@ -343,8 +459,8 @@ def main():
                                            stdout=logOut, stderr=subprocess.STDOUT)  # stdout=subprocess.STDOUT
             predictProc.wait()
             logOut.close()
-            shutil.copy2(str(fastaFileIds + '.nox.fna.out'), str(fastaFileIds + '.out'))
-            shutil.copy2(str(fastaFileIds + '.nox.fna.PP.out'), str(fastaFileIds + '.PP.out'))
+            shutil.move(str(fastaFileIds + '.nox.fna.out'), str(fastaFileIds + '.out'))
+            shutil.move(str(fastaFileIds + '.nox.fna.PP.out'), str(fastaFileIds + '.PP.out'))
             print('PPS "predict" contigs return code: %s' % predictProc.returncode)
 
         if inputFastaScaffoldsFile is not None:
@@ -364,15 +480,15 @@ def main():
                         return
                 shutil.copy2(fastaFileScaffoldsIds, os.path.join(crossValDir, os.path.basename(fastaFileScaffoldsIds)))
                 predictCmd = str(os.path.join(ppsScripts, 'predict.rb') + ' ' + scaffoldsIdsNewPath + ' ' +
-                                 os.path.normpath(config.get('configPPS')))
+                                 ppsConfigFilePath)
 
                 logOut = open(getLogFileName(logDir, 'PPS_predict_s'), 'w')
                 predictProc = subprocess.Popen(predictCmd, shell=True, bufsize=-1, cwd=config.get('ppsInstallDir'),
                                                stdout=logOut, stderr=subprocess.STDOUT)  # stdout=subprocess.STDOUT
                 predictProc.wait()
                 logOut.close()
-                shutil.copy2(str(scaffoldsIdsNewPath + '.nox.fna.out'), str(scaffoldsIdsNewPath + '.out'))
-                shutil.copy2(str(scaffoldsIdsNewPath + '.nox.fna.PP.out'), str(scaffoldsIdsNewPath + '.PP.out'))
+                shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.out'), str(scaffoldsIdsNewPath + '.out'))
+                shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.PP.out'), str(scaffoldsIdsNewPath + '.PP.out'))
                 print('PPS "predict" scaffolds return code: %s' % predictProc.returncode)
 
         # compare prediction of scaffolds and contigs
@@ -384,17 +500,22 @@ def main():
             elif not os.path.isfile(contigPred):
                 print('Comparison of contig/scaffold predictions: contigs were not predicted!')
             else:
-                # create prediction file for contigs from a prediction file for scaffolds
-                scaffPredAsContigs = os.path.join(workingDir, 'crossVal', 'scaffPredAsContigs.PP.out')
-                out_proc.scafToContigOutput(scaffoldContigMapIdsFile, scaffPred, scaffPredAsContigs)
+                cmpOutDir = os.path.join(outputDir, 'contigs_vs_scaff')
+                try:
+                    os.mkdir(cmpOutDir)
+                except IOError:
+                    print("Contigs vs. scaffolds: can't create directory: " + cmpOutDir)
+                else:
+                    # create prediction file for contigs from a prediction file for scaffolds
+                    scaffPredAsContigs = os.path.join(workingDir, 'crossVal', 'scaffPredAsContigs.PP.out')
+                    out_proc.scafToContigOutput(scaffoldContigMapIdsFile, scaffPred, scaffPredAsContigs)
 
-                ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
-                cm = confusion_matrix.ConfusionMatrix(fastaFileIds, contigPred,
-                                                      scaffPredAsContigs, databaseFile, ranks)
-                for rank in ranks:
-                    cm.generateConfusionMatrix(rank,
-                                               os.path.join(os.path.dirname(scaffPredAsContigs), 'contigs_vs_scaff'))
-                cm.close()
+                    ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
+                    cm = confusion_matrix.ConfusionMatrix(fastaFileIds, contigPred,
+                                                          scaffPredAsContigs, databaseFile, ranks)
+                    for rank in ranks:
+                        cm.generateConfusionMatrix(rank, os.path.join(cmpOutDir, 'contigs_vs_scaff'))
+                    cm.close()
                 #i = 0
                 #for rank in taxonomicRanks:
                 #    if i > (len(taxonomy_ncbi.TAXONOMIC_RANKS) - 2):
@@ -436,13 +557,19 @@ def main():
                                  writeIds=False, outputFileContigSubPattern=config.get('outputFileContigSubPattern'))
 
         # generate comparison tables
-        if os.path.isfile(referencePlacementFileOut):
-            ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
-            cm = confusion_matrix.ConfusionMatrix(inputFastaFile, predOutFilePath,
-                                                  referencePlacementFileOut, databaseFile, ranks)
-            for rank in ranks:
-                cm.generateConfusionMatrix(rank, os.path.join(outputDir, os.path.basename(inputFastaFile)))
-            cm.close()
+        outCmpRefDir = os.path.join(outputDir, 'cmp_ref')
+        try:
+            os.mkdir(outCmpRefDir)
+        except IOError:
+            print("Cmp to ref.: Can't create directory: " + outCmpRefDir)
+        else:
+            if os.path.isfile(referencePlacementFileOut):
+                ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
+                cm = confusion_matrix.ConfusionMatrix(inputFastaFile, predOutFilePath,
+                                                      referencePlacementFileOut, databaseFile, ranks)
+                for rank in ranks:
+                    cm.generateConfusionMatrix(rank, os.path.join(outCmpRefDir, os.path.basename(inputFastaFile)))
+                cm.close()
         #i = 0
         #if os.path.isfile(referencePlacementFilePPOut):
         #    for rank in taxonomicRanks:

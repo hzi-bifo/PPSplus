@@ -14,10 +14,10 @@ class RRNA16S():
     """
         A class that handels the rRNA 16S analysis.
     """
-    def __init__(self, config, workingDir):
+    def __init__(self, config, s16Database, workingDir):
         self._config = config
         self._workingDir = workingDir
-        self._refDir = os.path.normpath(self._config.get('s16Database'))
+        self._refDir = os.path.normpath(s16Database)
         self._refDict = csv.getMappingTuple(os.path.join(self._refDir, 'content.csv'), (0,1), (2,), '\t')
 
     def runHMM(self, inputFastaFile, outLog=None):

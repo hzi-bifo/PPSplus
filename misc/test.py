@@ -1,10 +1,10 @@
 from Bio.Seq import Seq
 from com.taxonomy_ncbi import TaxonomyNcbi
 import com.fasta as fas
+from com import csv
 import re
 import os
 
-__author__ = 'ivan'
 
 def sayHi(uu, ss, bb):
     """
@@ -17,7 +17,9 @@ def sayHi(uu, ss, bb):
     @param bb: bb something
         type bb: float
     """
+
     s = set()
+
     s.add('a')
     print s
     s.add('b')
@@ -27,22 +29,10 @@ def sayHi(uu, ss, bb):
     b='jkgh'
     b.replace
 
-
-
     print(uu + ss + bb)
 
     return int(2345)
 
-
-def taxPlay(db):
-    """
-        @param db: taxonomy
-            @type db: TaxonomyNcbi
-    """
-    a='asdf'
-    a.strip()
-
-    pass
 
 def test2():
     s = 'lsuparc_silva106_ncbitax.bacteria+archaea.tax'
@@ -114,11 +104,39 @@ def toPercent2(timeStrList, timeIdxHundredPercent=2):
     return map(lambda x: round(x / percent, 3), secList)
 
 
+def filterOutSequences(fastaFile, predFile, outFastaFile, outPredFile, minBp=1000):
+    seqIdToSeq = fas.fastaFileToDict(fastaFile)
+    seqIdToBp = fas.getSequenceToBpDict(fastaFile)
+    seqIdToPred = csv.predToDict(predFile)
+    outFasta = csv.OutFileBuffer(outFastaFile)
+    outPred = csv.OutFileBuffer(outPredFile)
 
+    totalBp = 0
+    taken = 0
+    takenBp = 0
+    for seqId, seq in seqIdToSeq.iteritems():
+        bp = seqIdToBp[seqId]
+        totalBp += bp
+        if bp >= minBp:
+            taxonId = seqIdToPred[seqId]
+            outFasta.writeText('>' + str(seqId) + '\n' + str(seq) + '\n')
+            outPred.writeText(str(seqId) + '\t' + str(taxonId) + '\n')
+            taken += 1
+            takenBp += bp
+    outFasta.close()
+    outPred.close()
 
+    print('Total sequences: ', len(seqIdToSeq))
+    print('Total size: ', totalBp)
+    print('Taken sequences: ', taken)
+    print('Taken size:', takenBp)
 
 
 if __name__ == "__main__":
     #stat()
     #test2()
-    print toPercent([12,24,50,209,3], 2)
+    #print toPercent([12,24,50,209,3], 2)
+    filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier51Strains/contigs_soapdenovo-20121119.fna',
+                       '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119.tax',
+                       '/Users/ivan/Documents/work/binning/data/mercier51Strains/contigs_soapdenovo-20121119_1000bp.fna',
+                       '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119_1000bp.tax')

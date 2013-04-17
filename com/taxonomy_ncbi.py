@@ -128,7 +128,7 @@ class TaxonomyNcbi():
             @return: set of parent ncbi taxon ids.
             @rtype: set
         """
-        s = set([])
+        s = set()
         currentId = ncbid
         while True:
             currentId = self.getParentNcbid(currentId)

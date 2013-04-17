@@ -17,22 +17,23 @@
 """
 import os
 import re
-import argparse
 import glob
+import argparse
 
 from com import csv
 from com import fasta as fas
-from com.taxonomy_ncbi import TaxonomyNcbi as tax
+from com import taxonomy_ncbi as tax
 
 
 _STRAIN = 'strain'
 _RANKS = ['phylum', 'class', 'order', 'family', 'genus', 'species', _STRAIN]
 
 
-class _TaxonomyWrap():
+class _TaxonomyWrapMD():
     def __init__(self, taxonomy):
         """ A taxonomy wrapper.
-            @type taxonomy TaxonomyNcbi
+            @param taxonomy: file path to the ncbi taxonomy database in the sqlite3
+            @type taxonomy: str
         """
         self._taxonomy = tax.TaxonomyNcbi(taxonomy, considerNoRank=True)
         self._existsTaxonIdSet = set()
@@ -66,7 +67,8 @@ class _TaxonomyWrap():
             @type rank: str
             @rtype: int
         """
-        assert isinstance(taxonId, int) and (rank in _RANKS), str('Rank "%s" is not supported!' % rank)
+        assert isinstance(taxonId, int)
+        assert (rank in _RANKS), str('Rank "%s" is not supported!' % rank)
         if rank == _STRAIN:
             assert self.isLeaf(taxonId)
             return taxonId
@@ -101,11 +103,11 @@ class _TaxonomyWrap():
         if taxonId in self._taxonIdToDirectChildrenSet:
             return self._taxonIdToDirectChildrenSet[taxonId]
         else:
-            list = self._taxonomy.getChildrenNcbids(taxonId)
-            if list is None:
+            lst = self._taxonomy.getChildrenNcbids(taxonId)
+            if lst is None:
                 return None
             else:
-                resultSet = set(map(int, list))
+                resultSet = set(map(int, lst))
                 self._taxonIdToDirectChildrenSet[taxonId] = resultSet
                 return resultSet
 
@@ -120,13 +122,14 @@ def _refFilePathToTaxonId(refFilePath):
         @rtype: int
     """
     assert refFilePath.endswith(('.fna', '.fas')), str(
-        'The fasta files can end either with .fna or .fas ' + refFilePath)
+        'The fasta files are allowed to end either with .fna or .fas ' + refFilePath)
     return int(os.path.basename(refFilePath).rsplit('.', 2)[0])
 
 
 def _mgSeqIdToTaxonId(seqId):
     """
         Extracts a taxonId from sequence id used in the Amphora or Silva mg databases (ends with '|ncbid:taxonId")
+
         @param seqId: sequence id used in mg databases
         @return: taxonId
         @rtype: int
@@ -135,73 +138,95 @@ def _mgSeqIdToTaxonId(seqId):
 
 
 def _main():
-    """ Main function, see module description."""
+    """ Main function (script interface), see module description."""
+    parser = argparse.ArgumentParser(description=__doc__, epilog='')
+
+    parser.add_argument('-a', '--action', nargs=1, required=True, choices=['cl', 'mr', 'mg'],
+                        help='''To determine ONE action that will be performed. (cl) generates a list of leaf level
+                        clades that should be masked. (mr) masked reference sequences as sim-links.
+                        (mg) mask Amphora or Silva mg db.''', dest='action')
+
+    parser.add_argument('-c', '--input-clades-list', nargs=1, type=file, required=True,
+                        help='A list of clades that will be masked from the databases.', metavar='clades.txt',
+                        dest='clades')
+
+    parser.add_argument('-d', '--input-dir', action='store', nargs=1, required=True,
+                        help='Directory that contains input files (reference sequences or mg reference sequences).',
+                        metavar='in_dir', dest='inDir')
+
+    parser.add_argument('-r', '--rank', action='store', nargs=1, required=True, choices=_RANKS,
+                        help='Rank to be masked.', metavar='genus', dest='rank')
+
+    parser.add_argument('-o', '--output-dir', action='store', nargs=1, required=True,
+                        help='Directory that contains the output files (masked (mg), reference sequences, '
+                             'or a list of masked clades)', metavar='out_dir', dest='outDir')
+
+    parser.add_argument('-t', '--taxonomy-file', nargs=1, type=file, required=True,
+                        help='NCBI taxonomy database file in the sqlite3 format.', metavar='ncbitax_sqlite.db',
+                        dest='taxonomy')
+
+    # parse and read arguments
+    args = parser.parse_args()
+    action = args.action[0]
+    inDir = args.inDir[0]
+    outDir = args.outDir[0]
+    rank = args.rank[0]
+    cladesFilePath = args.clades[0].name
+    taxonomyFilePath = args.taxonomy[0].name
+    maskDb(action, inDir, outDir, rank, cladesFilePath, taxonomyFilePath, verbose=True)
+
+
+def maskDb(action, inDir, outDir, rank, clades, taxonomyFilePath, verbose=False):
+    """
+        Main function (function interface), see module description.
+
+        @param action: one action that will be performed [cl, mr, mg] ~ (generate list, mask seq, mask mg)
+        @type action str
+        @param inDir: directory containing input files
+        @type inDir: str
+        @param outDir: directory containing output files
+        @type: outDir: str
+        @param rank: the data will be excluded at this rank
+        @type rank: str
+        @param clades: a file containing clades that will be masked (one ncbi taxon id at a line),
+            or a set of ncbi taxon ids that will be masked
+        @type clades: file or set of int
+        @param taxonomyFilePath: taxonomy database file in the sqlite3 format
+        @type taxonomyFilePath: str
+    """
+    # check input parameters
+    assert action in ['cl', 'mr', 'mg'], str('Given action is not supported: ' + action)
+    if action == 'mr':
+        assert os.name == 'posix', 'Symbolic links can be created only on posix systems, action "mr" is not valid!'
+    for dir in [inDir, outDir]:
+        assert os.path.isdir(dir), str("Directory doesn't exists: " + dir)
+    assert rank in _RANKS, str('Not supported rank: ' + rank)
+    assert os.path.isfile(taxonomyFilePath), str("Taxonomy database file doesn't exist: " + taxonomyFilePath)
+    assert isinstance(clades, set) or (isinstance(clades, str) and os.path.isfile(clades)), str(
+        "Parameter 'clades' can be either a file or a set of ncbi taxonIds to be excluded.")
+
+    # maps a rank to a lower rank
     toLowerRank = {}
     for i in range(1, len(_RANKS)):
         toLowerRank[_RANKS[i-1]] = _RANKS[i]
 
-    parser = argparse.ArgumentParser(description=__doc__, epilog="""""")
-
-    parser.add_argument('-a', '--action', nargs=1, required=True, choices=['cl', 'mr', 'mg'],
-        help='''To determine ONE action that will be performed. (cl) generates a list of leaf level clades that
-                should be masked. (mr) masked reference sequences as sim-links. (mg) mask Amphora or Silva mg db.''',
-        dest='action')
-
-    parser.add_argument('-c', '--input-clades-list', nargs=1, type=file, required=True,
-        help='A list of clades that will be masked from the databases.',
-        metavar='clades.txt',
-        dest='clades')
-
-    parser.add_argument('-d', '--input-dir', action='store', nargs=1, required=True,
-        help='Directory that contains input files (reference sequences or mg reference sequences).',
-        metavar='in_dir',
-        dest='inDir')
-
-    parser.add_argument('-r', '--rank', action='store', nargs=1, required=True, choices=_RANKS,
-        help='Rank to mask.',
-        metavar='rank',
-        dest='rank')
-
-    parser.add_argument('-o', '--output-dir', action='store', nargs=1, required=True,
-        help='Directory that contains the output files (masked (mg), reference sequences, or a list of masked clades)',
-        metavar='out_dir',
-        dest='outDir')
-
-    parser.add_argument('-t', '--taxonomy-file', nargs=1, type=file, required=True,
-        help='NCBI taxonomy database file in the sqlite3 format.', metavar='ncbitax_sqlite.db',
-        dest='taxonomy')
-
-    #parse arguments
-    args = parser.parse_args()
-    action = args.action[0]
-    inDir = args.inDir[0]
-    outDir =  args.outDir[0]
-    rank = args.rank[0]
-    cladesFilePath = args.clades[0].name
-    taxonomyFilePath = args.taxonomy[0].name
-
-    #check arguments
-    for f in [cladesFilePath, taxonomyFilePath]:
-        assert os.path.isfile(f), str('File does not exists: ' + f)
-    for dir in [inDir, outDir]:
-        assert os.path.isdir(dir), str('Directory does not exists: ' + dir)
-    if action == 'mr':
-        assert os.name == 'posix', 'Symbolic links can be created only on posix systems, action "mr" is not valid!'
-
-    taxonomy = _TaxonomyWrap(taxonomyFilePath)
+    taxonomy = _TaxonomyWrapMD(taxonomyFilePath)
 
     # leaf clades to mask
-    inCladesSet = set(map(int, csv.getColumnAsList(cladesFilePath)))
+    if isinstance(clades, set):
+        inCladesSet = set(map(int, clades))
+    else:
+        inCladesSet = set(map(int, csv.getColumnAsList(clades)))
 
     # clades in the reference
     refCladesSet = set()
     if action in ['cl', 'mr']:
         # get the list of all taxon ids that appear in the directory (as PPS reference)
-        for fastaFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.f[na][as]')): # *.fas or *.fna
-            refCladesSet.add(_refFilePathToTaxonId(fastaFilePath)) # taxonId.1.fna or taxonId.1.fas
+        for fastaFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.f[na][as]')):  # *.fas or *.fna
+            refCladesSet.add(_refFilePathToTaxonId(fastaFilePath))  # taxonId.1.fna or taxonId.1.fas
     elif action in ['mg']:
-        # get the list of all taxon ids that appears in any file in the input directory as taxonomy ".tax"
-        for mapFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.tax')): # *.tax
+        # get the list of all taxon ids that appear in any file in the input directory as taxonomy ".tax"
+        for mapFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.tax')):  # *.tax
             refCladesSet.update(set(map(_mgSeqIdToTaxonId, csv.getColumnAsList(mapFilePath, sep='\t'))))
     else:
         assert False, str('Not supported action: ' + action)
@@ -209,25 +234,26 @@ def _main():
     # checks whether taxonIds are in the taxonomy
     for taxonId in inCladesSet:
         assert taxonomy.exists(taxonId), str(
-            'taxonId: %s from clades list is not contained in the taxonomy!' % str(taxonId))
+            'taxonId: %s from clades list is not contained in the taxonomy!' % taxonId)
     for taxonId in refCladesSet:
         assert taxonomy.exists(taxonId), str(
-            'taxonId: %s from the reference is not contained in the taxonomy!' % str(taxonId))
+            'taxonId: %s from the reference is not contained in the taxonomy!' % taxonId)
 
-    # checks whether the taxonIds are leafs (does not have to be (unless you want to mask at the strain level))
+    # checks whether the taxonIds are leafs (doesn't have to be (unless you want to mask at the strain level))
     for taxonId in inCladesSet:
         if not taxonomy.isLeaf(taxonId):
-            print('Taxon id %s does not represent a leaf clade in the taxonomy.' % str(taxonId))
+            print('Taxon id %s does not represent a leaf clade in the taxonomy.' % taxonId)
 
-    print('Initial checks done.')
+    if verbose:
+        print('Initial checks done.')
 
     # taxonIds that should be excluded
     toExcludeSet = set()
     for taxonId in inCladesSet:
         taxonIdAtRank = taxonomy.getTaxonIdAtRank(taxonId, rank)
-        if taxonIdAtRank is None: # the lineage is not defined at this rank ! try a lower rank !
-            print('Taxon id: "%s" is not defined at rank: "%s"' % (str(taxonId), rank))
-            currentRank = rank # find a lower rank at which it`s defined
+        if taxonIdAtRank is None:  # the lineage is not defined at this rank ! try a lower rank !
+            print('Taxon id: "%s" is not defined at rank: "%s"' % (taxonId, rank))
+            currentRank = rank  # find a lower rank at which it's defined
             while currentRank in toLowerRank:
                 currentRank = toLowerRank[currentRank]
                 taxonIdAtRank = taxonomy.getTaxonIdAtRank(taxonId, currentRank)
@@ -236,28 +262,32 @@ def _main():
             if taxonIdAtRank is None:
                 taxonIdAtRank = taxonId
                 currentRank = _STRAIN
-            print('Taxon id: %s will be masked at rank: %s' % (str(taxonId), currentRank))
+            print('Taxon id: %s will be masked at rank: %s' % (taxonId, currentRank))
 
-        # all child clades
-        toExcludeSet.update(set(taxonomy.getAllChildren(taxonIdAtRank)))
+        # all child clades (and itself)
+        toExcludeSet.add(int(taxonIdAtRank))
+        toExcludeSet.update(set(map(int, taxonomy.getAllChildren(taxonIdAtRank))))
 
     # all clades that should be excluded (there is at least one sequence for each taxonId in the reference)
     toExcludeSet.intersection_update(refCladesSet)
-    print('Data to mask collected done.')
+    if verbose:
+        print('Data to mask collected done.')
+
+    print('To exclude: ', len(toExcludeSet))
 
     # exclude data from the reference
     if action == 'cl':
         # generates a list of taxonIds
         out = csv.OutFileBuffer(os.path.join(outDir, 'exclude_list.txt'))
         for taxonId in toExcludeSet:
-            out.writeText(str(str(taxonId) + '\n'))
+            out.writeText(str(taxonId) + '\n')
         out.close()
     elif action == 'mr':
         # masked reference sequences (create sim links to files that were not excluded)
-        for fastaFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.f[na][as]')): # *.fas or *.fna
-            taxonId = _refFilePathToTaxonId(fastaFilePath) # taxonId.1.fna or taxonId.1.fas
+        for fastaFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.f[na][as]')):  # *.fas or *.fna
+            taxonId = _refFilePathToTaxonId(fastaFilePath)  # taxonId.1.fna or taxonId.1.fas
             if taxonId not in toExcludeSet:
-                assert os.name == 'posix'
+                # assert os.name == 'posix'
                 os.symlink(fastaFilePath, os.path.join(outDir, os.path.basename(fastaFilePath)))
     elif action == 'mg':
         # exclude sequences from the marker gene databases
@@ -269,17 +299,30 @@ def _main():
 
             # filter out entries from the mapping file
             csv.filterOutLines(mapFilePath, os.path.join(outDir, os.path.basename(mapFilePath)),
-                allowedEntriesSet, entryModifyFunction=_mgSeqIdToTaxonId, colNum=0, sep='\t')
+                               allowedEntriesSet, entryModifyFunction=_mgSeqIdToTaxonId, colNum=0, sep='\t')
 
             # filter out entries from the fasta file
             fastaFilePath = str(mapFilePath.rsplit('.', 1)[0] + '.fna')
             fas.filterOutSequences(fastaFilePath, os.path.join(outDir, os.path.basename(fastaFilePath)),
-                allowedEntriesSet, seqNameModifyFunction=_mgSeqIdToTaxonId)
+                                   allowedEntriesSet, seqNameModifyFunction=_mgSeqIdToTaxonId)
     else:
         assert False, 'Not supported action!'
 
     taxonomy.close()
-    print('Data masked done.')
+    if verbose:
+        print('Data masked done.')
+
+
+def isRankAllowed(rank):
+    """
+        Returns true if the taxonomic rank is allowed to be excluded using this module
+
+        @param rank: taxonomic rank
+        @type rank: str
+        @rtype: bool
+    """
+    return bool(rank in _RANKS)
+
 
 ###------------------------------------------------------------------------
 
@@ -476,7 +519,7 @@ def _test2():
         removeSequences(mg)
 
 def _test3():
-    t = _TaxonomyWrap('/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db')
+    t = _TaxonomyWrapMD('/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db')
     id = 83763
     print 'exists:', t.exists(id)
     print 'isLeaf:', t.isLeaf(id)

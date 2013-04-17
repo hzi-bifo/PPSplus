@@ -9,7 +9,7 @@ from core.sequences import Sequences
 from core.sequences import seqWeightThenLenCmp
 from core.taxonomy import Taxonomy
 #from core.ref import DBData
-from core.ref import RefSequences
+from core.ref_seq import RefSequences
 from com import common
 from com.config import Config
 from old.ml_tree_map import placeSequences

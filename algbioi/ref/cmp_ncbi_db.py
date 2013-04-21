@@ -6,8 +6,8 @@
 
 import argparse
 
-from com.csv import getColumnAsList
-from com.taxonomy_ncbi import TaxonomyNcbi
+from algbioi.com.csv import getColumnAsList
+from algbioi.com.taxonomy_ncbi import TaxonomyNcbi
 
 
 def _main():

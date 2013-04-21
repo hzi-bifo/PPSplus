@@ -6,11 +6,11 @@ import re
 import subprocess
 import glob
 
-from com.config import Config
-from com.csv import forEachLine
-from com.csv import OutFileBuffer
-from com.csv import getMapping
-from com.fasta import fastaFileToDict
+from algbioi.com.config import Config
+from algbioi.com.csv import forEachLine
+from algbioi.com.csv import OutFileBuffer
+from algbioi.com.csv import getMapping
+from algbioi.com.fasta import fastaFileToDict
 
 
 class MGCluster():

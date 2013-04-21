@@ -20,9 +20,7 @@ import re
 import glob
 import argparse
 
-from com import csv
-from com import fasta as fas
-from com import taxonomy_ncbi as tax
+from algbioi.com import csv
 
 
 _STRAIN = 'strain'

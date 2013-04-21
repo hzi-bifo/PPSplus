@@ -4,8 +4,8 @@ import re
 import sys
 import argparse
 
-from com.csv import forEachLine
-from com.csv import OutFileBuffer
+from algbioi.com.csv import forEachLine
+from algbioi.com.csv import OutFileBuffer
 
 
 def main():

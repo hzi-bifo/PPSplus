@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import zlib
-from com.common import noNewLine
-from com.common import removeNonDna
+from algbioi.com.common import noNewLine
+from algbioi.com.common import removeNonDna
 
 
 #---------------------------------------------------

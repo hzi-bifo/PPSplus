@@ -3,9 +3,7 @@
 import os
 import argparse
 
-from com import csv
-from com import fasta
-from com import taxonomy_ncbi
+from algbioi.com import csv, fasta, taxonomy_ncbi
 
 
 class _TaxonomyWrapperA():

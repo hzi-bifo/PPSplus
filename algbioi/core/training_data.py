@@ -5,14 +5,12 @@ import sys
 import re
 import glob
 
-from core.sequences import Sequences
-from core.sequences import seqWeightThenLenCmp
-from core.taxonomy import Taxonomy
+from algbioi.core.sequences import seqWeightThenLenCmp
 #from core.ref import DBData
-from core.ref_seq import RefSequences
-from com import common
-from com.config import Config
-from old.ml_tree_map import placeSequences
+from algbioi.core.ref_seq import RefSequences
+from algbioi.com import common
+#from com.config import Config
+#from old.ml_tree_map import placeSequences
 
 
 class PPSInput():
@@ -589,30 +587,31 @@ def test():
         @deprecated: old test
     """
     pass
-#    config = Config(open(os.path.normpath('D:\\A_Phylo\\A_Metagenomic\\pPPS\\workspace\\pPPS\\config01.cfg')), 'pPPS')
-#
-#    #read sequences
-#    sequences = Sequences(config) #!!!
-#
-#    #write ids file
-#    sequences.writeSequences(config.get('inputIdsFastaFile'))
-#
-#    #taxonomy
-#    taxonomy = Taxonomy(config.get('databaseFile'), config.get('taxonomicRanks').split(','))
-#
-#    placeSequences(sequences, taxonomy, config.get('final_RAxML_outputs'))
-#
-#    if eval(config.get('placeContigsFromTheSameScaffold')):
-#        sequences.placeContigsFromTheSameScaffold(taxonomy)
-#
-#    taxonomy.close()
-#
-#    pps = PPSInput(sequences, config.get('taxonomicRanks').split(','), config.get('summaryAllFile'))
-#
-#    pps.createPPSInputFiles(config.get('nodesFile'), config.get('trainingDataDir'),
-#                        int(config.get('rankIdAll')), int(config.get('rankIdCut')), int(config.get('rankIdCutMinBp')),
-#                        int(config.get('minTrainingBp')),
-#                        int(config.get('fastaLineMaxChar')), config.get('summaryTrainFile'))
+
+    #config = Config(open(os.path.normpath('D:\\A_Phylo\\A_Metagenomic\\pPPS\\workspace\\pPPS\\config01.cfg')), 'pPPS')
+
+    #read sequences
+    #sequences = Sequences(config) #!!!
+
+    #write ids file
+    #sequences.writeSequences(config.get('inputIdsFastaFile'))
+
+    #taxonomy
+    #taxonomy = Taxonomy(config.get('databaseFile'), config.get('taxonomicRanks').split(','))
+
+    #placeSequences(sequences, taxonomy, config.get('final_RAxML_outputs'))
+
+    #if eval(config.get('placeContigsFromTheSameScaffold')):
+    #    sequences.placeContigsFromTheSameScaffold(taxonomy)
+
+    #taxonomy.close()
+
+    #pps = PPSInput(sequences, config.get('taxonomicRanks').split(','), config.get('summaryAllFile'))
+
+    #pps.createPPSInputFiles(config.get('nodesFile'), config.get('trainingDataDir'),
+    #                    int(config.get('rankIdAll')), int(config.get('rankIdCut')), int(config.get('rankIdCutMinBp')),
+    #                    int(config.get('minTrainingBp')),
+    #                    int(config.get('fastaLineMaxChar')), config.get('summaryTrainFile'))
 
 
 #(self, outFilePath, outTrainDataDir, rankIdAll, rankIdCut, rankIdCutMinBp, fastaLineMaxChar):

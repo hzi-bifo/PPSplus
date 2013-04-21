@@ -4,10 +4,10 @@ import re
 import os
 import glob
 
-from core.taxonomy import Taxonomy
-from core.sequences import toScafContigMap
-from com.config import Config
-from com import common
+from algbioi.core.taxonomy import Taxonomy
+from algbioi.core.sequences import toScafContigMap
+from algbioi.com.config import Config
+from algbioi.com import common
 
 
 def ppsOut2Placements(ppsOutFile, scafContigFile=None):

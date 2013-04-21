@@ -3,10 +3,9 @@
 import re
 import os
 
-from com import common
-from com.config import Config
-from core.taxonomy import Taxonomy
-from com import csv
+from algbioi.com import common, csv
+from algbioi.com.config import Config
+from algbioi.core.taxonomy import Taxonomy
 
 
 def scafToContigOutput(scaffContigMapFile, scaffPPSOutFile, contigPPSOutFile):

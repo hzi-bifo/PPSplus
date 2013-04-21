@@ -6,8 +6,7 @@ import re
 import subprocess
 from Bio import SeqIO
 
-from com import common
-from com import csv
+from algbioi.com import common, csv
 
 
 class RRNA16S():

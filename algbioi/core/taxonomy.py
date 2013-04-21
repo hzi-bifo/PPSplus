@@ -6,7 +6,7 @@ import re
 import sqlite3
 import datetime
 
-from com.config import Config
+from algbioi.com.config import Config
 
 
 class Node():

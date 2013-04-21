@@ -1,9 +1,9 @@
-from Bio.Seq import Seq
-from com.taxonomy_ncbi import TaxonomyNcbi
-import com.fasta as fas
-from com import csv
 import re
-import os
+
+from Bio.Seq import Seq
+
+from algbioi import com as fas
+from algbioi.com import csv
 
 
 def sayHi(uu, ss, bb):
@@ -27,7 +27,6 @@ def sayHi(uu, ss, bb):
     print a
 
     b='jkgh'
-    b.replace
 
     print(uu + ss + bb)
 
@@ -38,7 +37,6 @@ def test2():
     s = 'lsuparc_silva106_ncbitax.bacteria+archaea.tax'
     print s[(s.rindex('.', 0, s.rindex('.')) + 1):s.rindex('.')]
     print 'done'
-
 
 def stat():
     """

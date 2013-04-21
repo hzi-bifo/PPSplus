@@ -3,10 +3,10 @@
 import os
 import re
 
-from core.sequence import Sequence
-from core.scaffold import Scaffold
-from com.config import Config
-from com.common import noNewLine
+from algbioi.core.sequence import Sequence
+from algbioi.core.scaffold import Scaffold
+from algbioi.com.config import Config
+from algbioi.com.common import noNewLine
 
 
 class Sequences():

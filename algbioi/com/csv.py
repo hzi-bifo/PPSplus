@@ -5,7 +5,7 @@ import sys
 import re
 import types
 
-from com.common import noNewLine
+from algbioi.com.common import noNewLine
 
 
 def getColumnAsList(fileName, entryModifyFunction=None, colNum=0, sep=None, comment='#'):

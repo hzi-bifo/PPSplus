@@ -3,8 +3,8 @@
 import os
 import random
 
-from com.csv import OutFileBuffer #writeText close
-from com.fasta import fastaFileToDict
+from algbioi.com.csv import OutFileBuffer #writeText close
+from algbioi.com.fasta import fastaFileToDict
 
 
 def splitSet1(scaffFilePath, contigFilePath, outMapFilePath, settings):

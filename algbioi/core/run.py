@@ -10,31 +10,30 @@ import argparse
 import subprocess
 import datetime
 
-from com import common
-from com import csv
-from com import taxonomy_ncbi
-from com.config import Config
-from core import ssd_eval
-from core.pps import ppsOut2ppOut
-from core.pps import readPPSOutput
-from core.pps import computeTrainingAccuracy
-from core.training_data import PPSInput
-from core.analysis_mg import MarkerGeneAnalysis
-from core.cluster import MGCluster
-from core.taxonomy import Taxonomy
-from core.sequences import Sequences
-from core.analysis16s import RRNA16S
-from eval import consistency
-from eval import accuracy
-from eval import confusion_matrix
-from misc import out_proc
-from ref import mask_db
+from algbioi.com import csv, common, taxonomy_ncbi
+from algbioi.com.config import Config
+from algbioi.core import ssd_eval
+from algbioi.core.pps import ppsOut2ppOut
+from algbioi.core.pps import readPPSOutput
+from algbioi.core.pps import computeTrainingAccuracy
+from algbioi.core.training_data import PPSInput
+from algbioi.core.analysis_mg import MarkerGeneAnalysis
+from algbioi.core.cluster import MGCluster
+from algbioi.core.taxonomy import Taxonomy
+from algbioi.core.sequences import Sequences
+from algbioi.core.analysis16s import RRNA16S
+from algbioi.eval import consistency
+from algbioi.eval import accuracy, confusion_matrix
+from algbioi.misc import out_proc
 
 
 # paths on hera/gaia:
 # export PATH=/net/programs/Debian-6.0.3-x86_64/python-2.7joh/bin:$PATH
 # export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR19
 #
+from algbioi.ref import mask_db
+
+
 def main():
     # external commands will be executed in Shell in Unix/Linux
     assert os.name == 'posix', str('The pipeline runs only on "posix" systems (i.e. Unix/Linux compatible). ' +

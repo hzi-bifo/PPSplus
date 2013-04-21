@@ -8,9 +8,9 @@ import os
 import glob
 import re
 
-from com.csv import forEachLine
-from com.csv import OutFileBuffer
-from com.taxonomy_ncbi import TaxonomyNcbi
+from algbioi.com.csv import forEachLine
+from algbioi.com.csv import OutFileBuffer
+from algbioi.com.taxonomy_ncbi import TaxonomyNcbi
 
 
 def getBinToOrderDict():

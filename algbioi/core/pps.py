@@ -4,13 +4,9 @@ import os
 import re
 import subprocess
 
-from com import csv
-from com import fasta
-from com import common
-from com import taxonomy_ncbi
-from eval import accuracy
-from eval import confusion_matrix
-from core.taxonomy import Taxonomy
+from algbioi.com import csv, common, fasta, taxonomy_ncbi
+from algbioi.core.taxonomy import Taxonomy
+from algbioi.eval import accuracy, confusion_matrix
 
 
 def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrainDataDir, outputDir, ppsInstallDir,
@@ -74,8 +70,8 @@ def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrai
         predictProc.wait()
         logOut.close()
         if predictProc.returncode != 0:
-            print("PPS 'predict' training data error return code: %s, training data accuracy won't be computed!\n cmd:"
-                  % (predictProc.returncode, predictCmd))
+            print("PPS 'predict' training data error return code: %s, training data accuracy won't be computed!\n "
+                  "cmd: %s" % (predictProc.returncode, predictCmd))
             return
     else:
         print("Can't run PPS on a non-posix system!")

@@ -2,11 +2,11 @@
 
 """To detect Chimeras in the Mercier dataset - is NOT complete."""
 
-from com.csv import getColumnAsList
-from com.csv import getMapping
-from com.csv import filterOutLines
-from com.csv import OutFileBuffer
-from com.fasta import getSequenceToBpDict
+from algbioi.com.csv import getColumnAsList
+from algbioi.com.csv import getMapping
+from algbioi.com.csv import filterOutLines
+from algbioi.com.csv import OutFileBuffer
+from algbioi.com.fasta import getSequenceToBpDict
 
 
 def filterAlignments():

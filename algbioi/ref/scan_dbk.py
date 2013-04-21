@@ -5,18 +5,19 @@ import sys
 import signal
 import string
 import subprocess
-from Bio import SeqIO
-from Bio.Seq import Seq
 from sets import Set
 
-from com.csv import getMapping
-from com.csv import OutFileBuffer
-from com.csv import getColumnAsList
-from com.fasta import fastaFileToDict
-from com.fasta import getSequenceToBpDict
-from com.fasta import getSequencesToList
-from com.fasta import filterOutSequences
-from com.common import noNewLine
+from Bio import SeqIO
+from Bio.Seq import Seq
+
+from algbioi.com.csv import getMapping
+from algbioi.com.csv import OutFileBuffer
+from algbioi.com.csv import getColumnAsList
+from algbioi.com.fasta import fastaFileToDict
+from algbioi.com.fasta import getSequenceToBpDict
+from algbioi.com.fasta import getSequencesToList
+from algbioi.com.fasta import filterOutSequences
+from algbioi.com.common import noNewLine
 
 
 def printStatDbk():

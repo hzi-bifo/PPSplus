@@ -12,7 +12,7 @@ from Bio import Entrez
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna
 #Entrez.email = 'A.N.Other@example.com'
-from core.taxonomy import Taxonomy
+from algbioi.core.taxonomy import Taxonomy
 
 
 def test():

@@ -6,11 +6,11 @@ import re
 import subprocess
 from Bio import SeqIO
 
-from com.csv import forEachLine
-from com.csv import isComment
-from com.csv import OutFileBuffer
-from com import common
-from core.dna_to_prot import dnaToProt
+from algbioi.com.csv import forEachLine
+from algbioi.com.csv import isComment
+from algbioi.com.csv import OutFileBuffer
+from algbioi.com import common
+from algbioi.core.dna_to_prot import dnaToProt
 
 
 class _MgFiles():

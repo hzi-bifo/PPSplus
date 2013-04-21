@@ -5,8 +5,8 @@ import re
 import glob
 import sqlite3
 
-from com.config import Config
-from com import taxonomy_ncbi
+from algbioi.com.config import Config
+from algbioi.com import taxonomy_ncbi
 
 
 class RefSequences():

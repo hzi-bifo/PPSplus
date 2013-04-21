@@ -10,10 +10,10 @@ import os
 import sys
 import argparse
 
-from com.csv import predToDict
-from com.csv import getMapping
-from com.fasta import getSequenceToBpDict
-from com.taxonomy_ncbi import TaxonomyNcbi
+from algbioi.com.csv import predToDict
+from algbioi.com.csv import getMapping
+from algbioi.com.fasta import getSequenceToBpDict
+from algbioi.com.taxonomy_ncbi import TaxonomyNcbi
 
 
 class _TaxonomyWrapper():

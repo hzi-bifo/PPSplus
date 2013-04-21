@@ -10,9 +10,9 @@ import re
 import types
 from Bio import SeqIO
 
-from com.csv import OutFileBuffer
-from com.common import removeNonDna
-from com.common import noNewLine
+from algbioi.com.csv import OutFileBuffer
+from algbioi.com.common import removeNonDna
+from algbioi.com.common import noNewLine
 
 
 def filterOutSequences(inFileName, outFileName, allowedNamesSet, formatName="fasta", seqNameModifyFunction = None):

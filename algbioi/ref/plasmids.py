@@ -9,7 +9,7 @@ from Bio import SeqIO
 #from FastaFileFunctions import fastaFileToDict
 #from FastaFileFunctions import getSequenceToBpDict
 #from TabSepFileFunctions import getMapping
-from com.csv import OutFileBuffer
+from algbioi.com.csv import OutFileBuffer
 #from TabSepFileFunctions import getColumnAsList
 #from Common import noNewLine
 

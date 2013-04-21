@@ -3,7 +3,7 @@
 import os
 import re
 
-from com import common
+from algbioi.com import common
 
 
 def substCol(tabFile, mapFile, colKeySrc, colValueDst, delColKeys, shuffleList=None, outFile=None):

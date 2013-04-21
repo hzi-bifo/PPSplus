@@ -7,10 +7,10 @@ import argparse
 import string
 import gzip
 
-from com.config import Config
-from com.csv import getMapping
-from com.csv import OutFileBuffer
-from com.fasta import fastaFileToDict
+from algbioi.com.config import Config
+from algbioi.com.csv import getMapping
+from algbioi.com.csv import OutFileBuffer
+from algbioi.com.fasta import fastaFileToDict
 
 
 def main():

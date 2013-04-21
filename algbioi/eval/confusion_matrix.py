@@ -9,9 +9,7 @@
 
 import os
 import argparse
-from com import taxonomy_ncbi
-from com import fasta as fas
-from com import csv
+from algbioi.com import taxonomy_ncbi, csv
 
 
 class _TaxonomyWrapCM():

@@ -11,6 +11,8 @@ import glob
 import argparse
 
 from algbioi.com import csv
+from algbioi.com import fasta as fas
+from algbioi.com import taxonomy_ncbi as tax
 
 
 class _TaxonomyWrap():

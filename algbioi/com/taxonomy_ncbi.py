@@ -6,6 +6,7 @@ import sqlite3
 
 TAXONOMIC_RANKS = ['root','superkingdom','phylum','class','order','family','genus','species']
 
+
 class TaxonomyNcbi():
     """
         Represents an interface to the sqlite3 database in which the NCBI taxonomy is stored.

@@ -99,7 +99,7 @@ def seqFileToSeqList(file):
     try:
         f = open(os.path.normpath(file),'r')
     except Exception:
-        print "Cannot open file:", file1
+        print "Cannot open file:", file
         raise
     else:
         name = ''

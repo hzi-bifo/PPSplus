@@ -3,7 +3,8 @@
 import re
 import os
 
-from algbioi.com import common, csv
+from algbioi.com import common
+from algbioi.com import csv
 from algbioi.com.config import Config
 from algbioi.core.taxonomy import Taxonomy
 

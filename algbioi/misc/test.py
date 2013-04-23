@@ -1,9 +1,11 @@
 import re
+import os
 
 from Bio.Seq import Seq
 
-from algbioi import com as fas
+from algbioi.com import fasta as fas
 from algbioi.com import csv
+from algbioi.com import taxonomy_ncbi as tax
 
 
 def sayHi(uu, ss, bb):
@@ -73,6 +75,43 @@ def stat():
     print('total:', totalCount)
 
 
+def toSpecies(refDir, outFile, taxonomyFile, rank='species'):
+    """
+        Outputs a list of all species (rank) sorted according to the abundance of the individual species (rank).
+        Abundance in respect to the size of the reference data available.
+
+        @param refDir: directory containing reference data (as needed for PPS)
+        @param outList: tab sep file, first column taxon id, second column bp
+    """
+
+    taxonomy = tax.TaxonomyNcbi(taxonomyFile)
+    specNcbiToBp = {}
+    for fileName in os.listdir(refDir):
+        size = os.path.getsize(os.path.join(refDir, fileName))
+        ncbid = int(fileName.rsplit('.', 2)[0])
+        current = ncbid
+        while (current is not None) and (taxonomy.getRank(current) != rank):
+            current = taxonomy.getParentNcbid(int(current))
+        if current is not None:
+            if current in specNcbiToBp:
+                specNcbiToBp[current] += size
+            else:
+                specNcbiToBp[current] = size
+        else:
+            print('There is no ncbi taxon id defined at rank %s for ncbi taxon id %s' % (rank, ncbid))
+
+    tuples = []
+    for ncbid, size in specNcbiToBp.iteritems():
+        tuples.append((ncbid, size))
+    tuples.sort(key=lambda x: x[1], reverse=True)
+
+    out = csv.OutFileBuffer(outFile)
+    for t in tuples:
+        out.writeText(str(t[0]) + '\t' + str(t[1]) + '\n')
+    out.close()
+    taxonomy.close()
+
+
 def toPercent(costList, costIdxHundredPercent=2):
     """ For PTree, relative cost comparison. """
     percent = costList[costIdxHundredPercent] / 100.0
@@ -131,10 +170,15 @@ def filterOutSequences(fastaFile, predFile, outFastaFile, outPredFile, minBp=100
 
 
 if __name__ == "__main__":
+    toSpecies('/Volumes/hera - net/metagenomics/projects/PPSmg/data/nobackup/NCBI20121122/sequences',
+              '/Users/ivan/Documents/nobackup/species_list.txt',
+              '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db',
+              rank='species')
+
     #stat()
     #test2()
     #print toPercent([12,24,50,209,3], 2)
-    filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier51Strains/contigs_soapdenovo-20121119.fna',
-                       '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119.tax',
-                       '/Users/ivan/Documents/work/binning/data/mercier51Strains/contigs_soapdenovo-20121119_1000bp.fna',
-                       '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119_1000bp.tax')
+    #filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier51Strains/contigs_soapdenovo-20121119.fna',
+    #                   '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119.tax',
+    #                   '/Users/ivan/Documents/work/binning/data/mercier51Strains/contigs_soapdenovo-20121119_1000bp.fna',
+    #                   '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119_1000bp.tax')

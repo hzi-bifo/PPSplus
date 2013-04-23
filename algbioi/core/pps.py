@@ -4,9 +4,13 @@ import os
 import re
 import subprocess
 
-from algbioi.com import csv, common, fasta, taxonomy_ncbi
+from algbioi.com import csv
+from algbioi.com import common
+from algbioi.com import fasta
+from algbioi.com import taxonomy_ncbi
+from algbioi.eval import accuracy
+from algbioi.eval import confusion_matrix
 from algbioi.core.taxonomy import Taxonomy
-from algbioi.eval import accuracy, confusion_matrix
 
 
 def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrainDataDir, outputDir, ppsInstallDir,

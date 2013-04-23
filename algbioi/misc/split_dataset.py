@@ -3,7 +3,7 @@
 import os
 import random
 
-from algbioi.com.csv import OutFileBuffer #writeText close
+from algbioi.com.csv import OutFileBuffer
 from algbioi.com.fasta import fastaFileToDict
 
 

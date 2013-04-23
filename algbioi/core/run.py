@@ -10,7 +10,9 @@ import argparse
 import subprocess
 import datetime
 
-from algbioi.com import csv, common, taxonomy_ncbi
+from algbioi.com import csv
+from algbioi.com import common
+from algbioi.com import taxonomy_ncbi
 from algbioi.com.config import Config
 from algbioi.core import ssd_eval
 from algbioi.core.pps import ppsOut2ppOut
@@ -23,7 +25,8 @@ from algbioi.core.taxonomy import Taxonomy
 from algbioi.core.sequences import Sequences
 from algbioi.core.analysis16s import RRNA16S
 from algbioi.eval import consistency
-from algbioi.eval import accuracy, confusion_matrix
+from algbioi.eval import accuracy
+from algbioi.eval import confusion_matrix
 from algbioi.misc import out_proc
 
 

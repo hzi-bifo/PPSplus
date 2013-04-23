@@ -6,11 +6,8 @@ import re
 import glob
 
 from algbioi.core.sequences import seqWeightThenLenCmp
-#from core.ref import DBData
 from algbioi.core.ref_seq import RefSequences
 from algbioi.com import common
-#from com.config import Config
-#from old.ml_tree_map import placeSequences
 
 
 class PPSInput():

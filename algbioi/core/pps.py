@@ -11,6 +11,7 @@ from algbioi.com import taxonomy_ncbi
 from algbioi.eval import accuracy
 from algbioi.eval import confusion_matrix
 from algbioi.core.taxonomy import Taxonomy
+from algbioi.core import ref_seq
 
 
 def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrainDataDir, outputDir, ppsInstallDir,
@@ -126,7 +127,7 @@ def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrai
     acc = accuracy.Accuracy(seqIdToBpNoSampleSpec, seqIdToPred, seqIdToTruePred, databaseFile)
     out = csv.OutFileBuffer(os.path.join(outputDir, 'train_accuracy_all.txt'))
     out.writeText(acc.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
-                                       minFracClade=0.01, minFracPred=0.01, overview=True))
+                                       minFracClade=None, minFracPred=None, overview=True))
     out.close()
     taxonomyA = acc.getTaxonomy()
     acc.close(closeTaxonomy=False)
@@ -135,7 +136,7 @@ def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrai
     acc = accuracy.Accuracy(seqIdToBpMisc, seqIdToPredMisc, seqIdToTruePredMisc, taxonomyA)
     out = csv.OutFileBuffer(os.path.join(outputDir, 'train_accuracy_misc.txt'))
     out.writeText(acc.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
-                                       minFracClade=0.01, minFracPred=0.01, overview=True))
+                                       minFracClade=None, minFracPred=None, overview=True))
     out.close()
     acc.close(closeTaxonomy=False)
 
@@ -164,7 +165,7 @@ def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrai
         acc = accuracy.Accuracy(seqIdToBpSub, seqIdToPredSub, seqIdToTruePredSub, taxonomyA)
         out = csv.OutFileBuffer(os.path.join(outputDir, 'train_accuracy_' + dName + '.txt'))
         out.writeText(acc.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
-                                           minFracClade=0.01, minFracPred=0.01, overview=True))
+                                           minFracClade=None, minFracPred=None, overview=True))
 
         # confusion matrices
         cm = confusion_matrix.ConfusionMatrix(seqIdToBpSub, seqIdToPredSub, seqIdToTruePredSub, taxonomyCM,
@@ -193,6 +194,82 @@ def _trainAccuracyDataTest():
     modelTaxonIdFilePath = '/Users/ivan/Documents/nobackup/trainAccuracyTest/workingDir/ncbids.txt'
     computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrainDataDir, outputDir, ppsInstallDir,
                             ppsScripts, ppsConfigFilePath, predictLogFileName, modelTaxonIdFilePath, databaseFile)
+
+
+def refToClades(refDir, taxonomyFile, rank='species', outFile=None):
+    """
+        Returns (stores) a list of all clades (at the given rank) sorted according to the abundance of
+        the individual clades. Abundance in respect to the size of the reference data available.
+
+        @param refDir: directory containing reference data (as needed for PPS)
+        @param taxonomyFile: ncbi taxonomy in the sqlite3 format
+        @param rank: consider clades at this rank
+        @param outFile: tab sep file, first column taxon id, second column number of bp (can be None)
+        @return: list of tuples (clade, bp)
+    """
+    taxonomy = taxonomy_ncbi.TaxonomyNcbi(taxonomyFile)
+    cladeNcbiToBp = {}
+    for fileName in os.listdir(refDir):
+        size = os.path.getsize(os.path.join(refDir, fileName))
+        ncbid = int(fileName.rsplit('.', 2)[0])
+        current = ncbid
+        while (current is not None) and (taxonomy.getRank(current) != rank):
+            current = taxonomy.getParentNcbid(int(current))
+        if current is not None:
+            if current in cladeNcbiToBp:
+                cladeNcbiToBp[current] += size
+            else:
+                cladeNcbiToBp[current] = size
+        else:
+            print('There is no ncbi taxon id defined at rank %s for ncbi taxon id %s' % (rank, ncbid))
+    taxonomy.close()
+
+    tuples = []
+    for ncbid, size in cladeNcbiToBp.iteritems():
+        tuples.append((ncbid, size))
+    tuples.sort(key=lambda x: x[1], reverse=True)
+
+    if outFile is not None:
+        out = csv.OutFileBuffer(outFile)
+        for t in tuples:
+            out.writeText(str(t[0]) + '\t' + str(t[1]) + '\n')
+        out.close()
+
+    return tuples
+
+
+def generateCladesForGeneralModel(refSeqDir, taxonomyDatabaseFile,
+                                  rank, minTotalCount, minBpPerSpeciesCount, generalModelMaxClades, taxonIdListFile):
+    """
+        Generates the list of clades (file) to model for the general model
+
+        @param refSeqDir: directory with reference data as needed for PPS
+        @param taxonomyDatabaseFile: taxonomy file in the sqlite3 format
+        @param rank: the clades will be considered at this rank
+        @param minTotalCount: (see config)
+        @param minBpPerSpeciesCount: (see config)
+        @param generalModelMaxClades: maximum length of the list of the clades.
+        @param taxonIdListFile: file to which the ncbi taxon ids will be stored
+        @return: the number of the ncbi taxon ids stored in the file
+    """
+    cladeBpPairList = refToClades(refSeqDir, taxonomyDatabaseFile, rank)
+    rs = ref_seq.RefSequences(refSeqDir, taxonomyDatabaseFile)
+
+    cladeList = []
+    count = 0
+    for clade, bp in cladeBpPairList:
+        if rs.isRefSufficient(int(clade), minTotalCount, minBpPerSpeciesCount):
+            cladeList.append(int(clade))
+            count += 1
+        if count >= generalModelMaxClades:
+            break
+
+    out = csv.OutFileBuffer(taxonIdListFile)
+    for clade in cladeList:
+        out.writeText(str(clade) + '\n')
+    out.close()
+    rs.close()
+    return len(cladeList)
 
 
 def toRealNames(config, sequences):

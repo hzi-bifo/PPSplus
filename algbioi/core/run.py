@@ -18,6 +18,7 @@ from algbioi.core import ssd_eval
 from algbioi.core.pps import ppsOut2ppOut
 from algbioi.core.pps import readPPSOutput
 from algbioi.core.pps import computeTrainingAccuracy
+from algbioi.core.pps import generateCladesForGeneralModel
 from algbioi.core.training_data import PPSInput
 from algbioi.core.analysis_mg import MarkerGeneAnalysis
 from algbioi.core.cluster import MGCluster
@@ -58,8 +59,9 @@ def main():
                         dest='g')
 
     parser.add_argument('-o', '--process-preprocessed-output', action='store', nargs='+',
-                        help='process output from the 16S rRNA analysis (s16), marker gene "31" analysis (mg)',
-                        choices=["s16", "mg"],
+                        help='process output from the 16S rRNA analysis (s16), marker gene "31" analysis (mg); '
+                             'to build the general model (general)' ,
+                        choices=["s16", "mg", "general"],
                         dest='o')
     # push down predictions to more specific clades (sc)
     # build new OTUs (otu)
@@ -316,8 +318,26 @@ def main():
                         mask_db.maskDb('mr', refSeq, maskRefSeqDir, excludeRefSeqRank, refLeafCladesSet, databaseFile)
                         refSeq = maskRefSeqDir
 
+    # build the general model
+    if args.o and ('general' in args.o):
+        rankCut = taxonomy_ncbi.TAXONOMIC_RANKS[int(config.get('rankIdCut')) + 1]
+        count = generateCladesForGeneralModel(refSeq,
+                                              databaseFile,
+                                              rankCut,
+                                              int(config.get('minGenomesWgs')),
+                                              int(config.get('minBpPerSpecies')),
+                                              int(config.get('maxLeafClades')),
+                                              os.path.join(workingDir, 'ncbids.txt'))
+        # the sample specific dir must be empty and the sample specific dir must be set to '' in the PPS config file
+        sampleSpecDir = os.path.join(workingDir, 'sampleSpecificDir')
+        if os.path.isdir(sampleSpecDir):
+            for f in os.listdir(sampleSpecDir):
+                os.remove(os.path.join(sampleSpecDir, f))
+
+        print('General Model: the list of "%s" clades at rank "%s" generated.' % (count, rankCut))
+
     # process output of the marker gene (31 and 16, 23, 5) analysis and create output for PPS
-    if args.o:
+    elif args.o:
         if sequences is None:
             sequences = Sequences(inputFastaFile, inputFastaScaffoldsFile,
                                   scaffoldsToContigsMapFile, taxonomicRanks, minSeqLen)
@@ -399,19 +419,26 @@ def main():
             summaryTrainFile)
 
     # generate PPS configuration file (before train or predict) if custom configuration file is not available !
-    if (args.t or args.p) and (config.get('configPPS') is None):
+    if (args.t or args.p or args.a) and (config.get('configPPS') is None):
         if parallelPPSmodels:
             pm = 'TRUE'
         else:
             pm = 'FALSE'
+
+        # if the sample specific dir is empty or doesn't exist, it must be set to '' in the PPS configuration file
+        sampleSpecDir = os.path.join(workingDir, 'sampleSpecificDir')
+        if not os.path.isdir(sampleSpecDir) or len(os.listdir(sampleSpecDir)) == 0:
+            sampleSpecDir = ''
+
         keyDict = {'NCBI_PROCESSED_DIR': str(refSeq),
                    'NCBI_TAX_DIR': os.path.dirname(databaseFile),
                    'PROJECT_DIR': os.path.join(workingDir, 'projectDir'),
                    'TREE_FILE': os.path.join(workingDir, 'ncbids.txt'),
-                   'SAMPLE_SPECIFIC_DIR': os.path.join(workingDir, 'sampleSpecificDir'),
+                   'SAMPLE_SPECIFIC_DIR': sampleSpecDir,
                    'PARALLEL_MODELS': pm,  # optional
                    'GENOMES_EXCLUDE': ''}  # optional
         createPPSConfig(ppsConfigFilePath, keyDict)
+
 
     # run PhyloPythiaS train (optionally compute training accuracy)
     ppsScripts = os.path.normpath(os.path.join(config.get('ppsInstallDir'), 'scripts'))
@@ -561,7 +588,8 @@ def main():
         # generate comparison tables
         outCmpRefDir = os.path.join(outputDir, 'cmp_ref')
         try:
-            os.mkdir(outCmpRefDir)
+            if not os.path.isdir(outCmpRefDir):
+                os.mkdir(outCmpRefDir)
         except IOError:
             print("Cmp to ref.: Can't create directory: " + outCmpRefDir)
         else:
@@ -615,9 +643,11 @@ def main():
         taxonomy = Taxonomy(databaseFile, taxonomicRanks)
         if os.path.isfile(common.createTagFilePath(workingDir, fastaFileIds, 'out')):
             placementPPS = ssd_eval.ppsOut2Placements(common.createTagFilePath(workingDir, fastaFileIds, 'out'), None)
-            SSDPlacement = ssd_eval.ssd2Placements(os.path.join(workingDir, 'sampleSpecificDir'), None)
-            cmpList = ssd_eval.cmpPlacements(SSDPlacement, placementPPS, taxonomy, taxonomicRanks)
-            ssd_eval.cmp2Summary(cmpList, common.createTagFilePath(workingDir, fastaFileIds, 'ssd_cross'))
+            if os.path.isdir(os.path.join(workingDir, 'sampleSpecificDir')) and \
+                    (len(os.listdir(os.path.join(workingDir, 'sampleSpecificDir'))) > 0):
+                SSDPlacement = ssd_eval.ssd2Placements(os.path.join(workingDir, 'sampleSpecificDir'), None)
+                cmpList = ssd_eval.cmpPlacements(SSDPlacement, placementPPS, taxonomy, taxonomicRanks)
+                ssd_eval.cmp2Summary(cmpList, common.createTagFilePath(workingDir, fastaFileIds, 'ssd_cross'))
 
             # store the sequences that should not be used as sample specific data for respective clades
             # param: rankCut=0~bacteria, maxDist=10 ~ not limited, True ~ output the forbidden list
@@ -640,7 +670,8 @@ def main():
             acc = accuracy.Accuracy(inputFastaFile, common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'),
                                     referencePlacementFileOut, databaseFile)
             buff.writeText(acc.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
-                                                minFracClade=0.01, minFracPred=0.01, overview=True))
+                                                minFracClade=float(config.get('recallMinFracClade')),
+                                                minFracPred=float(config.get('precisionMinFracPred')), overview=True))
             buff.close()
             acc.close()
 

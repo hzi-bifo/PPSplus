@@ -165,9 +165,9 @@ class Accuracy():
         """
         predAtRankDict = self._taxonomy.getPredDictAtRank(self._seqToPred, rank)
         trueAtRankDict = self._taxonomy.getPredDictAtRank(self._seqToTrue, rank)
-        tp = dict()  # class label -> count of sequences correctly assigned to clade i
-        t = dict()  # class label -> true count of sequences of clade i
-        p = dict()  # class label -> count of sequences assigned to clade i
+        tp = {}  # class label -> count of sequences correctly assigned to clade i
+        t = {}  # class label -> true count of sequences of clade i
+        p = {}  # class label -> count of sequences assigned to clade i
         tpOther = 0  # count of sequences correctly unassigned
         tOther = 0  # true count of sequences that are unassigned at given rank
 
@@ -213,26 +213,26 @@ class Accuracy():
 
         # filter out least abundant TRUE clades
         if minFracClade is not None:
-            sum = tOther  # true bin containing all sequences undefined at this rank
+            sumT = tOther  # true bin containing all sequences undefined at this rank
             for i in classesR:
-                sum += t[i]
+                sumT += t[i]
             rmList = []
             for i in classesR:
-                if float(t[i]) / float(sum) < minFracClade:
+                if (sumT == 0) or (float(t[i]) / float(sumT) < minFracClade):
                     rmList.append(i)
             for i in rmList:
                 classesR.remove(i)
-            if float(tOther) / float(sum) < minFracClade:
+            if (sumT == 0) or (float(tOther) / float(sumT) < minFracClade):
                 tOther = 0
 
         # filter out least abundant PREDICTED clades
         if minFracPred is not None:
-            sum = 0
+            sumT = 0
             for i in classesP:
-                sum += p[i]
+                sumT += p[i]
             rmList = []
             for i in classesP:
-                if float(p[i]) / float(sum) < minFracPred:
+                if (sumT == 0) or (float(p[i]) / float(sumT) < minFracPred):
                     rmList.append(i)
             for i in rmList:
                 classesP.remove(i)
@@ -249,8 +249,8 @@ class Accuracy():
             if i not in t:
                 t[i] = 0
 
-        wp = dict()  # weights for precision
-        wr = dict()  # weights for recall
+        wp = {}  # weights for precision
+        wr = {}  # weights for recall
         if weightAccordingBinSize:
             # compute weights of individual bins that correspond to the number of bp/sequences
             # assigned to individual bins

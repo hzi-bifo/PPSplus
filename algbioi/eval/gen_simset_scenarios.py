@@ -91,6 +91,7 @@ def generateTestScenarios(fh, ppsMasterScript, ppspArgs, scenario='ppsp'):
         @param scenario: ppsp or pps or test
     """
     outSh = csv.OutFileBuffer(fh.runTestSh)
+    outSh.writeText('#!/bin/bash\n\n')
 
     substDictList = getSubstDictList(scenario)
 
@@ -109,7 +110,7 @@ def generateTestScenarios(fh, ppsMasterScript, ppspArgs, scenario='ppsp'):
         os.mkdir(os.path.normpath(substDict.getProperty('pipelineDir')))
 
         # add an entry to the shell test script
-        outSh.writeText('python ' + ppsMasterScript + ' -c ' + substDict.getFeature('configName') + ' ' + ppspArgs +
+        outSh.writeText('time python ' + ppsMasterScript + ' -c ' + substDict.getFeature('configName') + ' ' + ppspArgs +
                         ' > ' + substDict.getFeature('logName') + '\n\necho "' + str(count) + '"\n\n')
 
     outSh.close()
@@ -198,7 +199,7 @@ def _main():
     fh = FileHandler('/net/metagenomics/projects/PPSmg/tests/mercier042013/uniform/config_ex_rs_no_mg_no.cfg')
     scenario = 'test'
     ppspArgs = '-n -g -o s16 mg -t -a -p c -r -s'
-    ppsMasterScript = '/net/metagenomics/projects/PPSmg/scripts/current/algbioi/core/run.py'
+    ppsMasterScript = '/net/metagenomics/projects/PPSmg/scripts/scriptsR29/algbioi/core/run.py'
     generateTestScenarios(fh, ppsMasterScript, ppspArgs, scenario)
 
 

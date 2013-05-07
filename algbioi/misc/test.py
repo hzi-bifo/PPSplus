@@ -1,17 +1,21 @@
 import re
 import os
+import sys
 
 from Bio.Seq import Seq
 
 from algbioi.com import fasta as fas
 from algbioi.com import csv
 from algbioi.com import taxonomy_ncbi as tax
+import traceback
 
 
-def sayHi(uu, ss, bb):
+def sayHello2(a, b, d=4, e=5, c=3):
     """
     General description.
 
+    @param t:
+    @param n:
     @param uu: uu description
         @type uu: int
     @param ss: ssu param
@@ -25,20 +29,27 @@ def sayHi(uu, ss, bb):
     s.add('a')
     print s
     s.add('b')
-    a = Seq('ATGC')
+    s = Seq('ATGC')
     print a
 
-    b='jkgh'
+    #b='jkgh'
 
-    print(uu + ss + bb)
+    print("%s %s %s %s %s" % (a, b, c, d, e))
 
     return int(2345)
 
 
+
 def test2():
-    s = 'lsuparc_silva106_ncbitax.bacteria+archaea.tax'
-    print s[(s.rindex('.', 0, s.rindex('.')) + 1):s.rindex('.')]
-    print 'done'
+    print 'new test'
+    # s = 'lsuparc_silva106_ncbitax.bacteria+archaea.tax'
+    # print s[(s.rindex('.', 0, s.rindex('.')) + 1):s.rindex('.')]
+    # print 'done'
+    sayHello2('a', 'b', 44, e=33, c=33)
+    # print 'more'
+    sayHello2('a','a','a')
+
+
 
 def stat():
     """
@@ -135,12 +146,44 @@ def filterOutSequences(fastaFile, predFile, outFastaFile, outPredFile, minBp=100
     print('Taken size:', takenBp)
 
 
+def fastaBySeqNameList(inSeqIdList, inFastaFile, outFastaFile):
+    """
+        Generates outFastaFile that contains sequences that are in the inSeqIdList and inFastaFile.
+    """
+    seqIdList = csv.getColumnAsList(inSeqIdList)
+    seqIdToSeq = fas.fastaFileToDict(inFastaFile)
+    out = csv.OutFileBuffer(outFastaFile)
+    for seqId in seqIdList:
+        seq = seqIdToSeq.get(seqId, None)
+        if seq is None:
+            print("Can't find sequence for seqId: %s" % seqId)
+        else:
+            out.writeText('>' + str(seqId) + '\n' + str(seq) + '\n')
+    out.close()
+
+
+def testExeption():
+    d = {}
+    try:
+        print (str(1/0))
+    except Exception as ex:
+        #print(ex.message)
+        #print(ex.args)
+        print traceback.print_exc(file=sys.stdout)
+    print('done')
+
+
+
 if __name__ == "__main__":
+    fastaBySeqNameList('/Volumes/hhu-hera/data/CowRumen/chunked070513/chunks2000.scaffold_names',
+                       '/Users/ivan/Documents/work/binning/data/CowRumen/assembly/cow_rumen_fragmented_velvet_assembly_scaffolds.fas',
+                       '/Volumes/hhu-hera/data/CowRumen/chunked070513/chunks2000.scaffolds')
+
     #refToClades('/Volumes/hera - net/metagenomics/projects/PPSmg/data/nobackup/NCBI20121122/sequences',
     #          '/Users/ivan/Documents/nobackup/species_list.txt',
     #          '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db',
     #          rank='species')
-    pass
+    #testExeption()
     #stat()
     #test2()
     #print toPercent([12,24,50,209,3], 2)

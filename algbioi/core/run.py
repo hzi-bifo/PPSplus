@@ -5,12 +5,15 @@
 """
 
 import os
+import sys
 import shutil
 import argparse
 import subprocess
 import datetime
+import traceback
 
 from algbioi.com import csv
+from algbioi.com import fasta as fas
 from algbioi.com import common
 from algbioi.com import taxonomy_ncbi
 from algbioi.com.config import Config
@@ -33,7 +36,7 @@ from algbioi.misc import out_proc
 
 # paths on hera/gaia:
 # export PATH=/net/programs/Debian-6.0.3-x86_64/python-2.7joh/bin:$PATH
-# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR19
+# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR29
 #
 from algbioi.ref import mask_db
 
@@ -639,7 +642,7 @@ def main():
             consOutBuff.close()
             cons.close()
 
-        # validation: how were the sample specific training data assigned
+        # validation: how the sample specific training data were assigned
         taxonomy = Taxonomy(databaseFile, taxonomicRanks)
         if os.path.isfile(common.createTagFilePath(workingDir, fastaFileIds, 'out')):
             placementPPS = ssd_eval.ppsOut2Placements(common.createTagFilePath(workingDir, fastaFileIds, 'out'), None)
@@ -656,11 +659,15 @@ def main():
             #                             common.createTagFilePath(workingDir, fastaFileIds, 'ssd_forbidden'))
 
         # comparison to ref assignment:
-        placementPPSn = ssd_eval.ppsOut2Placements(common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'), None)
-        if os.path.isfile(referencePlacementFileOut):
-            placementPPSref = ssd_eval.ppsOut2Placements(referencePlacementFileOut, None)
-            cmpListR = ssd_eval.cmpPlacements(placementPPSref, placementPPSn, taxonomy, taxonomicRanks)
-            ssd_eval.cmp2Summary(cmpListR, common.createTagFilePath(workingDir, fastaFileIds, 'cmp_ref'))
+        # This block works only if the taxon Ids in the reference are at the species level
+        # try:
+        #     placementPPSn = ssd_eval.ppsOut2Placements(common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'), None)
+        #     if os.path.isfile(referencePlacementFileOut):
+        #         placementPPSref = ssd_eval.ppsOut2Placements(referencePlacementFileOut, None)
+        #         cmpListR = ssd_eval.cmpPlacements(placementPPSref, placementPPSn, taxonomy, taxonomicRanks)
+        #         ssd_eval.cmp2Summary(cmpListR, common.createTagFilePath(workingDir, fastaFileIds, 'cmp_ref'))
+        # except AssertionError:
+        #     pass
 
         taxonomy.close()
 
@@ -674,6 +681,41 @@ def main():
                                                 minFracPred=float(config.get('precisionMinFracPred')), overview=True))
             buff.close()
             acc.close()
+
+            # compute precision and recall values for the data that were not used as the sample specific data
+            # generates such a fasta file that can be then used for other binning methods!
+            ssdDir = os.path.join(workingDir, 'sampleSpecificDir')
+            if os.path.isdir(ssdDir):
+                ssdFastaFileList = os.listdir(ssdDir)
+                if len(ssdFastaFileList) > 0:
+                    seqIdList = []
+                    # get all sequences in the sample specific directory
+                    for ssdFile in ssdFastaFileList:
+                        for seqId in fas.fastaFileToDict(os.path.join(ssdDir, ssdFile)):
+                            seqIdList.append(seqId)
+                    contigIdList = map(lambda x: x.split('_', 1)[1], seqIdList)
+                    contigIdToContigName = csv.getMapping(
+                        os.path.join(workingDir, str(os.path.basename(inputFastaFile) + '.cToIds')),
+                        keyColNum=1, valColNum=0, sep='\t')
+                    # transform the seqIds to real contigNames
+                    ssdContigNameSet = set(map(lambda x: contigIdToContigName[x][0], contigIdList))
+                    out = csv.OutFileBuffer(os.path.join(outputDir, 'no_ssd.fas'))
+                    seqIdToBp = {}
+                    seqIdToSeq = fas.fastaFileToDict(inputFastaFile)
+                    for seqId, seq in seqIdToSeq.iteritems():
+                        if seqId not in ssdContigNameSet:
+                            out.writeText(str(seqId) + '\n' + str(seq) + '\n')
+                            seqIdToBp[seqId] = len(seq)
+                    out.close()
+                    buff = csv.OutFileBuffer(os.path.join(outputDir, 'precision_recall_no_ssd.csv'))
+                    acc = accuracy.Accuracy(seqIdToBp, common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'),
+                                            referencePlacementFileOut, databaseFile)
+                    buff.writeText(acc.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
+                                                        minFracClade=float(config.get('recallMinFracClade')),
+                                                        minFracPred=float(config.get('precisionMinFracPred')),
+                                                        overview=True))
+                    buff.close()
+                    acc.close()
 
 
 def getLogFileName(logDir, description):

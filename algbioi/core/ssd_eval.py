@@ -118,7 +118,7 @@ def cmpPlacements(refPlacement, placement, taxonomy, taxonomicRanks):
         @return: list of n-tuples where each n-touple contains comparison of two placements of one contig
     """
 
-    placementDict = dict([]) #contig -> ncbid
+    placementDict = {}  # contig -> ncbid
     for p in placement:
         placementDict[p[0]] = p[1]
 
@@ -155,17 +155,17 @@ def cmpPlacements(refPlacement, placement, taxonomy, taxonomicRanks):
         #    print ncbid, pNcbid
         pathDictLCA = taxonomy.getPathFromLowestCommonAncestorToRoot([ncbid,pNcbid])
 
-        if pathDictLCA != None:
+        if pathDictLCA is not None:
             pathDictLCALen = len(pathDictLCA)
         else:
             pathDictLCALen = 0
 
-        if pathDictRef != None:
+        if pathDictRef is not None:
             pathDictRefLen = len(pathDictRef)
         else:
             pathDictRefLen = 0
 
-        if pathDict != None:
+        if pathDict is not None:
             pathDictLen = len(pathDict)
         else:
             pathDictLen = 0
@@ -185,7 +185,7 @@ def cmpPlacements(refPlacement, placement, taxonomy, taxonomicRanks):
         dist = abs(pathDictLCALen - pathDictLen) + abs(pathDictLCALen - pathDictRefLen)
         if dist == 0:
             status = 'M'
-            assert ncbid == pNcbid, 'The ncbi values don`t match'
+            assert ncbid == pNcbid, str('The ncbi values don`t match %s %s' % (ncbid, pNcbid))
 
         ncbiName = taxonomy.getNcbidToName(ncbid)
         pNcbiName = taxonomy.getNcbidToName(pNcbid)

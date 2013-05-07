@@ -4,6 +4,8 @@
 
 import sys
 import re
+import zlib
+
 from algbioi.com import csv
 from algbioi.com import fasta as fas
 from algbioi.com import taxonomy_ncbi
@@ -70,7 +72,7 @@ def getLenStat(fileName, minLength=1000):
 
     buf += 'Bigger than %sbp (sequences: %s, Mbp: %s)\n' % (minLength, c, round(float(bp) / 1000000.0, 3))
     buf += 'Bigger than %sbp (min: %s, max %s, avg %s bp)\n' % (minLength, minLen, maxLen, round((float(bp) / c)))
-    buf += 'Total (sequences: %s, Mbp: %s\n' % (totalCount, round(float(totalBp) / 1000000.0, 3))
+    buf += 'Total (sequences: %s, Mbp: %s)\n' % (totalCount, round(float(totalBp) / 1000000.0, 3))
     return buf
 
 
@@ -93,7 +95,7 @@ def getCommunityId(readHeader):
     """
         Gets the communityId given a readHeader.
     """
-    return readHeader.strip('>').split('_', 1)[0]
+    return readHeader.strip('>').split('_', 1)[0].split('+', 1)[0]
 
 
 def getCoverage(contigHeader):
@@ -125,7 +127,12 @@ def getReadsTaxonIdList(readsFile, communityFile, readHeaderToCommunityId=getCom
     rowList = csv.getColumnAsList(readsFile, colNum=0, sep='\n')
     for line in rowList:
         if str(line).startswith('>'):
-            taxonId = int(communityIdToTaxonId.get(readHeaderToCommunityId(line)))
+            try:
+                taxonId = int(communityIdToTaxonId.get(readHeaderToCommunityId(line)))
+            except TypeError as ex:
+                print(ex.message)
+                print("%s, %s" % (taxonId, line))
+                raise ex
             d.append(taxonId)
             d.append(taxonId)
     return d
@@ -168,11 +175,14 @@ def toContigsLabelList(inFastaFileName, readsF, readsR, readOnContig, community,
     #
     out = csv.OutFileBuffer(outMappingFileName)
     for contigId in contigIdToBp:
-        readList = contigIdToReadList[contigId]
-        taxonIdList = []
-        for readId in readList:
-            taxonIdList.append(readFTaxonIdList[int(readId)])
-        out.writeText(str(contigId) + '\t' + ','.join(map(str, taxonIdList)) + '\n')
+        try:
+            readList = contigIdToReadList[contigId]
+            taxonIdList = []
+            for readId in readList:
+                taxonIdList.append(readFTaxonIdList[int(readId)])
+            out.writeText(str(contigId) + '\t' + ','.join(map(str, taxonIdList)) + '\n')
+        except KeyError:
+            print("No label for contigId: %s" % contigId)
     out.close()
     print 's4'
 
@@ -327,26 +337,34 @@ def getProfile(readsFFastaFile,
 
     tupleList = []
     taxonomy = taxonomy_ncbi.TaxonomyNcbi(taxonomyDbFile, considerNoRank=True)
+    ranks = taxonomy_ncbi.TAXONOMIC_RANKS[2:]
     avgCoverage = 0.0
     for taxonId, readCount in taxonIdToReadCount.iteritems():
+        scName = ScientificNameAtRank(taxonId, taxonomy, ranks)
         tupleList.append((taxonId,
                           round(100 * (readCount / float(readTotalCount)), 1),
                           round(100 * (taxonIdToTotalBp.get(taxonId, 0) / float(totalBp)), 1),
                           round(taxonIdToAvgCov.get(taxonId, 0), 2),
                           round(taxonIdToTotalBp.get(taxonId, 0) / 1000000.0, 2),
                           taxonIdToContigCount.get(taxonId, 0),
-                          taxonomy.getScientificName(taxonId)
+                          taxonomy.getScientificName(taxonId),
+                          scName.getNameAtRank('phylum'),
+                          scName.getNameAtRank('class'),
+                          scName.getNameAtRank('order'),
+                          scName.getNameAtRank('family'),
+                          scName.getNameAtRank('genus'),
+                          scName.getNameAtRank('species')  # this could be done in a nicer way
         ))
+
         avgCoverage += taxonIdToAvgCov.get(taxonId, 0) * taxonIdToTotalBp.get(taxonId, 0)
-    avgCoverage = avgCoverage / float(totalBp)
-    tupleList.sort(key=lambda x: x[1], reverse=True)
+    avgCoverage /= float(totalBp)
+    tupleList.sort(key=lambda x: x[2], reverse=True)
 
     out = csv.OutFileBuffer(outProfileFile)
-    out.writeText('#taxonId, % reads, % contigs, avg coverage, MB contigs, contigs count, scientific name\n')
+    out.writeText('#taxonId, % reads, % contigs, avg coverage, MB contigs, contigs count, strain name, ' +
+                  ",".join(ranks) + '\n')
     for entry in tupleList:
         out.writeText(','.join(map(str, entry)) + '\n')
-
-
 
     out.writeText('#Sum/Avg., -, -, ' + str(round(avgCoverage, 2)) + ', ' + str(round(totalBp / 1000000.0, 2)) +
                   ', ' + str(totalContigCount) + ', -\n')
@@ -354,26 +372,82 @@ def getProfile(readsFFastaFile,
     taxonomy.close()
 
 
+class ScientificNameAtRank():
+    def __init__(self, taxonId, taxonomy, ranks):
+        """
+            @type taxonId: int
+            @type taxonomy: TaxonomyNcbi
+        """
+        self._rankToName = {}
+        current = taxonId
+        while current is not None:
+            rank = taxonomy.getRank(current)
+            if rank in ranks:
+                self._rankToName[rank] = taxonomy.getScientificName(current)
+            current = taxonomy.getParentNcbid(current)
+
+    def getNameAtRank(self, rank):
+        return self._rankToName.get(rank, None)
+
+
 def _main():
+    #taxonomyDbFile = '/net/metagenomics/projects/PPSmg/taxonomy/20121122/ncbitax_sqlite.db'
     taxonomyDbFile = '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db'
 
-    fileHolderLn = FileHolder(readsF='/Users/ivan/Documents/nobackup/assembly/lognorm/ReadsF_lognormal.fasta',
-                            readsR='/Users/ivan/Documents/nobackup/assembly/lognorm/ReadsR_lognormal.fasta',
-                            community='/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
-                            contig='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.contig',
-                            readOnContig='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.readOnContig',
-                            newContigIndex='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.newContigIndex',
-                            scaf='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.scaf',
-                            scafSeq='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.scafSeq')
+    # fileHolderLn = FileHolder(readsF='/Users/ivan/Documents/nobackup/assembly/lognorm/ReadsF_lognormal.fasta',
+    #                         readsR='/Users/ivan/Documents/nobackup/assembly/lognorm/ReadsR_lognormal.fasta',
+    #                         community='/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
+    #                         contig='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.contig',
+    #                         readOnContig='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.readOnContig',
+    #                         newContigIndex='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.newContigIndex',
+    #                         scaf='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.scaf',
+    #                         scafSeq='/Users/ivan/Documents/nobackup/assembly/lognorm/soap_lognorm.scafSeq')
 
-    fileHolderUn = FileHolder(readsF='/Users/ivan/Documents/nobackup/assembly/uniform/ReadsF_uniform.fasta',
-                        readsR='/Users/ivan/Documents/nobackup/assembly/uniform/ReadsR_uniform.fasta',
-                        community='/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
-                        contig='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.contig',
-                        readOnContig='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.readOnContig',
-                        newContigIndex='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.newContigIndex',
-                        scaf='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.scaf',
-                        scafSeq='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.scafSeq')
+    # fileHolderUn = FileHolder(readsF='/Users/ivan/Documents/nobackup/assembly/uniform/ReadsF_uniform.fasta',
+    #                     readsR='/Users/ivan/Documents/nobackup/assembly/uniform/ReadsR_uniform.fasta',
+    #                     community='/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
+    #                     contig='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.contig',
+    #                     readOnContig='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.readOnContig',
+    #                     newContigIndex='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.newContigIndex',
+    #                     scaf='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.scaf',
+    #                     scafSeq='/Users/ivan/Documents/nobackup/assembly/uniform/soap_uniform.scafSeq')
+
+
+    # fileHolderLn = FileHolder(readsF='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/lognorm/R1_050513s_lognorm.fasta',
+    #                         readsR='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/lognorm/R2_050513s_lognorm.fasta',
+    #                         community='/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
+    #                         contig='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/lognorm/soap_lognorm.contig',
+    #                         readOnContig='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/lognorm/soap_lognorm.readOnContig',
+    #                         newContigIndex='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/lognorm/soap_lognorm.newContigIndex',
+    #                         scaf='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/lognorm/soap_lognorm.scaf',
+    #                         scafSeq='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/lognorm/soap_lognorm.scafSeq')
+
+    # fileHolderUn = FileHolder(readsF='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/uniform/R1_050513s_uniform.fasta',
+    #                     readsR='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/uniform/R2_050513s_uniform.fasta',
+    #                     community='/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
+    #                     contig='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/uniform/soap_uniform.contig',
+    #                     readOnContig='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/uniform/soap_uniform.readOnContig',
+    #                     newContigIndex='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/uniform/soap_uniform.newContigIndex',
+    #                     scaf='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/uniform/soap_uniform.scaf',
+    #                     scafSeq='/Users/ivan/Documents/nobackup/assembly/ReadSim_050513/uniform/soap_uniform.scafSeq')
+
+    fileHolderLn = FileHolder(readsF='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/R1_050513s_lognorm.fasta',
+                            readsR='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/R2_050513s_lognorm.fasta',
+                            community='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/community_20121116.tax',
+                            contig='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/soap_lognorm.contig',
+                            readOnContig='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/soap_lognorm.readOnContig',
+                            newContigIndex='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/soap_lognorm.newContigIndex',
+                            scaf='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/soap_lognorm.scaf',
+                            scafSeq='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/soap_lognorm.scafSeq')
+    #
+    fileHolderUn = FileHolder(readsF='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/R1_050513s_uniform.fasta',
+                        readsR='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/R2_050513s_uniform.fasta',
+                        community='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/community_20121116.tax',
+                        contig='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/soap_uniform.contig',
+                        readOnContig='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/soap_uniform.readOnContig',
+                        newContigIndex='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/soap_uniform.newContigIndex',
+                        scaf='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/soap_uniform.scaf',
+                        scafSeq='/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/soap_uniform.scafSeq')
 
     # choose input data
     fh = fileHolderLn
@@ -387,11 +461,11 @@ def _main():
         print getLenStat(fh.scaf)
 
     # take contigs of appropriate length
-    if False:
+    if True:
         toLongSeq(fh.contig, fh.contigL, minLength=1000)
 
     # get labels (map: contigId -> list of read taxonIds)
-    if False:
+    if True:
         toContigsLabelList(fh.contigL, fh.readsF, fh.readsR, fh.readOnContig, fh.community, fh.contigLTaxL)
 
     # get labels (map: contigId -> weight, majority taxonId)
@@ -402,7 +476,12 @@ def _main():
         print toWellMappedContigs(fh.contigL, fh.contigLTaxW, fh.contigM, fh.contigMisassembled, fh.contigLTaxM,
                                   weightThreshold=1.0)
 
-    if True:
+    # Do this only if needed !!!
+    if False:
+        filterOutContigs(fh.contigM, fh.contigLTaxM, str(fh.contigM + '2'), str(fh.contigLTaxM + '2'),
+                         notAllowedTaxonIdList=[103690, 228908, 395495]) # Nostoc sp. PCC 7120, Nanoarchaeum, Leptothrix
+
+    if False:
         getProfile(fh.readsF, fh.community, fh.contigM, fh.contigL, fh.contigLTaxM, taxonomyDbFile, fh.profile)
 
 
@@ -418,17 +497,24 @@ def filterOutReads():
     out.close()
 
 
-def filterOutContigs():
-    inFasta = ''
-    outFasta = ''
-    predFile = ''
-    out = csv.OutFileBuffer(outFasta)
-    seqIdToTaxonId = csv.predToDict(predFile)
-    notAllowedTaxonIdSet = set([103690])  # Nostoc sp. PCC 7120
-    for seqId, seq in fas.fastaFileToDict(inFasta).iteritems():
-        if int(seqIdToTaxonId[seqId]) not in notAllowedTaxonIdSet:
-            out.writeText('>' + str(seqId) + '\n' + str(seq) + '\n')
-    out.close()
+def filterOutContigs(inFastaFile, inTaxFile, outFastaFile, outTaxFile, notAllowedTaxonIdList):
+    outFasta = csv.OutFileBuffer(outFastaFile)
+    outTax = csv.OutFileBuffer(outTaxFile)
+    seqIdToTaxonId = csv.predToDict(inTaxFile)
+    notAllowedTaxonIdSet = set(notAllowedTaxonIdList)
+    taxonIdToFilteredSeq = {}
+    for taxonId in notAllowedTaxonIdSet:
+        taxonIdToFilteredSeq[taxonId] = 0
+    for seqId, seq in fas.fastaFileToDict(inFastaFile).iteritems():
+        taxonId = int(seqIdToTaxonId[seqId])
+        if taxonId not in notAllowedTaxonIdSet:
+            outFasta.writeText('>' + str(seqId) + '\n' + str(seq) + '\n')
+            outTax.writeText(str(seqId) + '\t' + str(taxonId) + '\n')
+        else:
+            taxonIdToFilteredSeq[taxonId] += 1
+    outFasta.close()
+    outTax.close()
+    print("filtered taxonId -> seqCount: " + str(taxonIdToFilteredSeq))
 
 
 def tmpCmp():
@@ -448,12 +534,47 @@ def tmpCmp():
             print("Ncbid %s from profile is not in community" % i)
 
 
+def sortReads(inReadsFile, outReadsFile, headerToNum=lambda x: int(x.split('_', 2)[1].strip('nr'))):
+    i = 0
+    seqName = None
+    tupleList = []
+    for line in csv.getColumnAsList(inReadsFile, sep='\n'):
+        if i % 2 == 0:
+            seqName = line
+        else:
+            seq = line
+            assert seqName is not None
+            tupleList.append((seqName, zlib.compress(seq), headerToNum(seqName)))
+            seqName = None
+        i += 1
+    tupleList.sort(key=lambda x: x[2])
+
+    out = csv.OutFileBuffer(outReadsFile)
+    for t in tupleList:
+        out.writeText(str(t[0]) + '\n' + str(zlib.decompress(t[1])) + '\n')
+    out.close()
+
+
 if __name__ == "__main__":
-    #tmpCmp()
     _main()
+    # sortReads('/home/mschirmer/GenerateReads_DUS/R1_seed0_CPUs20.fasta',
+    #           '/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/R1_050513s_lognorm.fasta')
+    # print('1')
+    # sortReads('/home/mschirmer/GenerateReads_DUS/R2_seed0_CPUs20.fasta',
+    #           '/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/R2_050513s_lognorm.fasta')
+    # print('2')
+    # sortReads('/home/mschirmer/GenerateReads_DUS/R1_seed12345_CPUs20.fasta',
+    #           '/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/R1_050513s_uniform.fasta')
+    # print('3')
+    # sortReads('/home/mschirmer/GenerateReads_DUS/R2_seed12345_CPUs20.fasta',
+    #           '/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/uniform/R2_050513s_uniform.fasta')
+    # print('4')
+
+    #tmpCmp()
 
 
     # 266265, Burkholderia xenovorans LB400, Bacteria; Proteobacteria; Betaproteobacteria; Burkholderiales; Burkholderiaceae; Burkholderia; Burkholderia xenovorans
     # 70601, Pyrococcus horikoshii OT3, Archaea; Euryarchaeota; Thermococci; Thermococcales; Thermococcaceae; Pyrococcus; Pyrococcus horikoshii
     # 269796, Rhodospirillum rubrum ATCC 11170, Bacteria; Proteobacteria; Alphaproteobacteria; Rhodospirillales; Rhodospirillaceae; Rhodospirillum; Rhodospirillum rubrum
     # 525146, Desulfovibrio desulfuricans subsp. desulfuricans str. ATCC 27774, Bacteria; Proteobacteria; delta/epsilon subdivisions; Deltaproteobacteria; Desulfovibrionales; Desulfovibrionaceae; Desulfovibrio; Desulfovibrio desulfuricans; Desulfovibrio desulfuricans subsp. desulfuricans
+    pass

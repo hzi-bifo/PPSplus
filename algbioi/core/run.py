@@ -7,10 +7,10 @@
 import os
 import sys
 import shutil
-import argparse
 import subprocess
 import datetime
 import traceback
+import argparse
 
 from algbioi.com import csv
 from algbioi.com import fasta as fas
@@ -32,14 +32,12 @@ from algbioi.eval import consistency
 from algbioi.eval import accuracy
 from algbioi.eval import confusion_matrix
 from algbioi.misc import out_proc
-
+from algbioi.ref import mask_db
 
 # paths on hera/gaia:
 # export PATH=/net/programs/Debian-6.0.3-x86_64/python-2.7joh/bin:$PATH
-# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR29
+# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR30
 #
-from algbioi.ref import mask_db
-
 
 def main():
     # external commands will be executed in Shell in Unix/Linux
@@ -116,17 +114,17 @@ def main():
             try:
                 os.mkdir(dirPath)
             except OSError:
-                print("Can't create helper directory", dirPath)
+                print("Can't create directory", dirPath)
                 return
 
     # read input fasta: contigs, scaffolds, mapping
     inputFastaFile = os.path.normpath(config.get('inputFastaFile'))
+    if (inputFastaFile is None) or ((inputFastaFile is not None) and (not os.path.isfile(inputFastaFile))):
+        print("The input fasta file %s doesn't exist" % inputFastaFile)
+        return
     if ('-' in inputFastaFile) or ('+' in inputFastaFile):
         print('The input fasta file path is not allowed to contain "+" or "-" characters ' +
               'due to the "Mothur" software, given path:\n' + inputFastaFile)
-        return
-    if not os.path.isfile(inputFastaFile):
-        print("The given input fasta file doesn't exist: ", inputFastaFile)
         return
 
     inputFastaScaffoldsFile = config.get('inputFastaScaffoldsFile')
@@ -157,34 +155,58 @@ def main():
     if config.get('configPPS') is None:
         ppsConfigFilePath = os.path.join(workingDir, 'PPS_config_generated.txt')  # config will be generated
     else:
+        if not os.path.isfile(config.get('configPPS')):
+            print("The PPS configuration file (configPPS) '%s' doesn't exist." % config.get('configPPS'))
+            return
         ppsConfigFilePath = os.path.normpath(config.get('configPPS'))  # use custom config file
 
     taxonomicRanks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]  # without root
-    minSeqLen = int(config.get('minSeqLen'))
-    databaseFile = os.path.join(os.path.normpath(config.get('databaseFile')), 'ncbitax_sqlite.db')
+    try:
+        minSeqLen = int(config.get('minSeqLen'))
+    except Exception as e:
+        print("Can't parse configuration entry (minSeqLen), make sure that it's an integer number")
+        raise e
+
+    if config.get('databaseFile') is None:
+        print("The taxonomy (databaseFile) is not specified.")
+        return
+    if os.path.isdir(config.get('databaseFile')):
+        databaseFile = os.path.join(os.path.normpath(config.get('databaseFile')), 'ncbitax_sqlite.db')
+        if not os.path.isfile(databaseFile):
+            print("The directory '%s' doesn't contain taxonomy file 'ncbitax_sqlite.db'")
+            return
     if not os.path.isfile(databaseFile):
         print("The database file doesn't exist:", databaseFile)
         return
 
     # reference predictions
     referencePlacementFileOut = config.get('referencePlacementFileOut')
+    if referencePlacementFileOut is not None and not os.path.isfile(referencePlacementFileOut):
+        print("The reference placement file doesn't exist: %s" % referencePlacementFileOut)
+        return
 
     # leaf clades contained in the reference
-    if (referencePlacementFileOut is not None) and os.path.isfile(referencePlacementFileOut):
-        refLeafCladesSet = set(map(int, csv.predToDict(referencePlacementFileOut).values()))
+    if referencePlacementFileOut is not None:
+        try:
+            refLeafCladesSet = set(map(int, csv.predToDict(referencePlacementFileOut).values()))
+        except Exception as e:
+            print("Can't get clade taxon ids from the reference placement file: %s" % referencePlacementFileOut)
+            raise e
     else:
         refLeafCladesSet = None
     referencePlacementFilePPOut = None  # config.get('referencePlacementFilePPOut')
-    if (referencePlacementFileOut is not None) and (not os.path.isfile(referencePlacementFileOut)):
-        print("The reference file doesn't exist: ", referencePlacementFileOut)
-        return
+
     #if (referencePlacementFilePPOut is not None) and (not os.path.isfile(referencePlacementFilePPOut)):
     #    print("The reference file doesn't exist: ", referencePlacementFilePPOut)
     #    return
     if (referencePlacementFilePPOut is None) and (referencePlacementFileOut is not None):
         # generate PP placement file
-        referencePlacementFilePPOut = os.path.join(workingDir, os.path.basename(referencePlacementFileOut) + '_.PP.out')
-        ppsOut2ppOut(referencePlacementFileOut, referencePlacementFilePPOut, taxonomicRanks, databaseFile)
+        try:
+            referencePlacementFilePPOut = os.path.join(workingDir, os.path.basename(referencePlacementFileOut) + '_.PP.out')
+            ppsOut2ppOut(referencePlacementFileOut, referencePlacementFilePPOut, taxonomicRanks, databaseFile)
+        except Exception as e:
+            print("An error '%s' occurred while file '%s' has been generated."
+                  % (e.message, referencePlacementFilePPOut))
 
     # generates working fasta files always when the configuration file is newer than particular files to be generated
     sequences = Sequences(inputFastaFile, inputFastaScaffoldsFile, scaffoldsToContigsMapFile, taxonomicRanks, minSeqLen)
@@ -454,33 +476,39 @@ def main():
         trainProc.wait()
         logOut.close()
         print('PPS "train" return code: %s' % trainProc.returncode)
+        if trainProc.returncode != 0:
+            raise Exception("PPS train returned with non-zero %s status: %s" % (trainProc.returncode, trainCmd))
 
         # compute training accuracy (precision and recall) and confusion matrices
     if args.a:
-        if not os.path.isdir(os.path.join(workingDir, 'projectDir', 'sampled_fasta')):
-            print("Train accuracy: Can't compute the training accuracy since the training phase hasn't been run yet.")
-        else:
-            taDir = os.path.join(workingDir, 'train_accuracy')
-            if os.path.isdir(taDir):
-                shutil.rmtree(taDir)
-            try:
-                os.mkdir(taDir)
-            except IOError:
-                print("Train accuracy: Can't create directory: " + taDir)
+        try:
+            if not os.path.isdir(os.path.join(workingDir, 'projectDir', 'sampled_fasta')):
+                print("Train accuracy: Can't compute the training accuracy since the training "
+                      "phase hasn't been run yet.")
             else:
-                taOutDir = os.path.join(outputDir, 'train_accuracy')
+                taDir = os.path.join(workingDir, 'train_accuracy')
+                if os.path.isdir(taDir):
+                    shutil.rmtree(taDir)
                 try:
-                    if not os.path.isdir(taOutDir):
-                        os.mkdir(taOutDir)
+                    os.mkdir(taDir)
                 except IOError:
                     print("Train accuracy: Can't create directory: " + taDir)
                 else:
-                    computeTrainingAccuracy(workingDir, taDir, os.path.join(workingDir, 'sampleSpecificDir'),
-                                            os.path.join(workingDir, 'projectDir', 'sampled_fasta'), taOutDir,
-                                            config.get('ppsInstallDir'), ppsScripts, ppsConfigFilePath,
-                                            getLogFileName(logDir, 'PPS_predict_train_data'),
-                                            os.path.join(workingDir, 'ncbids.txt'), databaseFile)
-                    print("Train accuracy: done")
+                    taOutDir = os.path.join(outputDir, 'train_accuracy')
+                    try:
+                        if not os.path.isdir(taOutDir):
+                            os.mkdir(taOutDir)
+                    except IOError:
+                        print("Train accuracy: Can't create directory: " + taDir)
+                    else:
+                        computeTrainingAccuracy(workingDir, taDir, os.path.join(workingDir, 'sampleSpecificDir'),
+                                                os.path.join(workingDir, 'projectDir', 'sampled_fasta'), taOutDir,
+                                                config.get('ppsInstallDir'), ppsScripts, ppsConfigFilePath,
+                                                getLogFileName(logDir, 'PPS_predict_train_data'),
+                                                os.path.join(workingDir, 'ncbids.txt'), databaseFile)
+                        print("Train accuracy: done")
+        except Exception as e:
+            print("Training data accuracy won't be computed due to an error: %s" % e.message)
 
     # run PhyloPythiaS predict
     if args.p:
@@ -494,6 +522,9 @@ def main():
             shutil.move(str(fastaFileIds + '.nox.fna.out'), str(fastaFileIds + '.out'))
             shutil.move(str(fastaFileIds + '.nox.fna.PP.out'), str(fastaFileIds + '.PP.out'))
             print('PPS "predict" contigs return code: %s' % predictProc.returncode)
+            if predictProc.returncode != 0:
+                raise Exception("PPS predict contigs returned with non-zero %s status: %s" %
+                                (predictProc.returncode, predictCmd))
 
         if inputFastaScaffoldsFile is not None:
             scaffoldsIdsNewPath = os.path.join(workingDir, 'crossVal', os.path.basename(fastaFileScaffoldsIds))
@@ -522,6 +553,9 @@ def main():
                 shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.out'), str(scaffoldsIdsNewPath + '.out'))
                 shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.PP.out'), str(scaffoldsIdsNewPath + '.PP.out'))
                 print('PPS "predict" scaffolds return code: %s' % predictProc.returncode)
+                if predictProc.returncode != 0:
+                    raise Exception("PPS predict scaffolds returned with non-zero %s status: %s" %
+                                (predictProc.returncode, predictCmd))
 
         # compare prediction of scaffolds and contigs
         if 'v' in args.p:
@@ -548,21 +582,6 @@ def main():
                     for rank in ranks:
                         cm.generateConfusionMatrix(rank, os.path.join(cmpOutDir, 'contigs_vs_scaff'))
                     cm.close()
-                #i = 0
-                #for rank in taxonomicRanks:
-                #    if i > (len(taxonomy_ncbi.TAXONOMIC_RANKS) - 2):
-                #        break
-                #    i += 1
-                #    # do comparison: contigs' prediction vs scaffolds' prediction
-                #    vCmd = str('java -jar tables.jar ' + fastaFileIds + ' ' + contigPred + ' ' +
-                #                scaffPredAsContigs + ' ' + os.path.normpath(os.path.join(
-                #                os.path.dirname(scaffPredAsContigs), str('crossVal_' + str(rank) + '.csv'))) + ' ' +
-                #                str(rank) + ' ' + 'unassigned' + ' ' + str(config.get('taxonomicRanks')))
-                #    vProc = subprocess.Popen(vCmd, shell=True, bufsize=-1, cwd=config.get('tablesGeneratorDir'),
-                #                              stdout=subprocess.STDOUT, stderr=subprocess.STDOUT)
-                #    vProc.wait()
-                #    print('Comparison of contig/scaffold predictions: %s return code: %s' %
-                #          (vCmd, vProc.returncode))
 
     # Read output from PPS predict and place sequences
     if args.r:
@@ -596,29 +615,13 @@ def main():
         except IOError:
             print("Cmp to ref.: Can't create directory: " + outCmpRefDir)
         else:
-            if os.path.isfile(referencePlacementFileOut):
+            if (referencePlacementFileOut is not None) and os.path.isfile(referencePlacementFileOut):
                 ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
                 cm = confusion_matrix.ConfusionMatrix(inputFastaFile, predOutFilePath,
                                                       referencePlacementFileOut, databaseFile, ranks)
                 for rank in ranks:
                     cm.generateConfusionMatrix(rank, os.path.join(outCmpRefDir, os.path.basename(inputFastaFile)))
                 cm.close()
-        #i = 0
-        #if os.path.isfile(referencePlacementFilePPOut):
-        #    for rank in taxonomicRanks:
-        #        if i > (len(taxonomy_ncbi.TAXONOMIC_RANKS) - 2):
-        #            break
-        #        i += 1
-        #        cmpCmd = str('java -jar tables.jar ' +
-        #                     str(common.createTagFilePath(workingDir, inputFastaFile, 'pOUT.fas')) + ' ' +
-        #                     str(referencePlacementFilePPOut) + ' ' + predPPOutFilePath + ' ' +
-        #                     str(common.createTagFilePath(outputDir, inputFastaFile,
-        #                                                  str('table.' + str(rank) + '.csv'))) + ' ' +
-        #                     str(rank) + ' ' + 'unassigned' + ' ' + ",".join(taxonomy_ncbi.TAXONOMIC_RANKS[1:]))
-        #        cmpProc = subprocess.Popen(cmpCmd, shell=True, bufsize=-1, cwd=config.get('tablesGeneratorDir'))
-        #        cmpProc.wait()
-        #        if cmpProc.returncode != 0:
-        #            print('Command', cmpCmd, 'ended with non-zero return code', cmpProc.returncode)
 
         # compute scaffold-contig consistency
         consOutBuff = csv.OutFileBuffer(common.createTagFilePath(outputDir, inputFastaFile, 'cons'))
@@ -672,7 +675,7 @@ def main():
         taxonomy.close()
 
         # compute the precision and recall values
-        if os.path.isfile(referencePlacementFileOut):
+        if (referencePlacementFileOut is not None) and os.path.isfile(referencePlacementFileOut):
             buff = csv.OutFileBuffer(os.path.join(outputDir, 'precision_recall.csv'))
             acc = accuracy.Accuracy(inputFastaFile, common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'),
                                     referencePlacementFileOut, databaseFile)
@@ -722,7 +725,7 @@ def getLogFileName(logDir, description):
     now = datetime.datetime.now()
     timeStamp = str(
         str(now.year) + str(now.month) + str(now.day) + '_' + str(now.hour) + str(now.minute) + str(now.second))
-    fileName = timeStamp + '_' + str(description) + '.txt'
+    fileName = str(description) + '_' + timeStamp + '.txt'
     return os.path.normpath(os.path.join(logDir, fileName))
 
 

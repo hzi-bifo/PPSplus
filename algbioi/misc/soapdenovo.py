@@ -556,7 +556,22 @@ def sortReads(inReadsFile, outReadsFile, headerToNum=lambda x: int(x.split('_', 
 
 
 if __name__ == "__main__":
-    _main()
+    #_main()
+    # fNames = ['/Volumes/HHU_hera_PPSmg/data/mercier050513/soapdenovo31kmer/soap_uniform.contig1k.M.fna',
+    #           '/Volumes/HHU_hera_PPSmg/data/ReadSim_050513/melanieAssembly/uniform/MetavelvetNoscafNewbler_ma-merge.fa',
+    #           '/Volumes/HHU_hera_PPSmg/data/ReadSim_050513/melanieAssembly/uniform/VelvetNoscafNewbler_ma-merge.fa',
+    #           '/Volumes/HHU_hera_PPSmg/data/ReadSim_050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma-merge.fa',
+    #           '/Volumes/HHU_hera_PPSmg/data/mercier050513/soapdenovo31kmer/soap_lognorm.contig1k.M.fna',
+    #           '/Volumes/HHU_hera_PPSmg/data/ReadSim_050513/melanieAssembly/lognorm/MetavelvetNoscafNewbler_ma-merge.fa',
+    #           '/Volumes/HHU_hera_PPSmg/data/ReadSim_050513/melanieAssembly/lognorm/VelvetNoscafNewbler_ma-merge.fa',
+    #           '/Volumes/HHU_hera_PPSmg/data/ReadSim_050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma-merge.fa'
+    # ]
+    # fNames = ['/Volumes/hera_net/metagenomics/projects/barley_metagenomics/samples/C/assembly/soap/soap_C_.contig']
+    fNames=['/net/metagenomics/projects/barley_metagenomics/samples/C/assembly/soap/soap_C_.contig']
+    for f in fNames:
+        print(str(f))
+        print(getLenStat(f, minLength=1000) + '\n')
+
     # sortReads('/home/mschirmer/GenerateReads_DUS/R1_seed0_CPUs20.fasta',
     #           '/net/metagenomics/projects/PPSmg/data/ReadSim_050513/nobackup/lognorm/R1_050513s_lognorm.fasta')
     # print('1')

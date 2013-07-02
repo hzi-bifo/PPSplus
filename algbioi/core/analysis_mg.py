@@ -18,7 +18,7 @@ class _MgFiles():
         Helper class to store all paths to the marker gene files.
     """
     def __init__(self, mgDir):
-        self.mgDict = dict()
+        self.mgDict = {}
         self.mgDir = mgDir # contains all marker genes
 
     def parse(self, line):
@@ -28,7 +28,7 @@ class _MgFiles():
 
     def addFilePath(self, geneName, fileType, filePath):
         if geneName not in self.mgDict:
-            self.mgDict[geneName] = dict()
+            self.mgDict[geneName] = {}
         self.mgDict[geneName][fileType] = os.path.join(self.mgDir, os.path.normpath(filePath))
 
     def getFilePath(self, geneName, fileType):
@@ -38,7 +38,7 @@ class _MgFiles():
             return None
 
     def getGeneNameList(self):
-        resultList = list([])
+        resultList = []
         for name in self.mgDict:
             resultList.append(name)
         return resultList
@@ -49,7 +49,7 @@ class _MgRegions():
         Helper class to read the hmmer dom? file to get the regions that correspond to the Amphora marker genes.
     """
     def __init__(self):
-        self.entryDict = dict()
+        self.entryDict = {}
 
     def parse(self, line):
         if not isComment(line, '#'):
@@ -186,8 +186,11 @@ class MarkerGeneAnalysis():
                     print 'run cmd:', cmd
                     hmmProc.wait()
                     print 'HMM  return code:', hmmProc.returncode
+                    if hmmProc.returncode != 0:
+                        raise Exception("Command returned with non-zero %s status: %s" % (hmmProc.returncode, cmd))
                 else:
                     print 'Marker genes analysis, doesn`t run (no posix): ', cmd
+
 
             #get regions that match to the HMM profile ()
             entryDictList = []
@@ -279,6 +282,8 @@ class MarkerGeneAnalysis():
                 print 'run cmd:', cmd
                 mothurProc.wait()
                 print 'mothur return code:', mothurProc.returncode
+                if mothurProc.returncode != 0:
+                    raise Exception("Command returned with non-zero %s status: %s" % (mothurProc.returncode, cmd))
             else:
                 print 'Cannot run mothur since your system is not "posix" but', str('"' + os.name + '"'), '\n', cmd
 

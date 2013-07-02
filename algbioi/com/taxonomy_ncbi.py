@@ -186,7 +186,7 @@ class TaxonomyNcbi():
             return None
         if ncbid == -1:
             ncbid = 1
-            sys.stderr.write('ncbid=(-1) converted to ncbid=(1)\n')
+            #sys.stderr.write('ncbid=(-1) converted to ncbid=(1)\n')
         self.cursor.execute('SELECT taxon_id FROM taxon T WHERE T.ncbi_taxon_id=?',(ncbid,))
         result = self.cursor.fetchall()
         if len(result) != 1:

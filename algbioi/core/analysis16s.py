@@ -39,21 +39,12 @@ class RRNA16S():
             if outLog is not None:
                 stdoutLog.close()
             print 'HMM return code:', hmmProc.returncode
+            if hmmProc.returncode != 0:
+                raise Exception("Command returned with non-zero %s status: %s" % (hmmProc.returncode, cmd))
         else:
             print 'Cannot run HMM since your system is not "posix" but', str('"' + os.name + '"'), '\n', cmd
 
-#        try:
-#            from Bio import SeqIO
-#        except Exception: #this is not nice, but it works
-#            cmd = str('python ' + os.path.normpath('/AM/metagenomic/work/projects/pPPS/tools/extract-feature-regions.py')
-#                      + ' ' + inputFastaFile + ' ' + regionsFile)
-#            reProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self._workingDir)
-#            print 'run cmd:', cmd
-#            reProc.wait()
-#            print 'extract regions 16S return code:', reProc.returncode
-#        else:
-            # read fasta file
-        handle = open( inputFastaFile, "rU")
+        handle = open(inputFastaFile, "rU")
         record_dict = SeqIO.to_dict(SeqIO.parse(handle, "fasta"))
         handle.close()
         #trunkoutputfilename = inputFastaFile.split( "/" )[-1]
@@ -76,7 +67,7 @@ class RRNA16S():
                     sys.stderr.write(" analysis16s: invalid strand symbol")
                     exit(1)
 
-                outfile = open( trunkoutputfilename + "." + gene + ".fna", "a" )
+                outfile = open(trunkoutputfilename + "." + gene + ".fna", "a")
                 print >> outfile, ">%s_%i_%i_%s" % (ident, start, stop, strand)
                 print >> outfile, subseq
                 outfile.close()
@@ -165,8 +156,11 @@ class RRNA16S():
             if outLog is not None:
                 stdoutLog.close()
             print 'mothur return code:', mothurProc.returncode
+            if mothurProc.returncode != 0:
+                raise Exception("Command returned with non-zero %s status: %s" % (mothurProc.returncode, cmd))
         else:
             print 'Cannot run mothur since your system is not "posix" but', str('"' + os.name + '"'), '\n', cmd
+
 
 
         #transform mothur prediction files to the tab separated files

@@ -15,6 +15,29 @@ from algbioi.com.common import removeNonDna
 from algbioi.com.common import noNewLine
 
 
+def splitPairedReads(inPairedFasta, outEvenFasta, outOddFasta):
+    _forEachRecord(inPairedFasta, SplitFasta(outEvenFasta, outOddFasta)).close()
+
+
+class SplitFasta():
+    def __init__(self, evenFasta, oddFasta):
+        self._evenFasta = OutFileBuffer(evenFasta)
+        self._oddFasta = OutFileBuffer(oddFasta)
+        self._counter = 0
+
+    def parse(self, record):
+        entry = '>' + str(record.id) + '\n' + str(record.seq) + '\n'
+        if self._counter % 2 == 0:
+            self._evenFasta.writeText(entry)
+        else:
+            self._oddFasta.writeText(entry)
+        self._counter += 1
+
+    def close(self):
+        self._oddFasta.close()
+        self._evenFasta.close()
+
+
 def filterOutSequences(inFileName, outFileName, allowedNamesSet, formatName="fasta", seqNameModifyFunction = None):
     """
         From the input fasta file filter out sequences their names are not contained in the allowedNamesSet.
@@ -176,7 +199,7 @@ class _RecordStorage():
         return self._seqNameToSeq
 
 
-def _forEachRecord(filePath, parser, formatName = "fasta"):
+def _forEachRecord(filePath, parser, formatName="fasta"):
     """
         Call the parser for each record in the file.
     """

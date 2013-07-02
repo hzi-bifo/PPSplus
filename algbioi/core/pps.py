@@ -75,9 +75,8 @@ def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrai
         predictProc.wait()
         logOut.close()
         if predictProc.returncode != 0:
-            print("PPS 'predict' training data error return code: %s, training data accuracy won't be computed!\n "
-                  "cmd: %s" % (predictProc.returncode, predictCmd))
-            return
+            raise Exception("PPS 'predict' training data returned with non-zero status: %s, cmd: %s" %
+                            (predictProc.returncode, predictCmd))
     else:
         print("Can't run PPS on a non-posix system!")
         return

@@ -28,7 +28,7 @@ class Sequence():
         self._hash = hash(seq.upper())
         self._candidateTaxPathDictList = []
         self._candidateTaxPathDictWeightsList = []
-        self._candidateTaxPathDictSourceList = [] #where does this prediction come from
+        self._candidateTaxPathDictSourceList = []  # where does this prediction come from
         self._candidateTaxPathDictTagList = []
         self.scaffold = None
         self._removeNonDna = False
@@ -44,7 +44,7 @@ class Sequence():
         self._removeNonDna = removeNonDnaChars
 
     def setScaffold(self, scaffold):
-        assert self.scaffold == None, 'Try to set the scaffold of a sequence twice'
+        assert self.scaffold is None, 'Try to set the scaffold of a sequence twice'
         self.scaffold = scaffold
 
     #def setTaxonomyPath(self, taxPathDict):
@@ -56,7 +56,7 @@ class Sequence():
         self._placementWeight = weight
 
     def delTaxonomyPath(self):
-        assert self._taxPathDict != None
+        assert self._taxPathDict is not None
         self._taxPathDict = None
         self._placementWeight = None
 

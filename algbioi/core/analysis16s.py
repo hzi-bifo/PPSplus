@@ -81,13 +81,21 @@ class RRNA16S():
         """
             Run mothur to classify the sequences.
         """
-        self._classify(16, inputFastaFile, outLog)
+        try:
+            self._classify(16, inputFastaFile, outLog)
+        except Exception:
+            print('Mothur was not able to classify 16S sequences.')
 
     def classify23S(self, inputFastaFile, outLog=None):
-        self._classify(23, inputFastaFile, outLog)
-
+        try:
+            self._classify(23, inputFastaFile, outLog)
+        except Exception:
+            print('Mothur was not able to classify 23S sequences.')
     def classify5S(self, inputFastaFile, outLog=None):
-        self._classify(5, inputFastaFile, outLog)
+        try:
+            self._classify(5, inputFastaFile, outLog)
+        except Exception:
+            print('Mothur was not able to classify 5S sequences.')
 
     def _classify(self, mode, inputFastaFile, outLog=None):
 
@@ -217,9 +225,21 @@ class RRNA16S():
         predFileName23S = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.23P'))
         #predFileName5S = str(inputFastaFile + '.5P')
         predFileName5S = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.5P'))
-        seqIdSet16S = self._setCandidatePlacement(sequences, taxonomy, predFileName16S, '16S_rRNA')
-        seqIdSet23S = self._setCandidatePlacement(sequences, taxonomy, predFileName23S, '23S_rRNA')
-        seqIdSet5S = self._setCandidatePlacement(sequences, taxonomy, predFileName5S, '5S_rRNA')
+        try:
+            seqIdSet16S = self._setCandidatePlacement(sequences, taxonomy, predFileName16S, '16S_rRNA')
+        except Exception:
+            seqIdSet16S = set()
+            print("Can't set candidate placement from 16S classification.")
+        try:
+            seqIdSet23S = self._setCandidatePlacement(sequences, taxonomy, predFileName23S, '23S_rRNA')
+        except Exception:
+            seqIdSet23S = set()
+            print("Can't set candidate placement from 23S sequences.")
+        try:
+            seqIdSet5S = self._setCandidatePlacement(sequences, taxonomy, predFileName5S, '5S_rRNA')
+        except Exception:
+            seqIdSet5S = set()
+            print("Can't set candidate placement from 5S sequences.")
         intersectSet = seqIdSet16S | seqIdSet23S | seqIdSet5S
         return [len(seqIdSet16S),len(seqIdSet23S),len(seqIdSet5S),len(intersectSet)]
 

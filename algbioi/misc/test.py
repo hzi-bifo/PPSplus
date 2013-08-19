@@ -268,22 +268,7 @@ def _main2():
         stdout.write( "%s\t%i\t%i\n" % (rank, consistent.get(rank,0), unconsistent.get(rank,0)) )
 
 
-def indexToDna(index, length, mapping={0: 'A', 1: 'T', 2: 'G', 3: 'C'}):
-    s = str(bin(index))[2:]  # get binary number, trim starting 0b
-    s = ((length * 2) - len(s)) * '0' + s  # add starting zeros
-    dna = ''
-    for i in range(length):  # for each dna character
-        dna += mapping[int(s[i*2:(i+1)*2], 2)]  # map binary to dna
-    return dna
 
-def indexLineToDnaLine(indexLine, kmerLen):
-    line = ''
-    for entry in indexLine.split('\t'):
-        index, count = entry.split(':')
-        if line != '':
-            line += '\t'
-        line += indexToDna(int(index), kmerLen) + ':' + str(count)
-    return line
 
 #{'AG': 3, 'TT': 2, 'GA': 4, 'TG': 3, 'TA': 1, 'TC': 2, 'CT': 2}
 
@@ -432,13 +417,53 @@ def countOccurances(inFile):
 
 
 
+def processSSDFromTaxator(inDir, outDir, ncbidsFile=None, threshold=100000):
+    """
+        Take all sample specific data in directory outDir and filter it s.t. only the longest sequences stay.
+        @param inDir: input directory with sample specific files
+        @param outDir: output directory
+        @param ncbidsFile: a file with all ncbids needed for PPS
+        @param threshold: once an output file contain more than this number of bp, no other sequence will be added.
+    """
+    taxonIdSet = set()
+    seqNameGen = 0
+    for f in os.listdir(inDir):
+        taxonId = int(f.split('.')[0])
+        taxonIdSet.add(taxonId)
+        seqList = fas.getSequencesToList(os.path.join(inDir, f))
+        entryList = []
+        for seqId, seq in seqList:
+            entryList.append((seq, len(seq)))
+        entryList.sort(key=lambda x: x[1], reverse=True)
+
+        out = csv.OutFileBuffer(os.path.join(outDir, str(str(taxonId) + '.2.fna')))
+        countBp = 0
+        for seq, bp in entryList:
+            if countBp > threshold:
+                break
+            countBp += bp
+            seqNameGen += 1
+            out.writeText('>' + str(seqNameGen) + '\n' + seq + '\n')
+        out.close()
+
+        out = csv.OutFileBuffer(ncbidsFile)
+        for clade in taxonIdSet:
+            out.writeText(str(clade) + '\n')
+        out.close()
+
 
 if __name__ == "__main__":
+    processSSDFromTaxator('/Users/ivan/Documents/nobackup/barley/taxator_ssd',
+                          '/Users/ivan/Documents/nobackup/barley/taxator_ssd_filtered',
+                          '/Users/ivan/Documents/nobackup/barley/ncbids.txt')
+
+
+
     #checkTrainData('/Users/ivan/Documents/nobackup/vm_hg/train_data')
     #import math
     #print (10*math.log(0.03,10))
 
-    countOccurances('/Users/ivan/Documents/nobackup/tmp.txt')
+    # countOccurances('/Users/ivan/Documents/nobackup/tmp.txt')
 
     #testException()
 
@@ -464,4 +489,4 @@ if __name__ == "__main__":
     #                   '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119.tax',
     #                   '/Users/ivan/Documents/work/binning/data/mercier51Strains/contigs_soapdenovo-20121119_1000bp.fna',
     #                   '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119_1000bp.tax')
-    pass
+    # pass

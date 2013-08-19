@@ -103,12 +103,13 @@ def main():
         print("Pipeline directory doesn't exist: ", pipelineDir)
         return
 
-    # create the following directories in the working directory if they don't exist
+    # create the following directories in the working/output directory if they don't exist
     workingDir = os.path.join(pipelineDir, 'working')
     mgWorkingDir = os.path.join(workingDir, 'mgWorking')
     outputDir = os.path.join(pipelineDir, 'output')
+    profilesDir = os.path.join(outputDir, 'profiles')
     dirArray = [workingDir, outputDir, os.path.join(workingDir, 'projectDir'),
-                os.path.join(workingDir, 'sampleSpecificDir'), mgWorkingDir]
+                os.path.join(workingDir, 'sampleSpecificDir'), mgWorkingDir, profilesDir]
     for dirPath in dirArray:
         if not os.path.isdir(dirPath):
             try:
@@ -583,6 +584,9 @@ def main():
                         cm.generateConfusionMatrix(rank, os.path.join(cmpOutDir, 'contigs_vs_scaff'))
                     cm.close()
 
+            createScaffoldAbundanceProfiles(scaffoldsIdsNewPath, scaffPred, profilesDir, databaseFile,
+                                            taxonomicRanks, int(config.get('minSeqLen')))
+
     # Read output from PPS predict and place sequences
     if args.r:
         if sequences is None:
@@ -677,13 +681,23 @@ def main():
         # compute the precision and recall values
         if (referencePlacementFileOut is not None) and os.path.isfile(referencePlacementFileOut):
             buff = csv.OutFileBuffer(os.path.join(outputDir, 'precision_recall.csv'))
+            buff2 = csv.OutFileBuffer(os.path.join(outputDir, 'precision_recall_corrections.csv'))
             acc = accuracy.Accuracy(inputFastaFile, common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'),
                                     referencePlacementFileOut, databaseFile)
+            acc2 = accuracy.Accuracy(inputFastaFile, common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'),
+                                    referencePlacementFileOut, databaseFile, float(config.get('correctLabelThreshold')))
+
             buff.writeText(acc.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
                                                 minFracClade=float(config.get('recallMinFracClade')),
                                                 minFracPred=float(config.get('precisionMinFracPred')), overview=True))
+            buff2.writeText(acc2.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
+                                                minFracClade=float(config.get('recallMinFracClade')),
+                                                minFracPred=float(config.get('precisionMinFracPred')), overview=True))
+
             buff.close()
+            buff2.close()
             acc.close()
+            acc2.close()
 
             # compute precision and recall values for the data that were not used as the sample specific data
             # generates such a fasta file that can be then used for other binning methods!
@@ -719,6 +733,114 @@ def main():
                                                         overview=True))
                     buff.close()
                     acc.close()
+
+        # generate abundance profiles
+        createContigAbundanceProfiles(sequences, profilesDir, int(config.get('minSeqLen')))
+
+
+def createScaffoldAbundanceProfiles(scaffFilePath, scaffPred,  profilesDir, databaseFile, taxonomicRanks, minScaffLen):
+    """
+        Generates abundance profiles for scaffolds
+        @param scaffFilePath:
+        @param scaffPred:
+        @param databaseFile:
+        @param minScaffLen: shorter scaffolds won't be considered
+        @return:
+    """
+    seqIdToBp = fas.getSequenceToBpDict(scaffFilePath)
+    seqIdToTaxonId = csv.predToDict(scaffPred)
+    taxonomy = Taxonomy(databaseFile, taxonomicRanks)
+
+    entryList = []  # (taxPath, bp)
+    for seqId, bp in seqIdToBp.iteritems():
+        if bp < minScaffLen:
+            continue
+        taxonId = seqIdToTaxonId.get(seqId, None)
+        if taxonId is None:
+            continue
+        taxPath = taxonomy.getPathToRoot(taxonId)
+
+        entryList.append((taxPath, bp))
+
+    taxonomy.close()
+    createAbundanceProfiles(entryList, profilesDir, 'scaffold')
+
+
+def createContigAbundanceProfiles(sequences, profilesDir, minSeqLen):
+        """
+            Generate abundance profiles for assigned sequences. One file for one rank.
+            @param sequences:
+            @param profilesDir:
+            @param minSeqLen: shorter sequences won't be considered
+            @return:
+        """
+        entryList = []
+        for seq in sequences.sequences:
+            bp = seq.seqBp
+            if bp < minSeqLen:
+                continue
+            taxPath = seq.getTaxonomyPath()
+            entryList.append((taxPath, bp))
+
+        createAbundanceProfiles(entryList, profilesDir, 'contig')
+
+
+def createAbundanceProfiles(entryList, profilesDir, label):
+
+        for rank in taxonomy_ncbi.TAXONOMIC_RANKS[1:]:
+
+            taxonIdToScientificName = {}
+            taxonIdToBp = {}
+            taxonIdToCount = {}
+            for taxPath, bp in entryList:
+                if rank not in taxPath:
+                    continue
+                taxonId = int(taxPath[rank].ncbid)
+                if taxonId not in taxonIdToScientificName:
+                    taxonIdToScientificName[taxonId] = taxPath[rank].name
+                if taxonId in taxonIdToBp:
+                    taxonIdToBp[taxonId] += bp
+                else:
+                    taxonIdToBp[taxonId] = bp
+                if taxonId in taxonIdToCount:
+                    taxonIdToCount[taxonId] += 1
+                else:
+                    taxonIdToCount[taxonId] = 1
+
+            infoList = []
+            bpSum = 0
+            countSum = 0
+            for taxonId, bp in taxonIdToBp.iteritems():
+                count = taxonIdToCount[taxonId]
+                name = taxonIdToScientificName[taxonId]
+                infoList.append((taxonId, name, bp, count))
+                bpSum += bp
+                countSum += count
+
+            infoList.sort(key=lambda x: x[2], reverse=True)
+
+            outFile = csv.OutFileBuffer(os.path.join(profilesDir, str(rank + '_' + label + '_profile.csv')))
+            outFile.writeText('bp%, count%, bp, count, taxonId, scientific name\n')
+
+            bpPercentSum = 0.0
+            countPercentSum = 0.0
+            if countSum > 0:
+                assert bpSum > 0
+                for taxonId, name, bp, count in infoList:
+                    if countSum > 0:
+                        assert bpSum > 0
+                        bpPercent = round((float(bp) / float(bpSum)) * 100.0, 1)
+                        countPercent = round((float(count) / float(countSum)) * 100.0, 1)
+                        print countPercent
+                        outFile.writeText(str(bpPercent) + ' %, ' + str(countPercent) + ' %, ' + str(bp) + ', ' +
+                                          str(count) + ', ' + str(taxonId) + ', ' + str(name) + '\n')
+                        bpPercentSum += bpPercent
+                        countPercentSum += countPercent
+
+
+                outFile.writeText(str(round(bpPercentSum, 0)) + ', ' + str(round(countPercentSum)) + ', ' + str(bpSum) +
+                                  ', ' + str(countSum) + ', ,\n')
+            outFile.close()
 
 
 def getLogFileName(logDir, description):

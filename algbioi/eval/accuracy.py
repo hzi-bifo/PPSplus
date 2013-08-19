@@ -114,7 +114,7 @@ class Accuracy():
         Implements computation of the "precision" and "recall" according to different definitions.
     """
 
-    def __init__(self, seqIdToBp, seqIdToPred, seqIdToTruePred, taxonomy):
+    def __init__(self, seqIdToBp, seqIdToPred, seqIdToTruePred, taxonomy, correctLabelThreshold=None):
         """
             Initializes the accuracy object.
             @param seqIdToBp: dictionary or a fasta file
@@ -145,6 +145,74 @@ class Accuracy():
         else:
             assert os.path.isfile(taxonomy)
             self._taxonomy = _TaxonomyWrapperA(taxonomy)
+
+        # correct the predictions self._seqToPred
+        if correctLabelThreshold is not None:
+            self._seqToPred = self._correctPredictions(
+                self._seqToBp, self._seqToPred, self._seqToTrue, self._taxonomy, correctLabelThreshold)
+
+
+    def _correctPredictions(self, seqIdToBp, seqIdToPred, seqIdToTruePred, taxonomy, correctLabelThreshold):
+        """
+
+        """
+        newPred = {}
+
+        ranks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
+        ranks.reverse()
+        for rank in ranks:
+
+            # get true clades at given rank
+            seqIdToLabelRank = taxonomy.getPredDictAtRank(seqIdToTruePred, rank)
+
+            # get pred clades at given rank
+            seqIdToPredRank = taxonomy.getPredDictAtRank(seqIdToPred, rank)
+
+            # map: true taxonId -> seqId
+            labelToSeqIdList = {}
+            for seqId, taxonId in seqIdToLabelRank.iteritems():
+                if taxonId in labelToSeqIdList:
+                    labelToSeqIdList[taxonId].append(seqId)
+                else:
+                    labelToSeqIdList[taxonId] = [seqId]
+
+            for taxonId, seqIdList in labelToSeqIdList.iteritems():
+
+                idToBp = {}
+                sumBp = 0
+                for seqId in seqIdList:
+                    id = seqIdToPredRank.get(seqId, None)
+                    if id is None:
+                        continue
+                    bp = seqIdToBp[seqId]
+                    if id in idToBp:
+                        idToBp[id] += bp
+                    else:
+                        idToBp[id] = bp
+                    sumBp += bp
+
+                entryList = []
+                for id, bp in idToBp.iteritems():
+                    entryList.append((id, bp))
+                if len(entryList) == 0:
+                    continue
+                entryList.sort(key=lambda x: x[1], reverse=True)
+
+                id, bp = entryList[0]
+                if id == taxonId:
+                    continue
+                percent = float(bp) / float(sumBp)
+                if percent >= correctLabelThreshold:
+                    for seqId in seqIdList:
+                        if seqIdToPred[seqId] == id:
+                            newPred[seqId] = taxonId
+
+        for seqId, taxonId in seqIdToPred.iteritems():
+            if seqId not in newPred:
+                newPred[seqId] = taxonId
+
+        return newPred
+
 
     def getAccuracy(self, rank, minFracClade=None, minFracPred=None, asBp=True, weightAccordingBinSize=True):
         """

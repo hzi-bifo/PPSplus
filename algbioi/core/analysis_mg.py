@@ -293,6 +293,11 @@ class MarkerGeneAnalysis():
             #                                  str(geneName + '_dna.' + os.path.basename(taxonomyFile) + 'onomy'))  # taxonomy
             #!!!!!!!!!!!!!
             mothurPredFileName = common.getMothurOutputFilePath(regionDnaFasta, taxonomyFile)
+            if not os.path.isfile(mothurPredFileName):
+                mothurPredFileName = common.getMothurOutputFilePath(regionDnaFasta, taxonomyFile, suffix='.bayesian.taxonomy')
+                if not os.path.isfile(mothurPredFileName):
+                    print("Can't open file: %s" % mothurPredFileName)
+
             outPredFileName = os.path.join(self.markerGeneWorkingDir,
                                            str(os.path.basename(fastaFileDNA) + '_' + geneName + '.mP'))
             outBuffer = OutFileBuffer(outPredFileName, bufferText=True)
@@ -336,7 +341,7 @@ class _SetCandidatePlacement():
 
         if ncbid != 1:
             taxPathDict = self.taxonomy.getPathToRoot(ncbid)
-            if taxPathDict != None and taxPathDict.keys() >= 1:
+            if taxPathDict is not None and taxPathDict.keys() >= 1:
                 self.sequences.setCandidateTaxonomyPath(contigId, scaffoldId, taxPathDict, weight, source, tag)
                 self.assignedIdList.append(contigId)
             else:

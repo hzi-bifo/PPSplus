@@ -196,10 +196,10 @@ def getSubstDictList(scenario='ppsp'):
 
 
 def _main():
-    fh = FileHandler('/net/metagenomics/projects/PPSmg/tests/mercier042013/uniform/config_ex_rs_no_mg_no.cfg')
-    scenario = 'test'
+    fh = FileHandler('/net/metagenomics/projects/PPSmg/tests/mercierVelvetMinimus050513/uniformGenusMg/config_rs_no_mg_no.cfg')
+    scenario = 'ppsp'
     ppspArgs = '-n -g -o s16 mg -t -a -p c -r -s'
-    ppsMasterScript = '/net/metagenomics/projects/PPSmg/scripts/scriptsR29/algbioi/core/run.py'
+    ppsMasterScript = '/net/metagenomics/projects/PPSmg/scripts/scriptsR31/algbioi/core/run.py'
     generateTestScenarios(fh, ppsMasterScript, ppspArgs, scenario)
 
 

@@ -50,7 +50,7 @@ class RRNA16S():
         #trunkoutputfilename = inputFastaFile.split( "/" )[-1]
         trunkoutputfilename = os.path.join(self._workingDir, os.path.basename(inputFastaFile))
         # parse results file line by line
-        for line in open(regionsFile, "rU" ):
+        for line in open(regionsFile, "rU"):
             if line[0] != "#":
                 line = line.split()
                 ident = line[0]
@@ -262,7 +262,7 @@ class RRNA16S():
                     tag = str(re.sub(r'^[0-9]+_[0-9]+\t[0-9]+\t[0-9\.]+\t([^\t]+)$',r'\1' ,line))
                     if ncbid != 1:
                         taxPathDict = taxonomy.getPathToRoot(ncbid)
-                        if taxPathDict != None and taxPathDict.keys() >= 1:
+                        if taxPathDict is not None and taxPathDict.keys() >= 1:
                             sequences.setCandidateTaxonomyPath(contigId, scaffoldId, taxPathDict, weight, source, tag)
                             assignedIdList.append(contigId)
                         else:

@@ -204,7 +204,7 @@ class Accuracy():
                 percent = float(bp) / float(sumBp)
                 if percent >= correctLabelThreshold:
                     for seqId in seqIdList:
-                        if seqIdToPred[seqId] == id:
+                        if seqIdToPred.get(seqId, None) == id:
                             newPred[seqId] = taxonId
 
         for seqId, taxonId in seqIdToPred.iteritems():

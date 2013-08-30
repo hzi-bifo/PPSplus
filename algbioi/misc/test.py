@@ -51,7 +51,7 @@ def test2():
 
 
 
-def stat():
+def stat(f):
     """
 
 
@@ -62,14 +62,14 @@ def stat():
     #file = '/Volumes/hhu-hera/PPSmg/data/mercier50/nobackup/seed5_63mer/soap_.contig'
     #file = '/Volumes/hhu-hera/PPSmg/data/mercier50/nobackup/seed5_127/soap_seed5_127.contig'
     #fas.fastaFileToDict(file)
-    file = '/Volumes/hhu-hera/PPSmg/data/mercier50/nobackup/seed0/ReadsR_seed0.fa'
+    #f = '/Volumes/hhu-hera/PPSmg/data/mercier50/nobackup/seed0/ReadsR_seed0.fa'
     c = 0
     bp = 0
     minLen = 1000
     maxLen = 0
     totalBp = 0
     totalCount = 0
-    for k, v in fas.fastaFileToDict(file).iteritems():
+    for k, v in fas.fastaFileToDict(f).iteritems():
         l = len(v)
         totalCount += 1
         if l > 1000:
@@ -81,7 +81,7 @@ def stat():
         elif l > maxLen:
             maxLen = l
 
-    print('Bigger than 1000bp (contigs, bp):', c, bp)
+    print('Bigger than 1000bp (contigs, bp, avgLen):', c, bp, round(float(bp) / float(c), 1))
     print('maxLen, minLen, avgLen:', minLen, maxLen, (totalBp / totalCount))
     print('total:', totalCount)
 
@@ -452,10 +452,64 @@ def processSSDFromTaxator(inDir, outDir, ncbidsFile=None, threshold=100000):
         out.close()
 
 
+def getLabels(inBlast, inMapping, outLabels):
+    """
+        Get labels for a simulated dataset using blast.
+
+        @param inBlast: input blast tab sep file (map: seqId -> string_label)
+        @param inMapping: map string_label -> ncbi label
+        @param outLabels: output labels (map: seqId -> taxonId)
+    """
+    seqIdToLabel = csv.getMapping(inBlast, 0, 1, sep='\t')
+    labelToTaxonId = csv.getMapping(inMapping, 0, 1, sep='\t')
+    out = csv.OutFileBuffer(outLabels)
+    for seqId, label in seqIdToLabel.iteritems():
+        taxonId = labelToTaxonId[label[0]]
+        out.writeText(str(seqId) + '\t' + str(taxonId[0]) + '\n')
+    out.close()
+
+
 if __name__ == "__main__":
-    processSSDFromTaxator('/Users/ivan/Documents/nobackup/barley/taxator_ssd',
-                          '/Users/ivan/Documents/nobackup/barley/taxator_ssd_filtered',
-                          '/Users/ivan/Documents/nobackup/barley/ncbids.txt')
+
+    # uniform
+    # getLabels('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/velv_min2_uniform_blast.txt',
+    #           '/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
+    #           '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform.tax')
+
+    # lognorm
+    # getLabels('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/velv_min2_lognorm_blast.txt',
+    #           '/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
+    #           '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.tax')
+
+    filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform.fa',
+                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform.tax',
+                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.fna',
+                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.tax',
+                       minBp=1000)
+
+    filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.fa',
+                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.tax',
+                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.fna',
+                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.tax',
+                       minBp=1000)
+
+
+    # l = ['/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/MetavelvetNoscafNewbler_ma-merge.fa',
+    #      '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma-merge.fa',
+    #      '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafNewbler_ma-merge.fa',
+    #      '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/MetavelvetNoscafNewbler_ma-merge.fa',
+    #      '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma-merge.fa',
+    #      '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafNewbler_ma-merge.fa']
+    # for f in l:
+    #     print(str(f))
+    #     stat(f)
+    #     print('----------------------------------------------------------------------')
+
+
+
+    # processSSDFromTaxator('/Users/ivan/Documents/nobackup/barley/taxator_ssd',
+    #                       '/Users/ivan/Documents/nobackup/barley/taxator_ssd_filtered',
+    #                       '/Users/ivan/Documents/nobackup/barley/ncbids.txt')
 
 
 

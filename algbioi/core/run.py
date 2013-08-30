@@ -36,7 +36,7 @@ from algbioi.ref import mask_db
 
 # paths on hera/gaia:
 # export PATH=/net/programs/Debian-6.0.3-x86_64/python-2.7joh/bin:$PATH
-# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR30
+# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR31
 #
 
 def main():
@@ -750,7 +750,7 @@ def createScaffoldAbundanceProfiles(scaffFilePath, scaffPred,  profilesDir, data
     seqIdToBp = fas.getSequenceToBpDict(scaffFilePath)
     seqIdToTaxonId = csv.predToDict(scaffPred)
     taxonomy = Taxonomy(databaseFile, taxonomicRanks)
-
+    errorIdToCount = {}
     entryList = []  # (taxPath, bp)
     for seqId, bp in seqIdToBp.iteritems():
         if bp < minScaffLen:
@@ -758,7 +758,18 @@ def createScaffoldAbundanceProfiles(scaffFilePath, scaffPred,  profilesDir, data
         taxonId = seqIdToTaxonId.get(seqId, None)
         if taxonId is None:
             continue
-        taxPath = taxonomy.getPathToRoot(taxonId)
+
+        try:
+            taxPath = taxonomy.getPathToRoot(taxonId)
+        except Exception:
+            if taxonId not in errorIdToCount:
+                errorIdToCount[taxonId] = 1
+            else:
+                errorIdToCount[taxonId] += 1
+            continue
+    if len(errorIdToCount) > 0:
+        for errorId, count in errorIdToCount.iteritems():
+            print('Error for taxonId: %s, records skipped: %s' % (errorId, count))
 
         entryList.append((taxPath, bp))
 
@@ -793,8 +804,13 @@ def createAbundanceProfiles(entryList, profilesDir, label):
             taxonIdToBp = {}
             taxonIdToCount = {}
             for taxPath, bp in entryList:
-                if rank not in taxPath:
-                    continue
+                try:
+                    if (taxPath is None) or (rank not in taxPath):
+                        continue
+                except Exception as e:
+                    print taxPath
+                    raise e
+
                 taxonId = int(taxPath[rank].ncbid)
                 if taxonId not in taxonIdToScientificName:
                     taxonIdToScientificName[taxonId] = taxPath[rank].name
@@ -831,7 +847,6 @@ def createAbundanceProfiles(entryList, profilesDir, label):
                         assert bpSum > 0
                         bpPercent = round((float(bp) / float(bpSum)) * 100.0, 1)
                         countPercent = round((float(count) / float(countSum)) * 100.0, 1)
-                        print countPercent
                         outFile.writeText(str(bpPercent) + ' %, ' + str(countPercent) + ' %, ' + str(bp) + ', ' +
                                           str(count) + ', ' + str(taxonId) + ', ' + str(name) + '\n')
                         bpPercentSum += bpPercent
@@ -936,7 +951,7 @@ KERNEL_POLYNOMIAL_S:1
 N_CLASSIFIERS:3
 #Create Pie charts for every taxonomic rank TRUE/FALSE (in prediction)
 #slice colors are determined automatically so no color consistency is guaranteed
-PIE_CHARTS:TRUE
+PIE_CHARTS:FALSE
 ###### Misc options #####
 #should the models be built in parallel (please make sure that you have enough number of
 processors and main memory)\n""")

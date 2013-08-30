@@ -28,7 +28,7 @@ def createTagFilePath(dstDir, fileNameFromPath, tag):
                                                             + '.' + tag))))
 
 
-def getMothurOutputFilePath(inputFastaFilePath, refTaxonomyFilePath):
+def getMothurOutputFilePath(inputFastaFilePath, refTaxonomyFilePath, suffix='.taxonomy'):
     """
         Returns mothur prediction file path that is generated based on the arguments of the Mothur classify command.
     """
@@ -40,8 +40,7 @@ def getMothurOutputFilePath(inputFastaFilePath, refTaxonomyFilePath):
     if '.' in taxPart:
         taxPart = taxPart[(taxPart.rindex('.') + 1):] # from last comma till the end
 
-    return os.path.join(dirName, str(fastaPart + '.' + taxPart + '.taxonomy'))
-
+    return os.path.join(dirName, str(fastaPart + '.' + taxPart + suffix))
 
 
 def seqFileCmp(file1, file2):

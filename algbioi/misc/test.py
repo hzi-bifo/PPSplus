@@ -469,7 +469,38 @@ def getLabels(inBlast, inMapping, outLabels):
     out.close()
 
 
+def ray():
+    accToNcbiFile = '/Users/ivan/Documents/work/teaching/CostTrainingSchool2013/dataset01/accessions_to_ncbids.txt'
+    contigToAccFile = '/Users/ivan/Documents/work/teaching/CostTrainingSchool2013/dataset01/velvet_k21/headers2.txt'
+    # inFastaFile = '/Users/ivan/Documents/work/teaching/CostTrainingSchool2013/dataset01/Contigs.fasta'
+    outDir = '/Users/ivan/Documents/work/teaching/CostTrainingSchool2013/dataset01/velvet_k21q'
+    accToNcbi = csv.getMapping(accToNcbiFile, 0, 1, sep='\t')
+    contigToAcc = csv.getMapping(contigToAccFile, 0, 1, sep='\t')
+    out = csv.OutFileBuffer(os.path.join(outDir, 'map.csv'))
+    for contigId, acc in contigToAcc.iteritems():
+        taxonId = accToNcbi.get(acc[0], None)
+        if taxonId is None:
+            print("No mapping for %s %s" % (contigId, acc))
+        else:
+            out.writeText(contigId + '\t' + taxonId[0] + '\n')
+    out.close()
+
+
 if __name__ == "__main__":
+    # ray()
+    # i = 0
+    # for line in open('/net/metagenomics/projects/PPSmg/tmp/test01/ppsp/old/summary.py'):
+    #     i += 1
+    #     print line
+    #     if i == 5:
+    #         break
+
+
+
+    # print('contigs')
+    # stat('/Users/ivan/Documents/work/binning/data/CowRumen/chunked070513/chunks2000.fna')
+    # print('scaffolds')
+    # stat('/Users/ivan/Documents/work/binning/data/CowRumen/chunked070513/chunks2000.scaffolds')
 
     # uniform
     # getLabels('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/velv_min2_uniform_blast.txt',
@@ -481,17 +512,17 @@ if __name__ == "__main__":
     #           '/Users/ivan/Documents/work/binning/data/mercier51Strains/syn-mercier51strains/generation/community_20121116.tax',
     #           '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.tax')
 
-    filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform.fa',
-                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform.tax',
-                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.fna',
-                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.tax',
-                       minBp=1000)
-
-    filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.fa',
-                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.tax',
-                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.fna',
-                       '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.tax',
-                       minBp=1000)
+    # filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform.fa',
+    #                    '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform.tax',
+    #                    '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.fna',
+    #                    '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.tax',
+    #                    minBp=1000)
+    #
+    # filterOutSequences('/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.fa',
+    #                    '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.tax',
+    #                    '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.fna',
+    #                    '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.tax',
+    #                    minBp=1000)
 
 
     # l = ['/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/MetavelvetNoscafNewbler_ma-merge.fa',
@@ -544,3 +575,4 @@ if __name__ == "__main__":
     #                   '/Users/ivan/Documents/work/binning/data/mercier51Strains/contigs_soapdenovo-20121119_1000bp.fna',
     #                   '/Users/ivan/Documents/work/binning/data/mercier51Strains/binning_soapdenovo-20121119_1000bp.tax')
     # pass
+    pass

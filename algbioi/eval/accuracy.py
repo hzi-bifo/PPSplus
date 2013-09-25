@@ -221,7 +221,7 @@ class Accuracy():
             The number of classes correspond to the number of classes in the true reference and param "minFracClades".
 
             @param rank: on which taxonomic rank the predictions should be considered
-            @param minFracClade: a clade is considered only if the dataset (true predictions) contain at least this
+            @param minFracClade: a clade is considered only if the dataset (true labels) contain at least this
                           fraction of sequences that belong to the clade
             @param minFracPred: a clade is considered only if the corresponding predicted bins contain at least this
                          fraction of the overall sequences (None ~ this criteria is not considered and only

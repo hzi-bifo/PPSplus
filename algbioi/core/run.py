@@ -128,6 +128,11 @@ def main():
               'due to the "Mothur" software, given path:\n' + inputFastaFile)
         return
 
+    if ('-' in pipelineDir) or ('+' in pipelineDir):
+        print('The project directory is not allowed to contain "+" or "-" characters ' +
+              'due to the "Mothur" software, directory given:\n' + pipelineDir)
+        return
+
     inputFastaScaffoldsFile = config.get('inputFastaScaffoldsFile')
     if (inputFastaScaffoldsFile is not None) and (not os.path.isfile(inputFastaScaffoldsFile)):
         print("The given scaffolds fasta file doesn't exist: ", inputFastaScaffoldsFile)
@@ -240,7 +245,10 @@ def main():
             print("Can't create logging directory:", logDir)
             return
 
-    parallelPPSmodels = eval(config.get('parallelPPSmodels'))
+    try:
+        parallelPPSmodels = eval(config.get('parallelPPSmodels'))
+    except:
+        parallelPPSmodels = False
 
     # is it specified what to do?
     if not (args.n or args.g or args.o or args.t or args.p or args.r or args.s or args.a):

@@ -226,17 +226,29 @@ def _evalSimDataset(predFile, labelFile, fastaFile, outDir, databaseFile,
 
 
 def _evalSimDatasetBatch():
-    predFileArray = [['/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7-ex.txt',
-                      '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7_strain-ex.txt',
-                      '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7_species-ex.txt',
-                      '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7_genus-ex.txt',
-                      '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7_family-ex.txt'],
+    # predFileArray = [['/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7-ex.txt',
+    #                   '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7_strain-ex.txt',
+    #                   '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7_species-ex.txt',
+    #                   '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7_genus-ex.txt',
+    #                   '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_m7_family-ex.txt'],
+    #
+    #                  ['/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7-ex.txt',
+    #                   '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7_strain-ex.txt',
+    #                   '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7_species-ex.txt',
+    #                   '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7_genus-ex.txt',
+    #                   '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7_family-ex.txt']]
+    predFileArray = [['/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.tax',
+                      '/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_strain.tax',
+                      '/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_species.tax',
+                      '/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_genus.tax',
+                      '/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp_family.tax'],
 
-                     ['/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7-ex.txt',
-                      '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7_strain-ex.txt',
-                      '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7_species-ex.txt',
-                      '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7_genus-ex.txt',
-                      '/Users/ivan/Documents/nobackup/megan/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_m7_family-ex.txt']]
+                    ['/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.tax',
+                     '/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_strain.tax',
+                     '/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_species.tax',
+                     '/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_genus.tax',
+                     '/Users/ivan/Documents/nobackup/taxator/predictions/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp_family.tax']]
+
 
     labelFile = ['/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.tax',
                  '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm.tax']
@@ -244,7 +256,8 @@ def _evalSimDatasetBatch():
     fastaFile = ['/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/uniform/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.fna',
                  '/Users/ivan/Documents/work/binning/data/mercier050513/melanieAssembly/lognorm/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.fna']
 
-    outDir = '/Users/ivan/Documents/nobackup/megan/evaluation'
+    # outDir = '/Users/ivan/Documents/nobackup/megan/evaluation'
+    outDir = '/Users/ivan/Documents/nobackup/taxator/evaluation'
     databaseFile = '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db'
     recallMinFracClade = 0.001
     precisionMinFracPred = 0.001
@@ -257,12 +270,15 @@ def _evalSimDatasetBatch():
 
 
 def _evalRealDataset():
-    contigPredArray = ['/Users/ivan/Documents/nobackup/megan/predictions/cr_chunks2000_contigs_m7-ex_1.txt', '/Users/ivan/Documents/nobackup/megan/predictions/hg_contigs_m7-ex_1.txt']
-    scaffPredArray = ['/Users/ivan/Documents/nobackup/megan/predictions/cr_chunks2000_scaffolds_m7-ex_1.txt', '/Users/ivan/Documents/nobackup/megan/predictions/hg_scaffolds_m7-ex_1.txt']
+    contigPredArray = ['/Users/ivan/Documents/nobackup/taxator/predictions/cr_chunks2000_contigs_alignment.tax', '/Users/ivan/Documents/nobackup/taxator/predictions/hg_contigs_alignment.tax']
+    scaffPredArray = ['/Users/ivan/Documents/nobackup/taxator/predictions/cr_chunks2000_scaffolds_alignment.tax', '/Users/ivan/Documents/nobackup/taxator/predictions/hg_scaffolds_alignment.tax']
+    # contigPredArray = ['/Users/ivan/Documents/nobackup/megan/predictions/cr_chunks2000_contigs_m7-ex_1.txt', '/Users/ivan/Documents/nobackup/megan/predictions/hg_contigs_m7-ex_1.txt']
+    # scaffPredArray = ['/Users/ivan/Documents/nobackup/megan/predictions/cr_chunks2000_scaffolds_m7-ex_1.txt', '/Users/ivan/Documents/nobackup/megan/predictions/hg_scaffolds_m7-ex_1.txt']
     contigFnaArray = ['/Users/ivan/Documents/nobackup/megan/fastaOrig/cr_chunks2000_contigs.fna', '/Users/ivan/Documents/nobackup/megan/fastaOrig/hg_contigs.fna']
     scaffFnaArray = ['/Users/ivan/Documents/nobackup/megan/fastaOrig/cr_chunks2000_scaffolds.fna', '/Users/ivan/Documents/nobackup/megan/fastaOrig/hg_scaffolds.fna']
     scaffContigMapArray = ['/Users/ivan/Documents/nobackup/megan/cowRumenChunked/chunks2000.groups', '/Users/ivan/Documents/nobackup/megan/hg/scafftocontig.txt']
-    outDir = '/Users/ivan/Documents/nobackup/megan/evaluation'
+    # outDir = '/Users/ivan/Documents/nobackup/megan/evaluation'
+    outDir = '/Users/ivan/Documents/nobackup/taxator/evaluation'
     databaseFile = '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db'
     taxonomicRanks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
     minSeqLen = 1000
@@ -275,7 +291,6 @@ def _evalRealDataset():
             os.mkdir(d)
 
         cToPred = csv.predToDict(contigPredArray[i])
-
 
         # compute scaffold contig consistency
         if True:
@@ -327,13 +342,13 @@ def _evalRealDataset():
 if __name__ == "__main__":
     # _prepareFastaAndAlignments()
 
-    _filterAlignments()
+    # _filterAlignments()
 
     #_checkMagenPred('/Users/ivan/Documents/nobackup/megan/predictions')
 
-    #_evalSimDatasetBatch()
+    _evalSimDatasetBatch()
 
-    # _evalRealDataset()
+    _evalRealDataset()
 
 
 # to get species to exclude:

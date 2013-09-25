@@ -33,13 +33,13 @@ class PPSInput():
         #map: rank -> list of Nodes (ncbids)
         #map: rank -> set of ncbids
 
-        #transform forbiddenDict to forbidden sets
+        # transform forbiddenDict to forbidden sets
         forbiddenDictSet = {}
         if forbiddenDict is not None:
             for ncbid in forbiddenDict:
                 forbiddenDictSet[ncbid] = set(forbiddenDict[ncbid])
 
-        #transform the list into a set
+        # transform the list into a set
         if exSSDContigNameList is None:
             exSSDContigNameSet = set()
         else:
@@ -49,17 +49,17 @@ class PPSInput():
 
             taxonomyPath = sequences.getTaxonomyPath(sequence.id)
             if taxonomyPath is None:
-                continue #the sequence was not assigned
+                continue  # the sequence was not assigned
 
             if sequence.name in exSSDContigNameSet:
                 print str('Exclude according exSSDContigNameList:' + sequence.name)
-                continue #don`t consider this sequence
+                continue  # don't consider this sequence
 
             for rankIdx in range(0, len(taxonomyPath.keys())):
 
                 ncbid = int(taxonomyPath[self.taxonomicRanks[rankIdx]].ncbid)
 
-                #if ncbid and seq.id are together from the forbidden dict then continue!!!
+                # if ncbid and seq.id are together from the forbidden dict then continue!!!
                 if (ncbid in forbiddenDictSet) and (sequence.id in forbiddenDictSet[ncbid]):
                     ignoreSeq = True
                 else:
@@ -67,7 +67,7 @@ class PPSInput():
 
                 if taxonomyPath[self.taxonomicRanks[rankIdx]].isCopy():  # if this rank is not specified in the taxonomy
                     if ncbid not in self.ncbidToJumpedRanksNum:
-                        #get down to a specified real node
+                        # get down to a specified real node
                         idx = rankIdx
                         while True:
                             idx += 1
@@ -124,7 +124,7 @@ class PPSInput():
                 sum += seq.seqBp
             self.ncbidToBp[ncbid] = sum
 
-        self.toSummary(self.ncbidToSequences, summaryAllFile) #alsoPrint=True
+        self.toSummary(self.ncbidToSequences, summaryAllFile)  # alsoPrint=True
 
 
     def toSummary(self, ncbidList, toFile=None, alsoPrint=False):
@@ -163,7 +163,7 @@ class PPSInput():
 
         sumEntry.sort(reverse=True)
 
-        #write it to a file
+        # write it to a file
         if toFile is not None:
             try:
                 f = open(os.path.normpath(toFile),'w')
@@ -210,7 +210,8 @@ class PPSInput():
                             maxLeafClades, minBpToModel, minGenomesWgs, minBpPerSpecies, wgsGenomesDir, forbiddenDict, dbFile, taxonomicRanks,
                             fastaLineMaxChar, minSSDfileSize, maxSSDfileSize, weightStayAll, summaryTrainFile=None):
         """
-            Create the input of PhyloPythiaS: a list of clades (ncbids) that will be modeled and corresponding sample specific data
+            Create the input for PhyloPythiaS: a list of clades (ncbids) that will be modeled
+            and corresponding sample specific data.
 
             @param outFilePath: a file path where the list of the clades will be stored
             @param outTrainDataDir: a directory where the sample specific data will be stored
@@ -226,11 +227,11 @@ class PPSInput():
             @param forbiddenDict: a dict (ncbid -> list of seq.ids) of data that can`t be used as the sample specific data
         """
 
-        #get all ncbids whose rank is at least rankIdAll or whose rank is at least rankIdCut and there is at least
-        #rankIdCutMinBp of the sample specific data
+        # get all ncbids whose rank is at least rankIdAll or whose rank is at least rankIdCut and there is at least
+        # rankIdCutMinBp of the sample specific data
         outNcbids = []
 
-        #here also add all ncbids that were assigned with a very high weight, they will stay in the set if possible
+        # here also add all ncbids that were assigned with a very high weight, they will stay in the set if possible
         outNcbidsStaySet = set()
         for seq in self.sequences.sequences:
             weight = seq.getTaxonomyPathWeight()
@@ -240,7 +241,7 @@ class PPSInput():
                     ncbid = taxPathDict[taxonomicRanks[rankId]].ncbid
                     outNcbidsStaySet.add(ncbid)
 
-        #print outNcbidsStaySet
+        # print outNcbidsStaySet
 
         for ncbid in self.ncbidToSequences:
             rankId = self.ncbidToRankId[ncbid]
@@ -248,14 +249,14 @@ class PPSInput():
                 outNcbids.append(ncbid)
                 outNcbidsStaySet.add(ncbid)
                 continue
-            if (rankId <= rankIdCut) and (self.ncbidToBp[ncbid] >= rankIdCutMinBp):
+            if (rankId <= rankIdCut) and (self.ncbidToBp[ncbid] >= rankIdCutMinBp):  # currently doesn't have sense
                 outNcbids.append(ncbid)
                 continue
             if ncbid in outNcbidsStaySet:
                 outNcbids.append(ncbid)
 
-
-        #delete all ncbids for which there is not enough training data, i.e. sample specific data or genomes/draft genomes
+        # delete all ncbids for which there is not enough training data,
+        # i.e. sample specific data or genomes/draft genomes
         temp = []
         # dbData = DBData(wgsGenomesDir, dbFile)
         refData = RefSequences(wgsGenomesDir, dbFile)
@@ -267,17 +268,17 @@ class PPSInput():
             if refData.isRefSufficient(ncbid, minGenomesWgs, minBpPerSpecies):
                 temp.append(ncbid)
                 continue
-            print 'There is not enough data to model: ', ncbid
+            print('There is not enough data to model: %s' % ncbid)
         outNcbids = temp
         refData.close()
 
-        #delete all ncbids that are not leafs
+        # delete all ncbids that are not leafs
         outNcbids = self.getLeafs(outNcbids)
 
-        #get leaf ncbids to which at least X% of the sample specific data (that is assigned to the leafs) is assigned
-        #(except for ncbids that are in the "stay set" - outNcbidsStaySet)
+        # get leaf ncbids to which at least X% of the sample specific data (that is assigned to the leafs) is assigned
+        # (except for ncbids that are in the "stay set" - outNcbidsStaySet)
         while True:
-            #sums up the data in leafs
+            # sums up the data in leafs
             bpInLeafs = 0
             for ncbid in outNcbids:
                 if ncbid in self.ncbidToBp:
@@ -286,7 +287,7 @@ class PPSInput():
                     print 'no sample specific data for:', ncbid, ' ', bpInLeafs
             minBpLeaf = (bpInLeafs/100.0)*minPercentInLeaf
 
-            #for leaf ncbids that don`t contain enough data, put their parents to the candidate list
+            # for leaf ncbids that don't contain enough data, put their parents to the candidate list
             candidateSet = set()
             breakLoop = True
             for ncbid in outNcbids:
@@ -299,7 +300,7 @@ class PPSInput():
                 else:
                     candidateSet.add(ncbid)
 
-            #transform the candidate set to the ncbids list
+            # transform the candidate set to the ncbids list
             outNcbids = []
             for ncbid in candidateSet:
                 if ncbid is not None:
@@ -309,8 +310,7 @@ class PPSInput():
             if breakLoop:
                 break
 
-
-        #take only the first X clades (defined by the maxLeafClades)
+        # take only the first X clades (defined by the maxLeafClades) for which we have the most sample specific data
         while len(outNcbids) > maxLeafClades:
             minBp = sys.maxint
             minBpNcbid = -1
@@ -323,7 +323,7 @@ class PPSInput():
                     minBpNcbid = ncbid
                     minIdx = idx
                 idx += 1
-            if minBpNcbid < 0: #this means that all ncbids in the outNcbids are also in outNcbidsStaySet
+            if minBpNcbid < 0:  # this means that all ncbids in the outNcbids are also in outNcbidsStaySet
                 idx = 0
                 for ncbid in outNcbids:
                     bp = self.ncbidToBp[ncbid]
@@ -337,16 +337,15 @@ class PPSInput():
                 break
             assert ncbid in self.ncbidToParentNcbid, str('cannot find parent for ncbid: ' + ncbid)
 
-            #replace ncbid with its parent and try again
+            # replace ncbid with its parent and try again
             outNcbids[minIdx] = self.ncbidToParentNcbid[ncbid] #eats up one leaf in one loop
             outNcbids = self.getLeafs(outNcbids)
 
-
-        #Store the Clades to Model
+        # Store the Clades to Model
         print('Nodes--------------------------------------------')
         for ncbid in outNcbids:
             print ncbid
-
+        f = None
         try:
             f = open(os.path.normpath(outFilePath),'w')
             i = 0
@@ -360,14 +359,15 @@ class PPSInput():
             print "Cannot create a file or write to it:", outFilePath
             raise
         finally:
-            f.close()
+            if f is not None:
+                f.close()
 
         print('Sample specific data------------------------------------')
 
-        #Store the sample specific data
+        # Store the sample specific data
         self.storeSSD(outTrainDataDir, outNcbids, self.ncbidToSequences, fastaLineMaxChar, forbiddenDict, minSSDfileSize, maxSSDfileSize)
 
-        #Store the summary of the clades that will be modeled
+        # Store the summary of the clades that will be modeled
         self.toSummary(outNcbids, summaryTrainFile, alsoPrint=True)
 
 
@@ -380,21 +380,21 @@ class PPSInput():
             @param ncbidToSeqDict: ncbid -> list of sequences
             @param forbiddenDict: is a dict of lists (map: ncbid -> list of sequence.id) that contain sequences that
             @param maxSSDfileSize: in bp maximum size of one file, short sequences are eliminated
-            @param minSSDfileSize: in bp min size of a file, if there is less data the file won`t be created
+            @param minSSDfileSize: in bp min size of a file, if there is less data the file won't be created
                 will not be used as sample specific data for a respective ncbid (if None ~ not considered)
         """
         try:
             os.mkdir(os.path.normpath(SSDDir))
         except OSError:
-            for filePath in glob.glob(os.path.join(os.path.normpath(SSDDir),r'*.1.fna')):
+            for filePath in glob.glob(os.path.join(os.path.normpath(SSDDir), r'*.1.fna')):
                 os.remove(filePath)
 
         for ncbid in ncbidList:
 
             seqList = ncbidToSeqDict[ncbid]
 
-            #filter out sequences that will not be used as the SSD
-            if (forbiddenDict != None) and (ncbid in forbiddenDict):#this entries are already excluded in the init function !!!
+            # filter out sequences that will not be used as the SSD
+            if (forbiddenDict is not None) and (ncbid in forbiddenDict):  # this entries are already excluded in the init function !!!
                 forbiddenSet = set(forbiddenDict[ncbid])
                 temp = []
                 for seq in seqList:
@@ -403,26 +403,26 @@ class PPSInput():
                     else:
                         print('skip seq_id: %s for ncbid: %s' % (seq.id, ncbid))
                 if len(temp) == 0:
-                    continue #no SSD will be stored for this ncbid
+                    continue  # no SSD will be stored for this ncbid
                 else:
                     seqList = temp
 
-            #do not create this file
+            # do not create this file
             countBp = 0
             for seq in seqList:
                 countBp += seq.seqBp
             if countBp < minSSDfileSize:
                 continue
 
-            #filter out short sequences
+            # filter out short sequences
             if countBp > maxSSDfileSize:
-                seqList.sort(cmp=seqWeightThenLenCmp, reverse=True)#reverse=True
+                seqList.sort(cmp=seqWeightThenLenCmp, reverse=True)
                 seqBpCount = 0
                 tmp = []
-                #this filters out only short sequences
+                # this filters out only short sequences
                 for seq in seqList:
                     if (seqBpCount + seq.seqBp) > maxSSDfileSize:
-                        continue #was break
+                        continue  # was break
                     else:
                         seqBpCount += seq.seqBp
                         tmp.append(seq)
@@ -440,6 +440,7 @@ class PPSInput():
 
             filePath = os.path.join(os.path.normpath(SSDDir), str(str(ncbid) + '.1.fna'))
             range = fastaLineMaxChar
+            f = None
             try:
                 f = open(os.path.normpath(filePath),'w')
                 k = 0
@@ -464,11 +465,12 @@ class PPSInput():
                         j = i + range
                         f.write('\n' + s[i:j])
                         i += range
-            except Exception:
+            except Exception as e:
                 print "Cannot create a file or write to it:", filePath
-                raise
+                raise e
             finally:
-                f.close()
+                if f is not None:
+                    f.close()
 
 
 def storeDictToAFile(filePath, dictOfLists):
@@ -478,6 +480,7 @@ def storeDictToAFile(filePath, dictOfLists):
         @param filePath: a file in which the dictionary will be stored in format: (key tab item)
         @param dictOfLists: dict to be stored that represents mapping: (key -> list of items)
     """
+    f = None
     try:
         f = open(os.path.normpath(filePath), 'w')
         k = 0
@@ -489,11 +492,12 @@ def storeDictToAFile(filePath, dictOfLists):
                     k = 1
                 else:
                     f.write('\n' + str(key) + '\t' + str(item))
-    except Exception:
+    except Exception as e:
         print "Cannot create a file or write to it:", filePath
-        raise
+        raise e
     finally:
-        f.close()
+        if f is not None:
+            f.close()
 
 
 def loadDictFromAFile(filePath):

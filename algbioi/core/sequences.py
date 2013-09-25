@@ -276,7 +276,7 @@ class Sequences():
 
             for e in weightsList:
                 if e is None:
-                    cWeights.append(50.0) # if a weight is not known, it is considered to be 50.0
+                    cWeights.append(50.0)  # if a weight is not known, it is considered to be 50.0
                 else:
                     cWeights.append(e)
             #assignments with at least this weight will be considered
@@ -288,7 +288,6 @@ class Sequences():
                     assignments.append(placementList[i])
                     weights.append(cWeights[i])
             weight = min(weights)
-
 
         return [assignments, weight]
 
@@ -302,7 +301,7 @@ class Sequences():
             assignments = result[0]
             weight = result[1]
             taxPathDict = taxonomy.getLongestCommonPathFromMultipleAssignments(assignments)
-            if taxPathDict != None:
+            if taxPathDict is not None:
                 self.setTaxonomyPath(seq.id, seq.scaffold.id, taxPathDict, weight)
 
 
@@ -365,20 +364,20 @@ class Sequences():
                     notPlacedSeqList.append(seq)
                     notPlacedBp += seq.seqBp
 
-            #assigned part of a scaffold in <0,1>
-            if ((placedBp + notPlacedBp) == 0):
+            # assigned part of a scaffold in <0,1>
+            if (placedBp + notPlacedBp) == 0:
                 assingnedPart = 0
                 bf = "Zero length sequences:\n"
                 for zls in scaffold.contigs:
                      bf += str(zls.name + str(zls.seqBp) + '\n')
             else:
                 assignedPart = (float(placedBp)/(float(placedBp) + float(notPlacedBp)))
-            if (assignedPart >= assignedPartThreshold):
+            if assignedPart >= assignedPartThreshold:
                 assignNotAssigned = True
             else:
                 assignNotAssigned = False
 
-            #place all not placed sequences based on one placed sequence
+            # place all not placed sequences based on one placed sequence
             if (len(placedSeqList) == 1) and (len(notPlacedSeqList) > 0) and assignNotAssigned:
                 taxPathDict = placedSeqList[0].getTaxonomyPath()
                 assert (taxPathDict is not None) and (len(taxPathDict) > 0)
@@ -386,8 +385,8 @@ class Sequences():
                     t = taxonomy.replicateTaxPathDict(taxPathDict)
                     self.setTaxonomyPath(seq.id, scaffold.id, t, placedSeqList[0].getTaxonomyPathWeight())
 
-            #place all sequences to the agreement based on the placed sequences
-            elif (len(placedSeqList) > 1):
+            # place all sequences to the agreement based on the placed sequences
+            elif len(placedSeqList) > 1:
 
                 taxPathDictList = []
                 weightsList = []
@@ -397,7 +396,7 @@ class Sequences():
                     taxPathDictList.append(tp)
                     weightsList.append(seq.getTaxonomyPathWeight())
 
-                #get only placements with top perCent weights
+                # get only placements with top perCent weights
                 resultA = self._filterPlacements(weightsList, taxPathDictList, topPercentThreshold)
                 assignmentsA = resultA[0]
                 weightA = resultA[1]

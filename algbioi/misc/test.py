@@ -1,3 +1,4 @@
+from numpy.distutils import system_info
 import re
 import os
 import sys
@@ -485,8 +486,69 @@ def ray():
             out.writeText(contigId + '\t' + taxonId[0] + '\n')
     out.close()
 
+def rex():
+    raise FloatingPointError
 
 if __name__ == "__main__":
+    import multiprocessing
+    print("Number of processors: %s" % multiprocessing.cpu_count())
+
+    import sys
+    print("Platform: %s" % sys.platform)
+    rex()
+
+    import platform
+
+    print platform.machine()
+
+    print platform.version()
+
+    print platform.platform()
+
+    print platform.uname()
+
+    print platform.system()
+
+    print platform.processor()
+
+    import os
+    print os.uname()
+
+    print 'uname:', platform.uname()
+
+    print
+    print 'system   :', platform.system()
+    print 'node     :', platform.node()
+    print 'release  :', platform.release()
+    print 'version  :', platform.version()
+    print 'machine  :', platform.machine()
+    print 'processor:', platform.processor()
+
+    print '------------'
+    print platform.architecture()
+    print platform.python_build()
+    print platform.python_compiler()
+    print platform.python_version()
+    print platform.python_implementation()
+    print platform.uname()
+    print platform.linux_distribution()
+
+    print '------------'
+    print os.getcwd()
+
+
+
+   # system_info.get_platform()
+
+
+
+
+    #print multiprocessing.current_process()
+    #import shutil
+
+    #print psutil.phymem_usage()
+
+    #print runtime.availableProcessors()
     # ray()
     # i = 0
     # for line in open('/net/metagenomics/projects/PPSmg/tmp/test01/ppsp/old/summary.py'):

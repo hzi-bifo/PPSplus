@@ -163,15 +163,11 @@ def fastaBySeqNameList(inSeqIdList, inFastaFile, outFastaFile):
     out.close()
 
 
-def testExeption():
-    d = {}
+def testException():
     try:
-        print (str(1/0))
-    except Exception as ex:
-        #print(ex.message)
-        #print(ex.args)
-        print traceback.print_exc(file=sys.stdout)
-    print('done')
+        i = 1 / 0
+    except ArithmeticError as e:
+        print(e.message)
 
 
 def sortColumn(inCsvFilePath, outCsvFilePath=None, colNum=0, separator=',', sortReverse=False):
@@ -360,12 +356,12 @@ def toMostAbundant(d='AG:3	TA:1	TG:3	TC:2	GA:4	TT:2	CT:2'):
     print l
 
 
-def testException():
-    try:
-        int(None)
-    except Exception as e:
-        # pass
-        traceback.print_exc(sys.stdout)
+#def testException():
+#    try:
+#        int(None)
+#    except Exception as e:
+#        pass
+        #traceback.print_exc(sys.stdout)
 
 
 def checkTrainData(slFileDir):
@@ -490,56 +486,7 @@ def rex():
     raise FloatingPointError
 
 if __name__ == "__main__":
-    import multiprocessing
-    print("Number of processors: %s" % multiprocessing.cpu_count())
-
-    import sys
-    print("Platform: %s" % sys.platform)
-    rex()
-
-    import platform
-
-    print platform.machine()
-
-    print platform.version()
-
-    print platform.platform()
-
-    print platform.uname()
-
-    print platform.system()
-
-    print platform.processor()
-
-    import os
-    print os.uname()
-
-    print 'uname:', platform.uname()
-
-    print
-    print 'system   :', platform.system()
-    print 'node     :', platform.node()
-    print 'release  :', platform.release()
-    print 'version  :', platform.version()
-    print 'machine  :', platform.machine()
-    print 'processor:', platform.processor()
-
-    print '------------'
-    print platform.architecture()
-    print platform.python_build()
-    print platform.python_compiler()
-    print platform.python_version()
-    print platform.python_implementation()
-    print platform.uname()
-    print platform.linux_distribution()
-
-    print '------------'
-    print os.getcwd()
-
-
-
-   # system_info.get_platform()
-
+    testException()
 
 
 

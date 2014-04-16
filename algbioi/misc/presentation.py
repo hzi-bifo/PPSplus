@@ -34,7 +34,7 @@ def printMaps():
     printDict(a)
 
 
-os.mkdir('tmp' )
+#os.mkdir('tmp' )
 
 
 
@@ -50,26 +50,11 @@ def nestedCycles():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 if __name__ == "__main__":
     printEnvironmentInfo()
     #toUpper()
+    #print("System:                %s" % platform.system())
+
 
 
 

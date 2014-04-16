@@ -163,7 +163,7 @@ class Taxonomy():
             if rank in pathDict:
                 deapestRank = rank
                 break
-        assert deapestRank != None
+        assert deapestRank != None, '%s' % (ncbid)
 
         lastNode = None
         for rank in revRanks:

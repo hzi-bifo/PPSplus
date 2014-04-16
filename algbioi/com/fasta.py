@@ -157,7 +157,8 @@ def fastaFileToDictWholeNames(filePath):
         Reads a fasta file and returns mapping: seqName -> sequence the whole sequence name is used
         as seqName!!! (even if it contains space)
     """
-    seqIdToSeq = dict([])
+    seqIdToSeq = {}
+    f = None
     try:
         f = open(os.path.normpath(filePath),'r')
     except Exception:
@@ -180,7 +181,8 @@ def fastaFileToDictWholeNames(filePath):
             assert name != ''
             seqIdToSeq[name] = seq
     finally:
-        f.close()
+        if f is not None:
+            f.close()
     return seqIdToSeq
 
 

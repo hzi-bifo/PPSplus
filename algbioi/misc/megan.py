@@ -15,6 +15,7 @@ from algbioi.eval import consistency
 from algbioi.misc import out_proc
 from algbioi.core import run
 from algbioi.core.sequences import Sequences
+from algbioi.core import taxonomy
 
 class TaxonomyNcbiWrap():
     def __init__(self, databaseFile):
@@ -272,17 +273,18 @@ def _evalSimDatasetBatch():
 def _evalRealDataset():
     contigPredArray = ['/Users/ivan/Documents/nobackup/taxator/predictions/cr_chunks2000_contigs_alignment.tax', '/Users/ivan/Documents/nobackup/taxator/predictions/hg_contigs_alignment.tax']
     scaffPredArray = ['/Users/ivan/Documents/nobackup/taxator/predictions/cr_chunks2000_scaffolds_alignment.tax', '/Users/ivan/Documents/nobackup/taxator/predictions/hg_scaffolds_alignment.tax']
-    # contigPredArray = ['/Users/ivan/Documents/nobackup/megan/predictions/cr_chunks2000_contigs_m7-ex_1.txt', '/Users/ivan/Documents/nobackup/megan/predictions/hg_contigs_m7-ex_1.txt']
-    # scaffPredArray = ['/Users/ivan/Documents/nobackup/megan/predictions/cr_chunks2000_scaffolds_m7-ex_1.txt', '/Users/ivan/Documents/nobackup/megan/predictions/hg_scaffolds_m7-ex_1.txt']
+    #contigPredArray = ['/Users/ivan/Documents/nobackup/megan/predictions/cr_chunks2000_contigs_m7-ex_1.txt', '/Users/ivan/Documents/nobackup/megan/predictions/hg_contigs_m7-ex_1.txt']
+    #scaffPredArray = ['/Users/ivan/Documents/nobackup/megan/predictions/cr_chunks2000_scaffolds_m7-ex_1.txt', '/Users/ivan/Documents/nobackup/megan/predictions/hg_scaffolds_m7-ex_1.txt']
     contigFnaArray = ['/Users/ivan/Documents/nobackup/megan/fastaOrig/cr_chunks2000_contigs.fna', '/Users/ivan/Documents/nobackup/megan/fastaOrig/hg_contigs.fna']
     scaffFnaArray = ['/Users/ivan/Documents/nobackup/megan/fastaOrig/cr_chunks2000_scaffolds.fna', '/Users/ivan/Documents/nobackup/megan/fastaOrig/hg_scaffolds.fna']
     scaffContigMapArray = ['/Users/ivan/Documents/nobackup/megan/cowRumenChunked/chunks2000.groups', '/Users/ivan/Documents/nobackup/megan/hg/scafftocontig.txt']
-    # outDir = '/Users/ivan/Documents/nobackup/megan/evaluation'
+    #outDir = '/Users/ivan/Documents/nobackup/megan/evaluation'
     outDir = '/Users/ivan/Documents/nobackup/taxator/evaluation'
     databaseFile = '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db'
     taxonomicRanks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
     minSeqLen = 1000
     minScaffLen = 1000
+    tax = taxonomy.Taxonomy(databaseFile, taxonomicRanks)
 
     for i in range(2):
 
@@ -293,7 +295,7 @@ def _evalRealDataset():
         cToPred = csv.predToDict(contigPredArray[i])
 
         # compute scaffold contig consistency
-        if True:
+        if False:
             cons = consistency.Consistency(contigFnaArray[i], cToPred, scaffContigMapArray[i], databaseFile,
                                            minScaffContigCount=None, minScaffBpLen=None, cladesSet=None,
                                            considerContigWithNoScaff=True)
@@ -304,7 +306,7 @@ def _evalRealDataset():
             out.close()
             cons.close()
 
-        if True:
+        if False:
             # confusion tables: prediction of contigs vs predictions of scaffolds
             cmpDir = os.path.join(d, 'contigs_vs_scaff')
             if not os.path.isdir(cmpDir):
@@ -330,13 +332,31 @@ def _evalRealDataset():
             if not os.path.isdir(abundanceScaffDir):
                 os.mkdir(abundanceScaffDir)
 
-            # for contigs !!!
-            run.createScaffoldAbundanceProfiles(contigFnaArray[i], contigPredArray[i],  abundanceContigDir, databaseFile,
-                                                taxonomicRanks, minScaffLen)
-            # for scaffolds !!!
-            run.createScaffoldAbundanceProfiles(scaffFnaArray[i], scaffPredArray[i],  abundanceScaffDir, databaseFile,
-                                                taxonomicRanks, minScaffLen)
+            # for contigs and scaffolds
+            for label, outDirectory, pred, fasta in zip(['contig', 'scaffold'], [abundanceContigDir, abundanceScaffDir],
+                                                 [contigPredArray[i], scaffPredArray[i]], [contigFnaArray[i], scaffFnaArray[i]]):
+                entryList = []  # (tax_path_dict, bp)
+                contigIdToTaxonId = csv.predToDict(pred)
+                contigIdToSeq = fas.fastaFileToDictWholeNames(fasta)
+                taxonIdToTaxPath = {}
+                for taxonId in contigIdToTaxonId.values():
+                    if int(taxonId) == 131567:  # avoid cellular organisms
+                        continue
+                    if int(taxonId) not in taxonIdToTaxPath:
+                        taxonIdToTaxPath[int(taxonId)] = tax.getPathToRoot(int(taxonId))
+                for contigId, taxonId in contigIdToTaxonId.iteritems():
+                    taxPath = taxonIdToTaxPath.get(int(taxonId), None)
+                    if taxPath is not None:
+                        entryList.append((taxPath, len(contigIdToSeq[contigId])))
+                run.createAbundanceProfiles(entryList, outDirectory, label)
 
+            # for contigs !!!
+            #run.createScaffoldAbundanceProfiles(contigFnaArray[i], contigPredArray[i], abundanceContigDir, databaseFile,
+            #                                    taxonomicRanks, minScaffLen)
+            # for scaffolds !!!
+            #run.createScaffoldAbundanceProfiles(scaffFnaArray[i], scaffPredArray[i], abundanceScaffDir, databaseFile,
+            #                                    taxonomicRanks, minScaffLen)
+    tax.close()
 
 
 if __name__ == "__main__":
@@ -346,7 +366,7 @@ if __name__ == "__main__":
 
     #_checkMagenPred('/Users/ivan/Documents/nobackup/megan/predictions')
 
-    _evalSimDatasetBatch()
+    #_evalSimDatasetBatch()
 
     _evalRealDataset()
 

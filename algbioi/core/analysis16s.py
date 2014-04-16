@@ -148,6 +148,9 @@ class RRNA16S():
         else:
             raise Exception('Wrong branch')
 
+        if not os.path.isfile(mothurPredFileName):
+            mothurPredFileName = common.getMothurOutputFilePath(extractedRegionsFasta, taxonomyFile, suffix='.bayesian.taxonomy')
+
         param = self._config.get('mothurClassifyParamOther')
 
         cmd = str('time ' + mothur + ' "#classify.seqs(fasta=' + extractedRegionsFasta + ', template=' + templateFile
@@ -197,7 +200,10 @@ class RRNA16S():
                             if len(placementList) < 2:
                                 continue
                             placement = placementList[-2]
-                            clade = int(re.sub('([0-9]+)\(.*', r'\1' , placement))
+                            try:
+                                clade = int(re.sub('([0-9]+)\(.*', r'\1' , placement))
+                            except ValueError:
+                                continue
                             weight = float(re.sub('[0-9]+\(([0-9\.]+)\)', r'\1' , placement))
                             lineCount += 1
                             if lineCount == 1:

@@ -2,6 +2,7 @@ from numpy.distutils import system_info
 import re
 import os
 import sys
+import shutil
 
 from Bio.Seq import Seq
 
@@ -485,10 +486,164 @@ def ray():
 def rex():
     raise FloatingPointError
 
+
+def toHour(h=0, m=0, s=0.):
+    ret = float(h)
+    ret += float(m) / 60
+    ret += float(s) / 3600
+    return ret
+
+
+
+    #testException()
+    #print 'PPS+ (predict)', 63399.0 / toHour(0,30,49.527), 187.1 / toHour(0,30,49.527)
+    #print 'PPS+ ', 63399.0 / toHour(3,24,19), 187.1 / toHour(3,24,19)
+    #print 'PPS+ laptop', 63399.0 / toHour(12,43,0), 187.1 / toHour(12,43,0)
+def runtimes():
+    print 'PPS+ (predict)', 153564.0 / toHour(0,30,49.527), 255.2 / toHour(0,30,49.527)
+    print 'PPS+ (train, predict)', 153564.0 / toHour(3,24,19), 255.2 / toHour(3,24,19)
+    print 'PPS+ (laptop: predict)', 153564.0 / toHour(0,42,44.6), 255.2 / toHour(0,42,44.6)
+    print 'PPS+ (laptop: train, predict)', 153564.0 / toHour(12,43,0), 255.2 / toHour(12,43,0)
+    print 'PPS (predict)', 153564.0 / toHour(0,59,37.425), 255.2 / toHour(0,59,37.425)
+    print 'PPS (train, predict)', 153564.0 / toHour(13,37,19), 255.2 / toHour(13,37,19)
+    print 'Megan', 153564.0 / toHour(3,56,49), 255.2 / toHour(3,56,49)
+    print 'taxator-tk', 153564.0 / toHour(8,26,2), 255.2 / toHour(8,26,2)
+
+
+def filterMG():
+    # filter out assignment corresponding to sample specific data
+    sampleSpecContigs = '/Users/ivan/Documents/nobackup/exclude_mg/sample_spec_data.fna'
+    scaffolds = '/Users/ivan/Documents/nobackup/exclude_mg/scaffolds.fna'
+    scaffPred = '/Users/ivan/Documents/nobackup/exclude_mg/scaffolds.fna.pOUT'
+    out = csv.OutFileBuffer('/Users/ivan/Documents/nobackup/exclude_mg/scaffolds_no_ssd_mg.txt')
+    sampleSpecList = fas.getSequencesToList(sampleSpecContigs)
+    scaffList = fas.getSequencesToList(scaffolds)
+
+    excludeSeqNamesList = []
+    for ssdName, ssdSeq in sampleSpecList:
+        for sName, sSeq in scaffList:
+            if ssdSeq in sSeq:
+                excludeSeqNamesList.append(sName)
+                print len(sSeq), len(ssdSeq)
+
+    print 'len excluded: ', len(excludeSeqNamesList)
+    excluded = 0
+    total = 0
+    for line in open(scaffPred):
+        name = line.split('\t')[0]
+        if name not in excludeSeqNamesList:
+            out.writeText(line)
+        else:
+            excluded += 1
+        total += 1
+
+    print 'excluded, total: ', excluded, total
+    out.close()
+
+
+def countLines():
+    count = 0
+    for line in sys.stdin:
+        if line.strip() == '':
+            continue
+        if line.strip().startswith('#'):
+        #    print line
+            continue
+        count += 1
+    print 'lines: %s' % count
+
+def filterRank():
+    rank = 'phylum'
+    clade = 'Proteobacteria'
+    inFile = '/Volumes/hera_net/metagenomics/projects/PPSmg/data/nobackup/NCBI20121122/ncbi_taxon_ids.csv'
+    db = '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db'
+    outFile = '/Users/ivan/Documents/nobackup/peter/' + clade + '.csv'
+    out = csv.OutFileBuffer(outFile)
+    t = tax.TaxonomyNcbi(db)
+
+    i = 0
+    for line in open(inFile):
+        i += 1
+        taxon_id = int(line)
+        id = taxon_id
+        while id != 1:
+            r = t.getRank(id)
+            if r == rank:
+                c = t.getScientificName(id)
+                #print c
+                if c == clade:
+                    out.writeText(str(taxon_id) + '\n')
+                else:
+                    break
+            id = t.getParentNcbid(id)
+        if i % 100 == 0:
+            print i
+    out.close()
+
+def filterReference():
+    retainTaxa = '/Users/ivan/Documents/nobackup/peter/' + 'proteobacteria' + '.csv'
+    inDir = '/Volumes/hera_net/metagenomics/projects/PPSmg/data/nobackup/NCBI20121122/sequences'
+    outDir = '/Users/ivan/Documents/nobackup/peter/proteobacteria'
+
+    allowed = set(map(int, csv.getColumnAsList(retainTaxa)))
+
+
+    for f in os.listdir(inDir):
+        id = int(f.split('.')[0])
+        if id in allowed:
+            shutil.copy(os.path.join(inDir, f), outDir)
+
+
+
+def getListAcc():
+    idToAcc = csv.getMapping('/Users/ivan/Documents/nobackup/tmp/community', 1, 0)
+    nameToTaxonId = csv.getMapping('/Users/ivan/Documents/work/binning/data/mercier050513/soap_lognorm.contig.profile.csv', 6, 0, sep=',')
+    for line in open('/Users/ivan/Documents/nobackup/tmp/list'):
+        line = line.strip()
+        ids = nameToTaxonId[line]
+        assert len(ids) == 1
+        id = ids[0]
+        print line  + ', ' + " ".join(idToAcc[id])
+
+
+# from Bio import SeqIO
+# from Bio.SeqIO.QualityIO import FastqGeneralIterator
+# import os, shutil
+#
+# def combinePairedEndFileFastqTest(file1, file2, outputFile):
+#     f1 = open(file1, "r")
+#     f2 = open(file2, "r")
+#     f3 = open(outputFile, 'w')
+#
+#     g1 = SeqIO.parse(f1, "fastq")
+#     g2 = SeqIO.parse(f2, "fastq")
+#
+#     try:
+#         while True:
+#             SeqIO.write([g1.next(), g2.next()], f3, "fastq")
+#     except StopIteration:
+#         pass
+#     f3.close()
+#
+
+       # for record1 in SeqIO.parse(f1, "fastq"):
+       #SeqIO.write([record1, record2], f3, "fastq")
+   # pass
+
+
+# SeqIO.parse(f2, "fastq"))
+# combinePairedEndFileFastqTest('/net/metagenomics/projects/albugo_metagenomics/pipeline_testing/output/trimmomatic/Epiphyte_forward_paired.fq',
+# '/net/metagenomics/projects/albugo_metagenomics/pipeline_testing/output/trimmomatic/Epiphyte_reverse_paired.fq',
+# '/net/metagenomics/projects/albugo_metagenomics/pipeline_testing/output/trimmomatic/Epiphyte_forward_combined.fq')
+
+
 if __name__ == "__main__":
-    testException()
-
-
+    getListAcc()
+    #filterRank()
+    # filterReference()
+    #runtimes()
+    #countLines()
+    #filterMG()
 
     #print multiprocessing.current_process()
     #import shutil

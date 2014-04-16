@@ -746,7 +746,7 @@ def main():
         createContigAbundanceProfiles(sequences, profilesDir, int(config.get('minSeqLen')))
 
 
-def createScaffoldAbundanceProfiles(scaffFilePath, scaffPred,  profilesDir, databaseFile, taxonomicRanks, minScaffLen):
+def createScaffoldAbundanceProfiles(scaffFilePath, scaffPred, profilesDir, databaseFile, taxonomicRanks, minScaffLen):
     """
         Generates abundance profiles for scaffolds
         @param scaffFilePath:

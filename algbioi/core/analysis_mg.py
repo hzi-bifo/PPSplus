@@ -97,7 +97,10 @@ class _MothurOutFileParser():
             return
 
         placement = placementList[-2]
-        clade = int(re.sub('([0-9]+)\(.*', r'\1' , placement))
+        try:
+            clade = int(re.sub('([0-9]+)\(.*', r'\1' , placement))
+        except ValueError:
+            return
         weight = float(re.sub('[0-9]+\(([0-9\.]+)\)', r'\1' , placement))
 
         entry = str(str(name) + '\t' + str(clade) + '\t' + str(weight) + '\t' + str(self.source) + '\t' + str(tag))

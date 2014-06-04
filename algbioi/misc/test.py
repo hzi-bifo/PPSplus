@@ -266,88 +266,6 @@ def _main2():
         stdout.write( "%s\t%i\t%i\n" % (rank, consistent.get(rank,0), unconsistent.get(rank,0)) )
 
 
-
-
-#{'AG': 3, 'TT': 2, 'GA': 4, 'TG': 3, 'TA': 1, 'TC': 2, 'CT': 2}
-
-def DecimalToBinary(inTxtFilePath, n, outTxtFilePath):
-    """
-
-
-
-
-
-    @param outTxtFilePath:
-    @param n:
-    @param inTxtFilePath:
-    """
-    inpath = open(inTxtFilePath, 'r')
-    lines = inpath.readlines()
-
-    for line in lines:
-        # d1 = dict (((lambda i: (int(i[0]), int(i[1])))(element.split(':')) for element in line.split('\t')))
-        d1 = dict(((lambda i: (((bin(int(i[0])))[2:].zfill(2 * n)), int(i[1])))(element.split(':')) for element in
-                   line.split('\t')))
-        # for i in d1:
-
-        # d2 = dict (int(i[0]),int(i[1]))
-
-    print d1.keys()
-
-    lists = []
-
-    values = []
-    for BinaryData in d1.keys():
-        # lists = [BinaryData[i:i + 2] for i in range(0, len(BinaryData), 2)]
-        lists.append([BinaryData[i:i + 2] for i in range(0, len(BinaryData), 2)])
-        values.append(d1.get(BinaryData))
-
-    print lists
-
-    knownData = {'00': 'A', '01': 'T', '10': 'G', '11': 'C'}
-
-    # Yao has difficulties from here and yao does not know how to write dict into file.
-
-    results = []
-
-    for data in lists:
-
-        #value = [knownData.get(y) for y in data if y in knownData.keys()]
-        value = []
-        for y in data:
-            if y in knownData.keys():
-                value.append(knownData.get(y))
-
-
-        results.append(value)
-
-    print results
-
-    Kmer = []
-
-    for Nucleotide in results:
-
-        Kmer.append("".join(Nucleotide))
-
-    print Kmer
-
-    new_dic = dict(zip(Kmer,values))
-
-    print new_dic
-
-    inpath.close()
-
-    outpath = open(outTxtFilePath, 'w')
-
-    for i in Kmer:
-
-        outpath.write(i+'\t')
-
-
-
-        # for k, v in new_dic.iteritems():
-        #     outpath.write(str(k) + ':' + str(v) + '\t')
-
 def toMostAbundant(d='AG:3	TA:1	TG:3	TC:2	GA:4	TT:2	CT:2'):
     l = []
     for entry in d.split('\t'):
@@ -355,14 +273,6 @@ def toMostAbundant(d='AG:3	TA:1	TG:3	TC:2	GA:4	TT:2	CT:2'):
         l.append((k,v))
     l.sort(key=lambda x: x[1], reverse=True)
     print l
-
-
-#def testException():
-#    try:
-#        int(None)
-#    except Exception as e:
-#        pass
-        #traceback.print_exc(sys.stdout)
 
 
 def checkTrainData(slFileDir):
@@ -637,8 +547,23 @@ def getListAcc():
 # '/net/metagenomics/projects/albugo_metagenomics/pipeline_testing/output/trimmomatic/Epiphyte_forward_combined.fq')
 
 
+def getDuplicate():
+    f1 = '/net/metagenomics/projects/PPSmg/tests/cami/noN.fna'
+    f2 = '/net/metagenomics/projects/PPSmg/tests/cami/noN2.fna'
+    d1 = fas.fastaFileToDict(f1)
+    d2 = fas.fastaFileToDict(f2)
+
+    for k, v1 in d1.iteritems():
+        if k in d2:
+            v2 = d2[k]
+
+            if v1.strip() != v2.strip():
+                print 'not equal ' + str(k)
+        else:
+            print 'k not in d2: ' + str(k)
+
 if __name__ == "__main__":
-    getListAcc()
+    #getListAcc()
     #filterRank()
     # filterReference()
     #runtimes()

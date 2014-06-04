@@ -23,7 +23,7 @@ def exportedSilvaFastaToMothurFormat(inFastaFile, outDir, taxonomyNcbi, taxonomy
         used for the Mothur Bayesian classifier
     """
     seqIdToSeq = fastaFileToDictWholeNames(inFastaFile)
-    accessionToNcbi = getMapping(accessionToNcbiFile, 0, 1, sep='\t', comment = '#')
+    accessionToNcbi = getMapping(accessionToNcbiFile, 0, 1, sep='\t', comment='#')
 
     newFasta = os.path.join(outDir, os.path.basename(inFastaFile))
     newFastaTax = str(os.path.join(outDir, os.path.basename(inFastaFile)) + '.tax')
@@ -134,6 +134,7 @@ def test():
     exportedSilvaFastaToMothurFormat(inFastaFile, outDir, taxonomyNcbi, taxonomy,accessionToNcbiFile)
     taxonomyNcbi.close()
     taxonomy.close()
+
 
 def checkMapping():
 

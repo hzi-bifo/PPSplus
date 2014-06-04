@@ -3,7 +3,8 @@
     Creates the marker gene database for the 16S and 23S genes as well as for the Amphora marker genes.
 
     The input 16S and 23S marker genes are generated using the "arb" software from the files downloaded from the
-    SILVA database (http://www.arb-silva.de). The database with the "Amphora" marker genes was generated using script "download_mg.py"
+    SILVA database (http://www.arb-silva.de). The database with the "Amphora" marker genes was generated using script
+    "download_mg.py"
     that downloads sequences from NCBI.
 """
 import os
@@ -25,8 +26,8 @@ class _TaxonomyWrap():
         """
         self._taxonomy = tax.TaxonomyNcbi(taxonomyFile, allowedRanks)
         self._allowedRanks = allowedRanks
-        self._parentDict = {} # map: taxonId -> parent taxonId
-        self._rankDict = {} # map: taxonId -> rank
+        self._parentDict = {}  # map: taxonId -> parent taxonId
+        self._rankDict = {}  # map: taxonId -> rank
 
     def _getParent(self, taxonId):
         if taxonId in self._parentDict:
@@ -86,7 +87,7 @@ def _main():
     parser.add_argument('-i', '--input-data-dir', action='store', nargs=1, required=True,
         help="""Directory that contains fasta files and corresponding mapping files, for each "*.tax" (or "*.csv")
                  file there must be a "*.fna" file with the same name. All files with suffix "tax" (or "*.csv")
-                 will be considered.""",
+                 will be considered. (Takes only Bacteria and Archaea)""",
         metavar='input_dir',
         dest='inDir')
 
@@ -107,7 +108,8 @@ def _main():
         help='Comma separated leaf level or top level taxonIds (as a string) what fill be filtered out. (optional)',
         metavar='"2759,10239,77133,155900,408172,32644, 408170,433727,749907,556182,702656,410661,652676,410659,797283'\
                 ',408171,703336,256318,32630,433724,766747,488339,942017,1076179,717931,455559,527640,904678,552539,'\
-                '54395,198431,358574,415540,511564,369433,380357,81726,198834,271928,311313"',
+                '54395,198431,358574,415540,511564,369433,380357,81726,198834,271928,311313,2759,749906,1077529,'\
+                '1077529,361146,511563,361147"',
         dest='filterOut')
 
     # parse arguments
@@ -129,23 +131,23 @@ def _main():
 
     # create db for each gene
     mapDict = {}  # map: seqId -> ncbid
-    for mapFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.[ct][sa][vx]')): # *.csv or *.tax
+    for mapFilePath in glob.glob(os.path.join(os.path.normpath(inDir), r'*.[ct][sa][vx]')):  # *.csv or *.tax
 
         assert mapFilePath.endswith(('.csv', '.tax')), \
             'The mapping files can either end with .csv or .tax ' + mapFilePath
 
-        base = os.path.basename(mapFilePath).rsplit('.', 1)[0] # cut out dir path and suffix
+        base = os.path.basename(mapFilePath).rsplit('.', 1)[0]  # cut out dir path and suffix
         fastaDict = fas.fastaFileToDict(os.path.join(os.path.dirname(mapFilePath), (base + '.fna'))) # map: seqId -> seq
         print("Processing: %s seq count: %s" % (base, str(len(fastaDict))))
 
-        if 'a' in srcType: # Amphora
+        if 'a' in srcType:  # Amphora
             mapDict = {}
             for k in csv.getColumnAsList(mapFilePath, colNum=0, sep='\t'):
                 v =  int(k.rsplit('|', 1)[1].split(':')[1]) # get ncbid
                 assert ((k not in mapDict) or (mapDict[k] == v)), str(
                     'There are at least two different values for key: ' + str(k) + ' in ' + mapFilePath)
                 mapDict[k] = v
-        elif 's' in srcType: # Silva
+        elif 's' in srcType:  # Silva
             mapTmp = csv.getMapping(mapFilePath, 0, 2, '\t')
             mapDict = {}
             for k, v in mapTmp.iteritems():
@@ -186,14 +188,14 @@ def _main():
             if topLevel in filterOutTaxonIdsSet:
                 filteredSup += 1
                 continue
-            if  topLevel not in [2, 2157]: # Bacteria, Archaea
+            if topLevel not in [2, 2157]:  # Bacteria, Archaea
                 noBacArch += 1
                 print('NoBactArch: ', topLevel)
 
             seq = fastaDict[seqId]
-            if 'a' in srcType: # Amphora
+            if 'a' in srcType:  # Amphora
                 id = seqId
-            elif 's' in srcType: # Silva
+            elif 's' in srcType:  # Silva
                 id = str(seqId + '|ncbid:' + str(taxonId))
 
             outTax.writeText(str(id + '\t' + path + '\n'))

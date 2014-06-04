@@ -1,5 +1,7 @@
 """
-    Manages the update of the reference data, i.e. download, verification, and decompression.
+    To manage the update of the reference data, i.e. download, verification, and decompression.
+
+    Directories are compressed using command: tar -cf - directory/ | xz -9 -c - > directory.tar.xz
 """
 import os
 import urllib2
@@ -8,6 +10,8 @@ import subprocess
 import time
 import argparse
 
+# block size when reading a file
+BLOCK_SIZE = 8192
 
 class Settings():
     def __init__(self):
@@ -56,6 +60,10 @@ class Settings():
     def setUrl(self, url):
         self._url = url
 
+    def setVersion(self, version):
+        self._version = version
+        print("Version '%s' will be used!" % self._version)
+
 
 def downloadFile(fileName, settings, type):
     """
@@ -84,9 +92,9 @@ def downloadFile(fileName, settings, type):
     except Exception as e:
         print("\nCan't determine local destination for file: %s" % localFilePath)
         raise e
-    fileRead = 0
-    blockSize = 8192
 
+    fileRead = 0
+    blockSize = BLOCK_SIZE
     try:
         while True:
             block = remoteFile.read(blockSize)
@@ -95,14 +103,13 @@ def downloadFile(fileName, settings, type):
             localFile.write(block)
             fileRead += len(block)
             percent = round((float(fileRead) / float(fileSize)) * 100.0, 1)
-
             print str(percent) + ' %\r',
         localFile.close()
     except Exception as e:
         print("An error occurred while a file has been downloaded.")
         raise e
 
-    if fileRead >= fileSize:
+    if fileRead == fileSize:
         print ("100.0 %")
         print("Download successful!")
     else:
@@ -117,7 +124,8 @@ def downloadFile(fileName, settings, type):
         raise e
 
     try:
-        checksumLocal = hashlib.md5(open(localFilePath).read()).hexdigest()
+        # checksumLocal = hashlib.md5(open(localFilePath).read()).hexdigest()
+        checksumLocal = getChecksumForFile(localFilePath)
     except Exception as e:
         print("Unable to calculate the checksum of the local file")
         raise e
@@ -153,6 +161,17 @@ def decompress(fileName, settings, type):
     print("File '%s' was successfully decompressed." % fileName)
 
 
+def getChecksumForFile(f):
+    fr = open(f)
+    md5 = hashlib.md5()
+    while True:
+        data = fr.read(BLOCK_SIZE)
+        if not data:
+            break
+        md5.update(data)
+    return md5.hexdigest()
+
+
 def getChecksumForDir(dirPath, outFile):
     """
         For each file in the directory, enter the path relative to the dirname to a file and its checksum.
@@ -165,8 +184,9 @@ def checkSumWalk(f, root, out):
     if os.path.isfile(f):
         assert root in f
         if not os.path.basename(f).startswith('.'):
-            out.write(os.path.sep.join(f[f.find(root.split(os.path.sep)[-1]):].split(os.path.sep)[1:])
-                      + '\t' + hashlib.md5(open(f).read()).hexdigest() + '\n')
+            out.write(os.path.sep.join(f[f.find(root.split(os.path.sep)[-1]):].split(os.path.sep)[1:]) +
+                      '\t' + getChecksumForFile(f) + '\n')
+            # + '\t' + hashlib.md5(open(f).read()).hexdigest() + '\n')
     else:
         for child in os.listdir(f):
             checkSumWalk(os.path.join(f, child), root, out)
@@ -185,7 +205,8 @@ def verifyChecksumForDir(dirName, settings, type):
         for line in urllib2.urlopen(urlChecksumFile):
             f, checksum = line.split('\t')
             f = os.path.join(dirName, f)
-            if checksum.strip() != hashlib.md5(open(f).read()).hexdigest():
+            # if checksum.strip() != hashlib.md5(open(f).read()).hexdigest():
+            if checksum.strip() != getChecksumForFile(f):
                 raise Exception("File '%s' is corrupted, it has a wrong checksum." % f)
     except Exception as e:
         print("Unable to verify directory: %s" % dirName)
@@ -231,6 +252,8 @@ def _main():
 
     parser.add_argument('-u', '--url', nargs=1, help='Use this url as a source of remote files.', dest='u')
 
+    parser.add_argument('-v', '--version', nargs=1, help='Use this version.', dest='v')
+
     args = parser.parse_args()
 
     if not args.r and not args.t and not args.c:
@@ -241,6 +264,9 @@ def _main():
 
     if args.u:
         settings.setUrl(args.u[0])
+
+    if args.v:
+        settings.setVersion(args.v[0])
 
     if args.r:
         if not os.path.exists(settings.getLocalDst('ref')):
@@ -256,8 +282,9 @@ def _main():
 
 
 def _test():
-    pass
-
+    # pass
+    #print getChecksumForFile('/Volumes/VerbatimSSD/work/silva115/arb/lsu_115.tax')
+    # hashlib.md5(open('/Volumes/VerbatimSSD/work/silva115/arb/lsu_115.tax').read()).hexdigest()
     # getChecksumForDir('/Volumes/MyPassportRedMac/A_DATA/vm_rel_1_2/vm_ref/reference',
     #                   '/Users/ivan/Documents/nobackup/vm_ref_download_test/reference.checksum')
 
@@ -267,8 +294,12 @@ def _test():
     # getChecksumForDir('/Volumes/My_Passport_Mac/A_DATA/work/rel_1_3/tools',
     #                    '/Volumes/My_Passport_Mac/A_DATA/work/rel_1_3/tools.checksum')
 
+    getChecksumForDir('/Volumes/VerbatimSSD/work/vm_rel_1_3/tools',
+                        '/Volumes/VerbatimSSD/work/vm_rel_1_3/tools.checksum')
+
+
 
 if __name__ == "__main__":
-    _main()
-
-    # _test()
+    # _main()
+    #
+    _test()

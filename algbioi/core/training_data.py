@@ -167,6 +167,7 @@ class PPSInput():
         if toFile is not None:
             try:
                 f = open(os.path.normpath(toFile),'w')
+                f.write('# collective sequence length, number of sequences, lineage: scientific name (ncbi taxon id)\n')
                 for e in sumEntry:
                     f.write(str(e) + '\n')
             except Exception:

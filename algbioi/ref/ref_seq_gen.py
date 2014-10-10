@@ -1,6 +1,25 @@
 #!/usr/bin/env python
 
 """
+    Copyright (C) 2014  Ivan Gregor
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+    Note that we could have written some parts of this code in a nicer way,
+    but didn't have time. Be careful when reusing the source code.
+
+
     After the resources has been downloaded, i.e. paths to the following data are available:
 
     ncbi-refseq-microbial_64:
@@ -293,8 +312,8 @@ def filterOutSequencesBatch(taxonIdSet, srcDir, dstDir, notAllowedSeqIdSet):
         For each fasta file that is in directory srcDir filters out sequences that are not defined in the allowedSeqIdSet.
     """
     for taxonId in taxonIdSet:
-        srcFilePath = os.path.join(srcDir,str(str(taxonId) + '.fna'))
-        dstFilePath = os.path.join(dstDir,str(str(taxonId) + '.fna'))
+        srcFilePath = os.path.join(srcDir,str(str(taxonId) + '.1.fna'))
+        dstFilePath = os.path.join(dstDir,str(str(taxonId) + '.1.fna'))
 
         seqIdDict = fasta.getSequenceToBpDict(srcFilePath)
         allowedNamesSet = set()
@@ -313,10 +332,10 @@ def getAllTaxonIdSet(mapFilePathList):
 
 
 def _main():
-    mergeS = True
-    sortS = True
-    clusterS = True
-    filterOutSeq = False  # this is optional, e.g. to remove plasmids
+    mergeS = False
+    sortS = False
+    clusterS = False
+    filterOutSeq = True  # this is optional, e.g. to remove plasmids
 
     # handle broken pipes
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -376,15 +395,16 @@ def _main():
     # sort and cluster sequences
     if clusterS:
         toCentroids(sortedDir, centroidsDir, mapFilePathList)
+        move(centroidsDir)
 
     if filterOutSeq:
         taxonIdSet = getAllTaxonIdSet(mapFilePathList)
-        srcDir = '/local/igregor/ref_20121122/nobackup/centroids_1_0'
-        dstDir = '/local/igregor/ref_20121122/nobackup/centroids_1_0_no_plasmids'
-        notAllowedSet = set(csv.getColumnAsList('/local/igregor/ref_20121122/nobackup/plasmid_accessions2.txt', colNum=0))
+        srcDir = '/net/refdata/static/nonredundant-microbial_20140513/nobackup/centroids'  # '/local/igregor/ref_20121122/nobackup/centroids_1_0'
+        dstDir = '/net/refdata/static/nonredundant-microbial_20140513/nobackup/centroids_noplasmids'  # '/local/igregor/ref_20121122/nobackup/centroids_1_0_no_plasmids'
+        notAllowedSet = set(csv.getColumnAsList('/net/refdata/static/nonredundant-microbial_20140513/nobackup/plasmids_accessions.txt', colNum=0))  # /local/igregor/ref_20121122/nobackup/plasmid_accessions2.txt
         filterOutSequencesBatch(taxonIdSet, srcDir, dstDir, notAllowedSet)
 
-    move(centroidsDir)
+
 
 
 def move(dirFasta):

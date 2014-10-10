@@ -1,17 +1,39 @@
 #!/usr/bin/env python
 
+"""
+    Copyright (C) 2014  Ivan Gregor
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+    Note that we could have written some parts of this code in a nicer way,
+    but didn't have time. Be careful when reusing the source code.
+"""
+
+import os
 import sys
 import signal
 import string
 from Bio import SeqIO
+from algbioi.com import csv
 
 
 #from FastaFileFunctions import fastaFileToDict
 #from FastaFileFunctions import getSequenceToBpDict
 #from TabSepFileFunctions import getMapping
-from algbioi.com.csv import OutFileBuffer
 #from TabSepFileFunctions import getColumnAsList
 #from Common import noNewLine
+
 
 
 def scanForPlasmids():
@@ -40,7 +62,7 @@ def scanForPlasmids():
     accessionSet = set([])
 #    accessionToLocationList = dict([])
 
-    outPlasmidAccessions = OutFileBuffer(plasmidAccessionFile)
+    outPlasmidAccessions = csv.OutFileBuffer(plasmidAccessionFile)
 #    outPlasmidLocations = OutFileBuffer(plasmidRegionsFile)
     for record in SeqIO.parse(sys.stdin, "genbank"):
         seqCount += 1
@@ -188,10 +210,78 @@ def scan():
 #    print 'zeros', zeros
 
 
+def extractPlasmidAccessions(gbDir, outFile):
+    """
+
+        @param dbkDir: directory containing gbk files, where the taxon id is encoded in the same way as PPS reference
+        @param outFile: output file containing (taxonId, tab, accession) of records whose description contain 'plasmid'
+    """
+    start = 1
+    stop = 1000000000
+    i = 0
+    out = csv.OutFileBuffer(outFile)
+    for f in os.listdir(gbDir):
+        i += 1
+        if i < start:
+            continue
+        if f in ['911244.1.gb','933263.1.gb', '1151366.1.gb']:
+            continue
+
+        taxonId = int(f.split('.')[0])
+        try:
+            for record in SeqIO.parse(os.path.join(gbDir, f), "genbank"):
+                if "plasmid" in str(record.description).lower():
+                    out.writeText(str(taxonId) + '\t' + record.id + '\n')
+        except Exception as e:
+            print('An exception occured when processing: %s' % f)
+
+        if i % 1000 == 0:
+            print i
+
+        if i == stop:
+            break
+
+    out.close()
+    print 'done'
+
+
+    # for record in SeqIO.parse("/Volumes/VerbatimSSD/work/plasmids/tmp/gb/139.1.gb", "genbank"):
+    #     print record.id, record.description
+
+
+    # handle = Entrez.efetch(db="nucleotide", id=str(intervalGi), seq_start=str(intervalFrom),
+    #                                seq_stop=str(intervalTo), strand=strandStr, rettype="gb", retmode="xml")
+    # dnaXml = handle.read()
+    # print(handle.read())
+
+    # handle = Entrez.efetch(db="nucleotide", id="NZ_AYVY01000002.1", rettype="gb", retmode="text")
+    # l = SeqIO.parse(handle, "genbank")
+    # for i in l:
+    #     print "i.id: " + i.id
+    #     print "i.name: " + i.name
+    #     print "i.description: " + i.description
+    #     print "i.annotations: " + i.annotations
+        #
+        # print "i.letter_annotations: " + i.letter_annotations
+        # print "i.features: " + i.features
+
+    # id_list = ["NZ_AYVY01000049.1", "NZ_AYVY01000044.1", "NZ_AYVY01000045.1"]
+    # search_results = Entrez.read(Entrez.epost("pubmed", id=",".join(id_list)))
+    # webenv = search_results["WebEnv"]
+    # query_key = search_results["QueryKey"]
+    # print webenv
+    # print query_key
+
+    # print dnaXml
 
 # MAIN
 if __name__ == "__main__":
     # handle broken pipes
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-    scanForPlasmids()
+
+    if len(sys.argv) != 3:
+        print 'Needs two parameters: a directory containing dbk files, an output file'
+    extractPlasmidAccessions(sys.argv[1], sys.argv[2])
+
+    # scanForPlasmids()
     #scan()

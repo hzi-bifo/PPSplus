@@ -1,7 +1,30 @@
+#!/usr/bin/env python
+
 """
+    Copyright (C) 2014  Ivan Gregor
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+    Note that we could have written some parts of this code in a nicer way,
+    but didn't have time. Be careful when reusing the source code.
+
+
     To manage the update of the reference data, i.e. download, verification, and decompression.
 
     Directories are compressed using command: tar -cf - directory/ | xz -9 -c - > directory.tar.xz
+
+    Files tar.xz are decompressed using command: tar -xJf directory.tar.xz
 """
 import os
 import urllib2
@@ -17,10 +40,11 @@ class Settings():
     def __init__(self):
         self._url = "http://algbio.cs.uni-duesseldorf.de/software/ppsp"
         self._customVal = ':'
+        self._refVersion = None
         try:
             self._version = urllib2.urlopen(self._url + '/' + 'version.txt').read()
         except urllib2.HTTPError:
-            self._version = "1_3"
+            self._version = "1_4"
             print("Can't get the current version from the server, version '%s' will be considered." % self._version)
 
     def getRemoteSrc(self):
@@ -29,7 +53,7 @@ class Settings():
     def getLocalDst(self, type):
         if type == 'ref':
             return "/mnt/host_shared"  # "/Users/ivan/Documents/nobackup/vm_ref_download_test"
-        elif type == 'tools':
+        elif type == 'tools' or type == 'sys':
             return "/apps/pps"  # "/Users/ivan/Documents/nobackup/vm_ref_download_test"
         elif type == 'custom':
             return self._customVal.split(':')[1]
@@ -38,9 +62,11 @@ class Settings():
 
     def getFileName(self, type):
         if type == 'ref':
-            return 'reference.tar.xz'
+            return 'reference_' + self.getRefVersion() + '.tar.xz'
         elif type == 'tools':
             return 'tools.tar.xz'
+        elif type == 'sys':
+            return 'sys.tar.xz'
         elif type == 'custom':
             return self._customVal.split(':')[0]
         else:
@@ -51,8 +77,13 @@ class Settings():
             return 'Reference data'
         elif type == 'tools':
             return 'Tools data'
+        elif type == 'sys':
+            return 'System data'
         else:
             return 'Data'
+
+    def getRefVersion(self):
+        return self._refVersion
 
     def setCustomValues(self, customVal):
         self._customVal = customVal
@@ -63,6 +94,9 @@ class Settings():
     def setVersion(self, version):
         self._version = version
         print("Version '%s' will be used!" % self._version)
+
+    def setRefVersion(self, refVersion):
+        self._refVersion = refVersion
 
 
 def downloadFile(fileName, settings, type):
@@ -172,10 +206,11 @@ def getChecksumForFile(f):
     return md5.hexdigest()
 
 
-def getChecksumForDir(dirPath, outFile):
+def getChecksumForDir(dirPath):
     """
         For each file in the directory, enter the path relative to the dirname to a file and its checksum.
     """
+    outFile = dirPath + '.checksum'
     out = open(outFile, 'w')
     checkSumWalk(dirPath, dirPath, out)
     out.close()
@@ -244,9 +279,11 @@ def updateData(settings, type):
 def _main():
     parser = argparse.ArgumentParser(description='Updates data.', epilog='')
 
-    parser.add_argument('-r', '--reference-data', action='store_true', help='Updates the reference data.', dest='r')
+    parser.add_argument('-r', '--reference-data', nargs=1, help='Updates the reference data, enter which version', dest='r')
 
     parser.add_argument('-t', '--tools', action='store_true', help='Updates tools.', dest='t')
+
+    parser.add_argument('-s', '--sys', action='store_true', help='Updates system data.', dest='s')
 
     parser.add_argument('-c', '--custom', nargs=1, help='file_name.tar.xz:local_dir_path', dest='c')
 
@@ -256,7 +293,7 @@ def _main():
 
     args = parser.parse_args()
 
-    if not args.r and not args.t and not args.c:
+    if not args.r and not args.t and not args.s and not args.c:
         parser.print_help()
         return
 
@@ -268,7 +305,11 @@ def _main():
     if args.v:
         settings.setVersion(args.v[0])
 
+    if args.s:
+        updateData(settings, type='sys')
+
     if args.r:
+        settings.setRefVersion(args.r[0])
         if not os.path.exists(settings.getLocalDst('ref')):
             print("The path to the shared folder is broken, verify that the shared folder was set correctly!")
         updateData(settings, type='ref')
@@ -282,24 +323,12 @@ def _main():
 
 
 def _test():
-    # pass
-    #print getChecksumForFile('/Volumes/VerbatimSSD/work/silva115/arb/lsu_115.tax')
-    # hashlib.md5(open('/Volumes/VerbatimSSD/work/silva115/arb/lsu_115.tax').read()).hexdigest()
-    # getChecksumForDir('/Volumes/MyPassportRedMac/A_DATA/vm_rel_1_2/vm_ref/reference',
-    #                   '/Users/ivan/Documents/nobackup/vm_ref_download_test/reference.checksum')
-
-    #getChecksumForDir('/Volumes/HHU_hera_PPSmg/release/1_2/nobackup/reference',
-    #                   '/Users/ivan/Documents/nobackup/vm_ref_download_test/reference_true.checksum')
-
-    # getChecksumForDir('/Volumes/My_Passport_Mac/A_DATA/work/rel_1_3/tools',
-    #                    '/Volumes/My_Passport_Mac/A_DATA/work/rel_1_3/tools.checksum')
-
-    getChecksumForDir('/Volumes/VerbatimSSD/work/vm_rel_1_3/tools',
-                        '/Volumes/VerbatimSSD/work/vm_rel_1_3/tools.checksum')
-
-
+    pass
+    # getChecksumForDir('/Volumes/VerbatimSSD/work/vm_rel_1_3/reference_NCBI20121122')
+    getChecksumForDir('/Volumes/VerbatimSSD/work/vm_1_4/tools')
+    # getChecksumForDir('/Volumes/VerbatimSSD/work/vm_1_4/sys')
+    # getChecksumForDir('/net/metagenomics/projects/PPSmg/release/1_4/nobackup/reference_NCBI20140513')
 
 if __name__ == "__main__":
-    # _main()
-    #
-    _test()
+    _main()
+    # _test()

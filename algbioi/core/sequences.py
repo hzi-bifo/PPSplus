@@ -1,5 +1,25 @@
 #!/usr/bin/env python
 
+"""
+    Copyright (C) 2014  Ivan Gregor
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+    Note that we could have written some parts of this code in a nicer way,
+    but didn't have time. Be careful when reusing the source code.
+"""
+
 import os
 import re
 
@@ -568,7 +588,8 @@ class Sequences():
 
         try:
             f = open(os.path.normpath(outFile), 'w')
-            k = 0
+            f.write('# SEQUENCEID	TAXID')
+            # k = 0
 
             for seq in self.sequences:
 
@@ -585,11 +606,11 @@ class Sequences():
 
                 entry = (noNewLine(re.sub(outputFileContigSubPattern, r'\1' , seq.name)) + '\t' + str(ncbid))
 
-                if k == 0:
-                    f.write(entry)
-                    k += 1
-                else:
-                    f.write('\n' + entry)
+                # if k == 0:
+                #     f.write(entry)
+                #     k += 1
+                # else:
+                f.write('\n' + entry)
 
         except Exception:
             print "Cannot create a file or write to it:", outFile

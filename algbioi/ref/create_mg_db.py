@@ -1,5 +1,25 @@
 #!/usr/bin/env python
+
 """
+    Copyright (C) 2014  Ivan Gregor
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+    Note that we could have written some parts of this code in a nicer way,
+    but didn't have time. Be careful when reusing the source code.
+
+
     Creates the marker gene database for the 16S and 23S genes as well as for the Amphora marker genes.
 
     The input 16S and 23S marker genes are generated using the "arb" software from the files downloaded from the
@@ -10,6 +30,9 @@
 import os
 import glob
 import argparse
+
+from Bio import Entrez
+from Bio import SeqIO
 
 from algbioi.com import csv
 from algbioi.com import fasta as fas

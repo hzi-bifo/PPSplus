@@ -16,10 +16,6 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Note that we could have written some parts of this code in a nicer way,
-    but didn't have time. Be careful when reusing the source code.
-
-
     Computes the confusion (comparison) matrices for different taxonomic ranks.
     A confusion matrix presents comparison of two prediction methods,
     usually taxonomic predictions of a particular method and true (or reference) assignments.
@@ -31,6 +27,7 @@ import argparse
 from algbioi.com import taxonomy_ncbi
 from algbioi.com import csv
 from algbioi.com import fasta as fas
+from algbioi.eval import cami
 
 
 class _TaxonomyWrapCM():
@@ -156,7 +153,7 @@ class ConfusionMatrix():
         if isinstance(seqNameToPred, dict):
             self._seqNameToPred = seqNameToPred
         elif isinstance(seqNameToPred, str) and os.path.isfile(seqNameToPred):
-            self._seqNameToPred = csv.predToDict(seqNameToPred)
+            self._seqNameToPred = cami.readAssignments(seqNameToPred)
         else:
             print("Can't get prediction info from:", seqNameToPred)
             self._initFailed = True
@@ -164,7 +161,7 @@ class ConfusionMatrix():
         if isinstance(seqNameToRefPred, dict):
             self._seqNameToRefPred = seqNameToRefPred
         elif isinstance(seqNameToRefPred, str) and os.path.isfile(seqNameToRefPred):
-            self._seqNameToRefPred = csv.predToDict(seqNameToRefPred)
+            self._seqNameToRefPred = cami.readAssignments(seqNameToRefPred)
         else:
             print("Can't get reference prediction info from:", seqNameToRefPred)
             self._initFailed = True
@@ -357,21 +354,21 @@ class ConfusionMatrix():
             out.writeText(line + '\n')
 
         out.writeText(',\n')
-        out.writeText('Matches, ' + str(int(round(float(matchBp) / 1000.0))) + 'k, ' + str(matchCount) + ', ' +
-                      self._div(matchBp, matchBp + mismatchBp, 1) + ' %k' + ', ' +
-                      self._div(matchCount, matchCount + mismatchCount, 1) + ' %\n')
+        out.writeText('Matches, ' + str(int(round(float(matchBp) / 1000.0))) + 'k, ' + str(matchCount) + ', '
+                      + self._div(matchBp, matchBp + mismatchBp, 1) + ' %k' + ', '
+                      + self._div(matchCount, matchCount + mismatchCount, 1) + ' %\n')
 
-        out.writeText('Mismatches, ' + str(int(round(float(mismatchBp) / 1000.0))) + 'k, ' + str(mismatchCount) + ', ' +
-                      self._div(mismatchBp, matchBp + mismatchBp, 1) + ' %k' + ', ' +
-                      self._div(mismatchCount, matchCount + mismatchCount, 1) + ' %\n')
+        out.writeText('Mismatches, ' + str(int(round(float(mismatchBp) / 1000.0))) + 'k, ' + str(mismatchCount) + ', '
+                      + self._div(mismatchBp, matchBp + mismatchBp, 1) + ' %k' + ', '
+                      + self._div(mismatchCount, matchCount + mismatchCount, 1) + ' %\n')
 
-        out.writeText('Pred. assigned, ' + str(int(round(float(predTotalBp) / 1000.0))) + 'k, ' + str(predTotalCount) + ', ' +
-                      self._div(predTotalBp, totalBp, 1) + ' %k, ' +
-                      self._div(predTotalCount, totalCount, 1) + ' %\n')
+        out.writeText('Pred. assigned, ' + str(int(round(float(predTotalBp) / 1000.0))) + 'k, ' + str(predTotalCount)
+                      + ', ' + self._div(predTotalBp, totalBp, 1) + ' %k, '
+                      + self._div(predTotalCount, totalCount, 1) + ' %\n')
 
-        out.writeText('Ref. assigned, ' + str(int(round(float(refTotalBp) / 1000.0))) + 'k, ' + str(refTotalCount) + ', ' +
-                      self._div(refTotalBp, totalBp, 1) + ' %k, ' +
-                      self._div(refTotalCount, totalCount, 1) + ' %\n')
+        out.writeText('Ref. assigned, ' + str(int(round(float(refTotalBp) / 1000.0))) + 'k, ' + str(refTotalCount)
+                      + ', ' + self._div(refTotalBp, totalBp, 1) + ' %k, '
+                      + self._div(refTotalCount, totalCount, 1) + ' %\n')
 
         out.writeText('Total fasta, ' + str(int(round(float(totalBp) / 1000.0))) + 'k, ' + str(totalCount) + '\n')
         out.close()
@@ -394,7 +391,7 @@ def _main():
     """ Main method of the script, see the module documentation and argument description. """
     parser = argparse.ArgumentParser(description='Computes the confusion matrix, detailed comparison of two placements '
                                                  '(e.g. true/reference assignments vs. predictions by a particular '
-                                                 'method).', epilog='Module description: ' + __doc__)
+                                                 'method).', epilog='')
 
     parser.add_argument('-f', '--fasta', nargs=1, type=file, required=True, help='Fasta file.', metavar='sequences.fna',
                         dest='f')
@@ -412,7 +409,8 @@ def _main():
                         metavar='ncbitax_sqlite.db', dest='d')
 
     parser.add_argument('-o', '--output', nargs=1, required=True,
-                        help='Prefix of the output path.', metavar='sample0', dest='o')
+                        help='Prefix of the output path (e.g. directory/prefix_ or ./prefix).', metavar='./sample0',
+                        dest='o')
 
     parser.add_argument('-r', '--ranks', nargs=1, help='Compute the measures only for these ranks (given as comma '
                                                        'separated strings) Default ~ consider all ranks.',

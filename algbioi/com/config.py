@@ -59,25 +59,6 @@ class Config():
             return self._defaultDict.get(option, None)
 
 
-#class Config2():
-#    def __init__(self, config, section):
-#        """
-#            Initializes a config object from an existing Config object to read from a different section.
-#        """
-#        self._config = config._config
-#        self._section = section
-#
-#    def get(self, option):
-#        """
-#            Gets an element 'option' from a given section
-#        """
-#        elem = self._config.get(self._section, option)
-#        if elem == '':
-#            return None
-#        else:
-#            return elem
-
-
 def _test():
     config = Config(open(os.path.normpath('/Users/ivan/Documents/work/python/PyCharm/PPSplus/config.cfg')), 'pPPS')
     print "|", config.get('inputFastaScaffoldsFile'), '|'
@@ -98,4 +79,5 @@ def _test():
 
 
 if __name__ == "__main__":
-    _test()
+    # _test()
+    pass

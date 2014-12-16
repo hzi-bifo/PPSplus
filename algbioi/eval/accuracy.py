@@ -16,16 +16,15 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Note that we could have written some parts of this code in a nicer way,
-    but didn't have time. Be careful when reusing the source code.
+    Computes precision and recall, including correction.
 """
 
 import os
 import argparse
 
-from algbioi.com import csv
 from algbioi.com import fasta
 from algbioi.com import taxonomy_ncbi
+from algbioi.eval import cami
 
 
 class _TaxonomyWrapperA():
@@ -152,13 +151,13 @@ class Accuracy():
             self._seqToPred = seqIdToPred
         else:
             assert os.path.isfile(seqIdToPred)
-            self._seqToPred = csv.predToDict(seqIdToPred)
+            self._seqToPred = cami.readAssignments(seqIdToPred)
 
         if isinstance(seqIdToTruePred, dict):
             self._seqToTrue = seqIdToTruePred
         else:
             assert os.path.isfile(seqIdToTruePred)
-            self._seqToTrue = csv.predToDict(seqIdToTruePred)
+            self._seqToTrue = cami.readAssignments(seqIdToTruePred)
 
         if isinstance(taxonomy, _TaxonomyWrapperA):
             self._taxonomy = taxonomy
@@ -170,7 +169,6 @@ class Accuracy():
         if correctLabelThreshold is not None:
             self._seqToPred = self._correctPredictions(
                 self._seqToBp, self._seqToPred, self._seqToTrue, self._taxonomy, correctLabelThreshold)
-
 
     def _correctPredictions(self, seqIdToBp, seqIdToPred, seqIdToTruePred, taxonomy, correctLabelThreshold):
         """
@@ -232,7 +230,6 @@ class Accuracy():
                 newPred[seqId] = taxonId
 
         return newPred
-
 
     def getAccuracy(self, rank, minFracClade=None, minFracPred=None, asBp=True, weightAccordingBinSize=True):
         """
@@ -385,7 +382,7 @@ class Accuracy():
         if tOther > 0:
             recall += (float(tpOther) / float(tOther)) * wrOther
             classesRCount += 1
-            #
+
         return [precision, recall, len(classesP), classesRCount]
 
     def getAccuracyPrint(self, ranks, minFracClade, minFracPred, overview=True, asBp=True, weightAccordingBinSize=True):
@@ -476,6 +473,12 @@ def _main():
     parser.add_argument('-o', '--overview', action='store_true',
                         help='Compute the measures according to several default settings. '
                              'You can still set the (-c) and (-b) options.', dest='o')
+
+    parser.add_argument('-m', '--map-by-correction', nargs=1,
+                        help='Correct assignments by mapping to the most probable label. A float close to 0.9. '
+                             '(Default ~ no correction)',
+                        metavar='0.9', dest='m')
+
     args = parser.parse_args()
 
     if args.r:
@@ -493,7 +496,12 @@ def _main():
     else:
         minFracPred = 0.01
 
-    acc = Accuracy(args.f[0].name, args.p[0].name, args.t[0].name, args.d[0].name)
+    if args.m:
+        correction = float(args.m[0])
+    else:
+        correction = None
+
+    acc = Accuracy(args.f[0].name, args.p[0].name, args.t[0].name, args.d[0].name, correction)
 
     print(acc.getAccuracyPrint(ranks, minFracClade, minFracPred,
                                overview=bool(args.o), asBp=bool(args.s), weightAccordingBinSize=bool(args.w)))
@@ -501,15 +509,8 @@ def _main():
 
 
 def _test():
-    # -f /Users/ivan/Documents/work/binning/data/simMC/AMGN_AMD.Arachne.contigs.fna
-    # -p /Users/ivan/Documents/work/binning/tests/simMC/AMD05/output/AMGN_AMD.Arachne.contigs.fna.pOUT
-    # -t /Users/ivan/Documents/work/binning/data/simMC/AMD.Arachne.genus
-    # -d /Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db
     fastaFilePath = '/Users/ivan/Documents/work/binning/data/simMC/AMGN_AMD.Arachne.contigs.fna'
-    # just marker genes
     predFilePath = '/Users/ivan/Documents/work/binning/tests/simMC/AMD05/output/AMGN_AMD.Arachne.contigs.fna.pOUT'
-    # with taxator
-    #predFilePath = '/Users/ivan/Documents/work/binning/tests/simMC/AMD06/output/AMGN_AMD.Arachne.contigs.fna.pOUT'
     trueFilePath = '/Users/ivan/Documents/work/binning/data/simMC/AMD.Arachne.genus'
     databaseFile = '/Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db'
     ranks = ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']

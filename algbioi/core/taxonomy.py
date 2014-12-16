@@ -25,8 +25,10 @@ import sys
 import re
 import sqlite3
 import datetime
+import argparse
 
 from algbioi.com.config import Config
+from algbioi.com import taxonomy_ncbi
 
 
 class Node():
@@ -48,16 +50,18 @@ class Node():
         return self._copy
 
     def clone(self):
-        node =  Node(self.ncbid, self.rank, self.name)
+        node = Node(self.ncbid, self.rank, self.name)
         node._copy = self._copy
         return node
 
 #---------------------------------------------------
+
+
 class Taxonomy():
-    def __init__(self, databaseFile, taxonomicRanks):#taxonomicRanks is a list of taxonomic ranks
+    def __init__(self, databaseFile, taxonomicRanks):  # taxonomicRanks is a list of taxonomic ranks
         self.taxonomicRanks = taxonomicRanks
         self.taxonomicRanksSet = set(taxonomicRanks)
-        self.ncbidToPathToRoot = dict([]) #buffer: ncbid -> path to root
+        self.ncbidToPathToRoot = {}  # buffer: ncbid -> path to root
         self.newOtuCounter = 0
         try:
             self.conn = sqlite3.connect(os.path.normpath(databaseFile))
@@ -88,12 +92,13 @@ class Taxonomy():
         parent_taxon_id = parentNcbid
         node_rank = rank
         now = datetime.datetime.now()
-        timeStamp = str(str(now.year) + str(now.month) + str(now.day) + '_' + str(now.hour) + str(now.minute) + str(now.second))
+        timeStamp = str(str(now.year) + str(now.month) + str(now.day) + '_' + str(now.hour) + str(now.minute)
+                        + str(now.second))
         name = str('OTU' + str(self.newOtuCounter) + '_' + timeStamp + '_' + sampleName)
         name_class = 'scientific name'
         #insert into tables
-        self.cursor.execute(str('INSERT INTO taxon (taxon_id, ncbi_taxon_id, parent_taxon_id, node_rank)' +
-        ' VALUES (?,?,?,?)'),(taxon_id, ncbi_taxon_id, parent_taxon_id, node_rank))
+        self.cursor.execute(str('INSERT INTO taxon (taxon_id, ncbi_taxon_id, parent_taxon_id, node_rank)'
+                                + ' VALUES (?,?,?,?)'), (taxon_id, ncbi_taxon_id, parent_taxon_id, node_rank))
         self.cursor.execute(str('INSERT INTO taxon_name (taxon_id, name, name_class) VALUES (?,?,?)'),
                             (taxon_id, name, name_class))
         self.conn.commit()
@@ -112,24 +117,21 @@ class Taxonomy():
     def getNewNCBID(self, parentNcbid):
         pass
 
-
     def getNcbidToName(self, ncbid):
         taxonNcbid = ncbid
         self.cursor.execute(str('SELECT TN.name FROM taxon_name TN, taxon T WHERE T.ncbi_taxon_id=?' +
-                                ' AND T.taxon_id = TN.taxon_id AND TN.name_class="scientific name"'),(taxonNcbid,))
+                                ' AND T.taxon_id = TN.taxon_id AND TN.name_class="scientific name"'), (taxonNcbid,))
         result = self.cursor.fetchall()
         assert len(result) == 1, str('Cannot find name for ncbi: ' + str(taxonNcbid))
         name = result[0][0]
         return name
 
-
-
     def getPathToRoot(self, ncbid):
-        assert ncbid != None
-        pathDict = dict([]) #map: rank -> Node
+        assert ncbid is not None
+        pathDict = {}  # map: rank -> Node
         #if we are in the root, empty dict is returned
         if ncbid == 1:
-            return None #!!!!!!!!!!
+            return None  # !!!!!!!!!!
 
         #check buffer
         if ncbid in self.ncbidToPathToRoot:
@@ -137,17 +139,17 @@ class Taxonomy():
 
         taxonNcbid = ncbid
         taxonRank = ''
-        history = [] #temp
+        history = []  # temp
 
         while True:
-            history.append(taxonNcbid) #temp
-            if taxonNcbid == 1: #the root of the taxonomy reached
+            history.append(taxonNcbid)  # temp
+            if taxonNcbid == 1:  # the root of the taxonomy reached
                 break
-            self.cursor.execute('SELECT taxon_id FROM taxon T WHERE T.ncbi_taxon_id=?',(taxonNcbid,))
+            self.cursor.execute('SELECT taxon_id FROM taxon T WHERE T.ncbi_taxon_id=?', (taxonNcbid,))
             result = self.cursor.fetchall()
             if len(result) != 1:
-                sys.stderr.write('Taxonomy: Cannot find taxon_id for ncbi:' + str(taxonNcbid) + ' result:' + str(result) + ' \n')
-                return None # !!!!!!!!!
+                sys.stderr.write('Taxonomy: Cannot find taxon_id for ncbi: %s result: %s \n' % (taxonNcbid, result))
+                return None  # !!!!!!!!!
             taxonId = result[0][0]
 
             self.cursor.execute('SELECT node_rank FROM taxon T WHERE T.taxon_id=?', (taxonId,))
@@ -155,7 +157,8 @@ class Taxonomy():
             assert len(result) == 1, str('Cannot find rank for taxon_id: ' + str(taxonId))
             taxonRank = result[0][0]
 
-            self.cursor.execute('SELECT name FROM taxon_name TN WHERE TN.taxon_id=? AND name_class="scientific name"', (taxonId,))
+            self.cursor.execute('SELECT name FROM taxon_name TN WHERE TN.taxon_id=? AND name_class="scientific name"',
+                                (taxonId,))
             result = self.cursor.fetchall()
             assert len(result) == 1, str('Cannot find scientific name for taxon_id: ' + str(taxonId))
             taxonName = result[0][0]
@@ -172,10 +175,11 @@ class Taxonomy():
             #get parent
             self.cursor.execute('SELECT parent_taxon_id FROM taxon T WHERE T.taxon_id=?', (taxonId,))
             result = self.cursor.fetchall()
-            assert len(result) == 1, str('Cannot find parent for taxon_id', taxonId)
+            assert len(result) == 1, str('Cannot find parent for taxon_id: %s' % taxonId)
             taxonNcbid = result[0][0]
 
-        #test if the path is correct and if a rank is missing along the path, it adds it as a copy of an existing lower node
+        # test if the path is correct and if a rank is missing along the path,
+        # it adds it as a copy of an existing lower node
         revRanks = list(self.taxonomicRanks)
         revRanks.reverse()
         deapestRank = None
@@ -183,7 +187,7 @@ class Taxonomy():
             if rank in pathDict:
                 deapestRank = rank
                 break
-        assert deapestRank != None, '%s' % (ncbid)
+        assert deapestRank is not None, '%s' % ncbid
 
         lastNode = None
         for rank in revRanks:
@@ -192,13 +196,15 @@ class Taxonomy():
                 lastNode = pathDict[rank]
                 continue
 
-            if lastNode == None:
+            if lastNode is None:
                 continue
 
             if rank not in pathDict:
                 pathDict[rank] = lastNode.copy(rank)
-                #print str('Set rank "' + rank + '" for "' + pathDict[deapestRank].rank + ' ' + pathDict[deapestRank].name +
-                #    ' (' + str(pathDict[deapestRank].ncbid) + ')" as: "' + lastNode.rank + ' ' + lastNode.name + ' (' + str(lastNode.ncbid) + ')"')
+                #print str('Set rank "' + rank + '" for "' + pathDict[deapestRank].rank + ' '
+                # + pathDict[deapestRank].name +
+                #    ' (' + str(pathDict[deapestRank].ncbid) + ')" as: "' + lastNode.rank + ' ' + lastNode.name
+                # + ' (' + str(lastNode.ncbid) + ')"')
             else:
                 lastNode = pathDict[rank]
 
@@ -214,7 +220,6 @@ class Taxonomy():
         self.ncbidToPathToRoot[ncbid] = self.replicateTaxPathDict(pathDict)
 
         return pathDict
-
 
     def getPathToRootSemicolonSeparated(self, ncbid):
         """
@@ -235,13 +240,13 @@ class Taxonomy():
         else:
             return outBuffer
 
-
     def getLongestCommonPathFromMultipleAssignments2(self, taxPathDictList, threshold):
         """
         !!!!!!!!!!!
 
         @param taxPathDictList: list of taxPathDicts
-        @param threshold: percent that says which fraction of the assigned sequences must lie at least at this rank (or lower)
+        @param threshold: percent that says which fraction of the assigned sequences must lie at least
+        at this rank (or lower)
 
         @return: - longest path s.t. all placements up to this rank lie on this path, moreover at least X%
         of the sequences that are assigned are assigned at least to this rank or lower
@@ -253,7 +258,7 @@ class Taxonomy():
 
         #longest common path
         lpTaxPathDict = self.getLongestCommonPathFromMultipleAssignments(taxPathDictList)
-        if lpTaxPathDict == None:
+        if lpTaxPathDict is None:
             print 'getLongestCommonPathFromMultipleAssignments2: Longest common path is 0'
             return None
         #min number of sequences assigned to the final level:
@@ -284,7 +289,6 @@ class Taxonomy():
         assert depth == 0, 'The number of elements in the reference dictionary is too small'
         return taxPathDict
 
-
     def replicateTaxPathDict(self, taxPathDict):
         """
             Replicate the dictionary. !!!!!!!!!!!
@@ -293,7 +297,6 @@ class Taxonomy():
         for rank in taxPathDict:
             taxPathDict2[rank] = taxPathDict[rank].clone()
         return taxPathDict2
-
 
     def getLongestCommonPathFromMultipleAssignments(self, taxPathDictList):
         """
@@ -327,7 +330,6 @@ class Taxonomy():
 
         return self.getPathToRoot(ncbiLowest)
 
-
     def getPathFromLowestCommonAncestorToRoot(self, listOfNcbid):
 
         if len(listOfNcbid) == 1:
@@ -336,7 +338,7 @@ class Taxonomy():
         listOfPlacements = []
         for ncbid in listOfNcbid:
             path = self.getPathToRoot(ncbid)
-            if path != None:
+            if path is not None:
                 listOfPlacements.append(path)
 
         if len(listOfPlacements) == 1:
@@ -366,7 +368,6 @@ class Taxonomy():
 
         return self.getPathToRoot(lowestCommonNcbid)
 
-
     def getNcbidFromScientificName(self, scientificName):
         """
             Gets NCBID of a clade for which we know its scientific name.
@@ -374,7 +375,7 @@ class Taxonomy():
         """
         self.cursor.execute(str('SELECT T.ncbi_taxon_id FROM taxon_name TN, taxon T ' +
                                 'WHERE TN.name_class="scientific name" AND TN.name=? AND TN.taxon_id=T.taxon_id'),
-                                (scientificName,))
+                            (scientificName,))
         result = self.cursor.fetchall()
         if len(result) == 1:
             return int(result[0][0])
@@ -406,7 +407,6 @@ def test1():
         print str
     print '-------------------------'
 
-
     pathDict = t.getPathFromLowestCommonAncestorToRoot(list2)
     #pathDict = t.getPathToRoot(170187)
 
@@ -416,6 +416,7 @@ def test1():
         n = pathDict[k]
         print n.ncbid, n.rank, n.name
 
+
 def test2():
     config = Config(open(os.path.normpath('D:\\A_Phylo\\A_Metagenomic\\pPPS\\workspace\\pPPS\\config01.cfg')), 'pPPS')
 
@@ -424,30 +425,70 @@ def test2():
     t = Taxonomy(databaseFile, taxonomicRanks)
 
     taxPathDictList = []
-    taxPathDictList.append(t.getPathToRoot(33958))#Lactobacillaceae
-    taxPathDictList.append(t.getPathToRoot(91061))#Bacilli
-    taxPathDictList.append(t.getPathToRoot(2))#Bacteria
-    #taxPathDictList.append(t.getPathToRoot(1385))#Bacillales
-    taxPathDictList.append(t.getPathToRoot(1578))#Lactobacilus
-    #taxPathDictList.append(t.getPathToRoot(31979))#Clostridiaceae
-    taxPathDictList.append(t.getPathToRoot(2))#Bacteria
+    taxPathDictList.append(t.getPathToRoot(33958))  # Lactobacillaceae
+    taxPathDictList.append(t.getPathToRoot(91061))  # Bacilli
+    taxPathDictList.append(t.getPathToRoot(2))  # Bacteria
+    #taxPathDictList.append(t.getPathToRoot(1385))  # Bacillales
+    taxPathDictList.append(t.getPathToRoot(1578))  # Lactobacilus
+    #taxPathDictList.append(t.getPathToRoot(31979))  # Clostridiaceae
+    taxPathDictList.append(t.getPathToRoot(2))  # Bacteria
 
     taxPathDict = t.getLongestCommonPathFromMultipleAssignments(taxPathDictList)
 
     for key in taxPathDict:
         print key, taxPathDict[key]
 
-def test3():
-    config = Config(open(os.path.normpath('/Users/ivan/Documents/work/binning/tests/CowRumen/03/config.cfg')), 'pPPS')
-    databaseFile = os.path.normpath(config.get('databaseFile'))
-    taxonomicRanks = config.get('taxonomicRanks').split(',')
+
+def newTaxonId():
+
+    parser = argparse.ArgumentParser(description='Gets a new taxon ID',
+                                     epilog='Note that the use of this functionality alter the taxonomy file')
+
+    parser.add_argument('-c', '--config', nargs=1, type=file, required=True,
+                        help='Configuration file, the taxonomy file in this configuration file will be changed',
+                        metavar='config.cfg', dest='c')
+
+    parser.add_argument('-p', '--parent', nargs=1, required=True,
+                        help='The parent NCBI taxon id of the new taxon id.', metavar='parent', dest='p')
+
+    parser.add_argument('-r', '--rank', nargs=1, required=True,
+                        help='Rank of the new taxon ID', metavar='rank', dest='r')
+
+    parser.add_argument('-n', '--name_suffix', nargs=1, required=True,
+                        help='Scientific name suffix of the new taxon ID', metavar='name', dest='n')
+
+    args = parser.parse_args()
+
+    if len(args.c) != 1 or len(args.p) != 1 or len(args.r) != 1 or len(args.n) != 1:
+        print parser.print_help()
+    configFile = args.c[0].name
+    try:
+        parent = int(args.p[0])
+    except:
+        print("The parent taxonomic id must be a number")
+        return
+    rank = args.r[0]
+    name = args.n[0]
+    if len(name) == 0:
+        print("The scientific name cannot be empty!")
+        return
+
+    config = Config(open(os.path.normpath(configFile)), 'PhyloPythiaS_Plus')
+    databaseFile = os.path.join(os.path.normpath(config.get('databaseFile')), 'ncbitax_sqlite.db')
+    print databaseFile
+    taxonomicRanks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
+    if rank not in taxonomicRanks:
+        print("Allowed ranks are only: %s" % taxonomicRanks)
+        return
     t = Taxonomy(databaseFile, taxonomicRanks)
-    parentNcbid = 1239 #Firmicutes
-    sampleName = 'test_sample'
-    rank = 'species'
-    t.createNewOtuDBEntry(parentNcbid, sampleName, rank)
+
+    newId = t.createNewOtuDBEntry(parent, name, rank)
+    print('New taxonomic id: "%s"; with name suffix "%s"; at rank "%s"; '
+          'as a descendant of "%s" has been created in "%s"'
+          % (newId, name, rank, parent, databaseFile))
     t.close()
+    return newId
 
 
 if __name__ == "__main__":
-  test3()
+    newTaxonId()

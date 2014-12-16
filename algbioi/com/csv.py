@@ -16,8 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Note that we could have written some parts of this code in a nicer way,
-    but didn't have time. Be careful when reusing the source code.
+    Contains basic functionality to work with CSV files.
 """
 
 import os
@@ -40,7 +39,8 @@ def getColumnAsList(fileName, entryModifyFunction=None, colNum=0, sep=None, comm
     return forEachLine(fileName, lineParser).retVal()
 
 
-def filterOutLines(inFileName, outFileName, allowedEntriesSet, entryModifyFunction=None, colNum=0, sep=None, comment='#'):
+def filterOutLines(inFileName, outFileName, allowedEntriesSet, entryModifyFunction=None, colNum=0, sep=None,
+                   comment='#'):
     """
         From the input file filter out lines that does not contain entries from the allowedSet
         in a specific column and store the rest lines to the output file.
@@ -56,7 +56,7 @@ def filterOutLines(inFileName, outFileName, allowedEntriesSet, entryModifyFuncti
     forEachLine(inFileName, parser)
 
 
-def getMapping(inFileName, keyColNum, valColNum, sep=None, comment ='#'):
+def getMapping(inFileName, keyColNum, valColNum, sep=None, comment='#'):
     """
         Transforms a tab separated file to a dictionary.
 
@@ -76,8 +76,8 @@ def getMappingTuple(inFileName, keyColNumTuple, valColNumTuple, sep=None, commen
         @param keyColNumTuple: tuple of numbers that define key columns, e.g. (0,1)
         @param valColNumTuple: tuple of numbers that define value columns, e.g. (4,3,2)
         """
-    return forEachLine(inFileName,
-        _MappingTupleParser(keyColNumTuple, valColNumTuple, sep=sep, comment=comment)).getMapping()
+    return forEachLine(inFileName, _MappingTupleParser(keyColNumTuple, valColNumTuple, sep=sep,
+                                                       comment=comment)).getMapping()
 
 
 class _MappingTupleParser():
@@ -148,7 +148,7 @@ class OutFileBuffer():
     """
         To append text to a file.
     """
-    def __init__(self, outFilePath, bufferText = False, fileOpenMode='w'):
+    def __init__(self, outFilePath, bufferText=False, fileOpenMode='w'):
         self.outFilePath = outFilePath
         self.empty = True
         self.bufferText = bufferText
@@ -163,7 +163,7 @@ class OutFileBuffer():
 
     def writeText(self, text):
         try:
-            if not self.opened: #reopen to append
+            if not self.opened:  # reopen to append
                 self.outFile = open(os.path.normpath(self.outFilePath), 'a')
                 self.opened = True
             self.outFile.write(text)
@@ -197,8 +197,10 @@ class _MappingParser():
         self._valColNum = valColNum
         self._sep = sep
         self._comment = comment
+
     def getDict(self):
         return self._dict
+
     def parse(self, line):
         if not isComment(line, self._comment):
             lineList = line.split(self._sep)
@@ -213,7 +215,8 @@ class _MappingParser():
                     self._dict[key].append(val)
             else:
                 if len(lineList) > 0:
-                    print str('TabSepFileFunctions:_MappingParser: line skipped: ' + line + ' doesn`t have enough entries\n')
+                    print str("TabSepFileFunctions:_MappingParser: line skipped:  %s  doesn't have enough entries\n"
+                              % line)
 
 
 class _LineConditionFilterOutLines():
@@ -231,7 +234,7 @@ class _LineConditionFilterOutLines():
             lineList = line.split(self.sep)
             if len(lineList) > self.colNum:
                 entry = lineList[self.colNum]
-                if self.entryModifyFunction != None:
+                if self.entryModifyFunction is not None:
                     entry = self.entryModifyFunction(entry)
                 if entry in self.allowedEntriesSet:
                     return True
@@ -270,7 +273,7 @@ class _PredParser():
                 key = lineList[0]
                 val = lineList[len(lineList) - 1]
                 if key in self._dict:
-                    sys.stderr.write('Consistency:PredParser: the contig "' + key + '" has already been assigned' )
+                    sys.stderr.write('Consistency:PredParser: the contig "%s" has already been assigned' % key)
                 self._dict[key] = int(val)
 
     def getContigToPredDict(self):
@@ -289,7 +292,7 @@ class _ColumnEntryListBuffer():
         self.entryModifyFunction = entryModifyFunction
 
     def parse(self, line):
-        if not isComment(line, self.comment): #the line is not a comment
+        if not isComment(line, self.comment):  # the line is not a comment
             lineList = line.split(self.sep)
             if len(lineList) > self.colNum:
                 entry = lineList[self.colNum]
@@ -301,5 +304,5 @@ class _ColumnEntryListBuffer():
         return self.list
 
 
-if __name__ == "__main__":
-    pass
+# if __name__ == "__main__":
+#     pass

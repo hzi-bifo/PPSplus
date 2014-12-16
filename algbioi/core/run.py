@@ -19,17 +19,14 @@
     Note that we could have written some parts of this code in a nicer way,
     but didn't have time. Be careful when reusing the source code.
 
-
-    Master script of the PPSplus.
+    Master script of the PPSplus pipeline.
 """
 
 import os
-import sys
 import re
 import shutil
 import subprocess
 import datetime
-import traceback
 import argparse
 
 from algbioi.com import csv
@@ -48,18 +45,17 @@ from algbioi.core.cluster import MGCluster
 from algbioi.core.taxonomy import Taxonomy
 from algbioi.core.sequences import Sequences
 from algbioi.core.analysis16s import RRNA16S
-from algbioi.eval import consistency
+from algbioi.eval import consistency, cami
 from algbioi.eval import accuracy
 from algbioi.eval import confusion_matrix
 from algbioi.misc import out_proc
 from algbioi.ref import mask_db
 
-# paths on hera/gaia:
-# export PATH=/net/programs/Debian-6.0.3-x86_64/python-2.7joh/bin:$PATH
-# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR31
-#
 
-def main():
+# paths on hera/gaia:
+# export PYTHONPATH=/net/metagenomics/projects/PPSmg/scripts/scriptsR31
+
+def _main():
     # external commands will be executed in Shell in Unix/Linux
     assert os.name == 'posix', str('The pipeline runs only on "posix" systems (i.e. Unix/Linux compatible). ' +
                                    'Your system is "' + os.name + '"')
@@ -81,7 +77,7 @@ def main():
 
     parser.add_argument('-o', '--process-preprocessed-output', action='store', nargs='+',
                         help='process output from the 16S rRNA analysis (s16), marker gene "31" analysis (mg); '
-                             'to build the general model (general)' ,
+                             'to build the general model (general)',
                         choices=["s16", "mg", "general"],
                         dest='o')
     # push down predictions to more specific clades (sc)
@@ -196,13 +192,14 @@ def main():
     if config.get('databaseFile') is None:
         print("The taxonomy (databaseFile) is not specified.")
         return
+
     if os.path.isdir(config.get('databaseFile')):
         databaseFile = os.path.join(os.path.normpath(config.get('databaseFile')), 'ncbitax_sqlite.db')
         if not os.path.isfile(databaseFile):
-            print("The directory '%s' doesn't contain taxonomy file 'ncbitax_sqlite.db'")
+            print('The directory "%s" does not contain taxonomy file "ncbitax_sqlite.db"' % config.get('databaseFile'))
             return
-    if not os.path.isfile(databaseFile):
-        print("The database file doesn't exist:", databaseFile)
+    else:
+        print('The directory from the configuration file "%s" does not exist' % config.get('databaseFile'))
         return
 
     # reference predictions
@@ -228,7 +225,8 @@ def main():
     if (referencePlacementFilePPOut is None) and (referencePlacementFileOut is not None):
         # generate PP placement file
         try:
-            referencePlacementFilePPOut = os.path.join(workingDir, os.path.basename(referencePlacementFileOut) + '_.PP.out')
+            referencePlacementFilePPOut = os.path.join(workingDir, os.path.basename(referencePlacementFileOut)
+                                                       + '_.PP.out')
             ppsOut2ppOut(referencePlacementFileOut, referencePlacementFilePPOut, taxonomicRanks, databaseFile)
         except Exception as e:
             print("An error '%s' occurred while file '%s' has been generated."
@@ -237,10 +235,10 @@ def main():
     # generates working fasta files always when the configuration file is newer than particular files to be generated
     sequences = Sequences(inputFastaFile, inputFastaScaffoldsFile, scaffoldsToContigsMapFile, taxonomicRanks, minSeqLen)
     mtimeConfig = os.path.getmtime(config.getConfigFile())
-    if ((not os.path.isfile(fastaFileIds) or not os.path.isfile(seqNameSeqIdFile) or
-             not os.path.isfile(scaffoldContigMapIdsFile)) or
-            (mtimeConfig > min(os.path.getmtime(fastaFileIds), os.path.getmtime(seqNameSeqIdFile),
-                               os.path.getmtime(scaffoldContigMapIdsFile)))):
+    if ((not os.path.isfile(fastaFileIds) or not os.path.isfile(seqNameSeqIdFile)
+         or not os.path.isfile(scaffoldContigMapIdsFile))
+        or (mtimeConfig > min(os.path.getmtime(fastaFileIds), os.path.getmtime(seqNameSeqIdFile),
+                              os.path.getmtime(scaffoldContigMapIdsFile)))):
         sequences.writeSequences(fastaFileIds)
         print('Working contigs input fasta file created: %s' % fastaFileIds)
         sequences.writeSeqNameSeqId(seqNameSeqIdFile)
@@ -248,9 +246,9 @@ def main():
         sequences.writeScaffoldContigMap(scaffoldContigMapIdsFile)
         print('Scaffolds -> contigs map ids file created: %s' % scaffoldContigMapIdsFile)
         # assert Common.seqFileCmp(inputFastaFile, fastaFileIds), 'The fasta IDs file contains different sequences!'
-    if ((fastaFileScaffoldsIds is not None) and
-            ((not os.path.isfile(fastaFileScaffoldsIds) or not os.path.isfile(scaffNameScaffIdFile)) or
-                 (mtimeConfig > min(os.path.getmtime(fastaFileScaffoldsIds), os.path.getmtime(scaffNameScaffIdFile))))):
+    if ((fastaFileScaffoldsIds is not None)
+        and ((not os.path.isfile(fastaFileScaffoldsIds) or not os.path.isfile(scaffNameScaffIdFile))
+             or (mtimeConfig > min(os.path.getmtime(fastaFileScaffoldsIds), os.path.getmtime(scaffNameScaffIdFile))))):
         sequences.writeScaffolds(fastaFileScaffoldsIds)
         print('Working scaffolds input fasta file created: %s' % fastaFileScaffoldsIds)  # (scaffold id -> sequence)
         sequences.writeScaffNameScaffId(scaffNameScaffIdFile)
@@ -493,7 +491,6 @@ def main():
                    'GENOMES_EXCLUDE': ''}  # optional
         createPPSConfig(ppsConfigFilePath, keyDict)
 
-
     # run PhyloPythiaS train (optionally compute training accuracy)
     ppsScripts = os.path.normpath(os.path.join(config.get('ppsInstallDir'), 'scripts'))
     if args.t:
@@ -583,8 +580,8 @@ def main():
                 shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.PP.out'), str(scaffoldsIdsNewPath + '.PP.out'))
                 print('PPS "predict" scaffolds return code: %s' % predictProc.returncode)
                 if predictProc.returncode != 0:
-                    raise Exception("PPS predict scaffolds returned with non-zero %s status: %s" %
-                                (predictProc.returncode, predictCmd))
+                    raise Exception("PPS predict scaffolds returned with non-zero %s status: %s"
+                                    % (predictProc.returncode, predictCmd))
 
         # compare prediction of scaffolds and contigs
         if 'v' in args.p:
@@ -639,6 +636,12 @@ def main():
         sequences.writeSequences(str(common.createTagFilePath(workingDir, inputFastaFile, 'pOUT.fas')),
                                  writeIds=False, outputFileContigSubPattern=config.get('outputFileContigSubPattern'))
 
+        # Create the output file in the CAMI format
+        try:
+            cami.createCamiOut(outputDir)
+        except:
+            print("Cannot create CAMI output file")
+
         # generate comparison tables
         outCmpRefDir = os.path.join(outputDir, 'cmp_ref')
         try:
@@ -660,16 +663,23 @@ def main():
         cons = None
         if scaffoldsToContigsMapFile is not None:
             cons = consistency.Consistency(inputFastaFile,
-                               str(common.createTagFilePath(outputDir, inputFastaFile, 'pOUT')),
-                               scaffoldsToContigsMapFile, databaseFile, minScaffContigCount=None,
-                               minScaffBpLen=None, cladesSet=None, considerContigWithNoScaff=True)
+                                           str(common.createTagFilePath(outputDir, inputFastaFile, 'pOUT')),
+                                           scaffoldsToContigsMapFile,
+                                           databaseFile,
+                                           minScaffContigCount=None,
+                                           minScaffBpLen=None,
+                                           cladesSet=None,
+                                           considerContigWithNoScaff=True)
         else:
             if os.path.isfile(os.path.normpath(str(fastaFileIds + '.out'))):
                 cons = consistency.Consistency(fastaFileIds,
-                                   str(fastaFileIds + '.out'),
-                                   scaffoldContigMapIdsFile,
-                                   databaseFile, minScaffContigCount=None,
-                                   minScaffBpLen=None, cladesSet=None, considerContigWithNoScaff=True)
+                                               str(fastaFileIds + '.out'),
+                                               scaffoldContigMapIdsFile,
+                                               databaseFile,
+                                               minScaffContigCount=None,
+                                               minScaffBpLen=None,
+                                               cladesSet=None,
+                                               considerContigWithNoScaff=True)
 
         if cons is not None:
             consOutBuff.writeText(cons.getScaffoldsPrint() + '\n')
@@ -713,14 +723,15 @@ def main():
             acc = accuracy.Accuracy(inputFastaFile, common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'),
                                     referencePlacementFileOut, databaseFile)
             acc2 = accuracy.Accuracy(inputFastaFile, common.createTagFilePath(outputDir, inputFastaFile, 'pOUT'),
-                                    referencePlacementFileOut, databaseFile, float(config.get('correctLabelThreshold')))
+                                     referencePlacementFileOut, databaseFile,
+                                     float(config.get('correctLabelThreshold')))
 
             buff.writeText(acc.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
                                                 minFracClade=float(config.get('recallMinFracClade')),
                                                 minFracPred=float(config.get('precisionMinFracPred')), overview=True))
             buff2.writeText(acc2.getAccuracyPrint(taxonomy_ncbi.TAXONOMIC_RANKS[1:],
-                                                minFracClade=float(config.get('recallMinFracClade')),
-                                                minFracPred=float(config.get('precisionMinFracPred')), overview=True))
+                                                  minFracClade=float(config.get('recallMinFracClade')),
+                                                  minFracPred=float(config.get('precisionMinFracPred')), overview=True))
 
             buff.close()
             buff2.close()
@@ -791,7 +802,7 @@ def createScaffoldAbundanceProfiles(scaffFilePath, scaffPred, profilesDir, datab
 
         try:
             taxPath = taxonomy.getPathToRoot(taxonId)
-        except Exception:
+        except:
             if taxonId not in errorIdToCount:
                 errorIdToCount[taxonId] = 1
             else:
@@ -881,7 +892,6 @@ def createAbundanceProfiles(entryList, profilesDir, label):
                                           str(count) + ', ' + str(taxonId) + ', ' + str(name) + '\n')
                         bpPercentSum += bpPercent
                         countPercentSum += countPercent
-
 
                 outFile.writeText(str(round(bpPercentSum, 0)) + ', ' + str(round(countPercentSum)) + ', ' + str(bpSum) +
                                   ', ' + str(countSum) + ', ,\n')
@@ -998,4 +1008,4 @@ ONLY_MODELS:FALSE\n""")
 
 
 if __name__ == "__main__":
-    main()
+    _main()

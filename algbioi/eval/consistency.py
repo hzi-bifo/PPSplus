@@ -16,21 +16,14 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Note that we could have written some parts of this code in a nicer way,
-    but didn't have time. Be careful when reusing the source code.
-
-
-    Computes the scaffold-contig consistency based on new definitions (2012).
-
-    @author: Ivan
-    @version: 26.4.2013 (internal subversion: 17)
+    Computes the scaffold-contig consistency.
 """
 
 import os
 import sys
 import argparse
 
-from algbioi.com.csv import predToDict
+from algbioi.eval import cami
 from algbioi.com.csv import getMapping
 from algbioi.com.fasta import getSequenceToBpDict
 from algbioi.com.taxonomy_ncbi import TaxonomyNcbi
@@ -63,7 +56,7 @@ class _TaxonomyWrapper():
         """
         current = ncbid
         dist = 0
-        while (current not in ncbidSet):
+        while current not in ncbidSet:
             if current is None:
                 sys.stderr.write('Consistency:_TaxonomyWrapper:getDist: current is "None" '
                                  + str(ncbid) + ' ' + str(ncbidSet) + '\n')
@@ -283,7 +276,7 @@ class Consistency():
         if isinstance(contigNameToNcbid, dict):
             self._contigToPred = contigNameToNcbid
         elif isinstance(contigNameToNcbid, str) and os.path.isfile(contigNameToNcbid):
-            self._contigToPred = predToDict(contigNameToNcbid)
+            self._contigToPred = cami.readAssignments(contigNameToNcbid)
         else:
             print("Can't get prediction info from: ", contigNameToNcbid)
             return
@@ -614,8 +607,7 @@ def _main():
         Main function.
     """
     parser = argparse.ArgumentParser(description='Computes the scaffold-contig consistency based on '
-                                                 'the "maximum support path".',
-                                     epilog=__doc__)
+                                                 'the "maximum support path".', epilog='')
 
     parser.add_argument('-f', '--fasta', nargs=1, type=file, required=True,
                         help='Fasta file containing contigs.', metavar='contigs.fna',
@@ -702,13 +694,13 @@ def _test1():
 
     minScaffContigCount = 26
     minScaffBpLen = None
-    cladesSet = None  # set([133925])
+    cladesSet = None
     considerContigWithNoScaff = False
 
-    #SRM
+    # SRM
     fasta = '/Users/ivan/Documents/work/binning/data/Reindeer/contigs.fna'
     pred = '/Users/ivan/Documents/work/binning/tests/SRM1/07/output/contigs.fna.pOUT'
-    map = '/Users/ivan/Documents/work/binning/data/Reindeer/scaffolds-contigs.tab'
+    mapping = '/Users/ivan/Documents/work/binning/data/Reindeer/scaffolds-contigs.tab'
 
     #HG
     #fasta = '/Users/ivan/Documents/work/binning/data/HumanGut/working/contigs.fna'
@@ -721,7 +713,8 @@ def _test1():
     #pred = '/Volumes/Macintosh HD/Users/ivan/Documents/work/binning/tests/TW/TW13/output/contigs_tw.fna.pOUT'
     #map = '/Users/ivan/Documents/work/binning/data/TW/scaff_contig.tab'
 
-    cons = Consistency(fasta, pred, map, db, minScaffContigCount, minScaffBpLen, cladesSet, considerContigWithNoScaff)
+    cons = Consistency(fasta, pred, mapping, db, minScaffContigCount, minScaffBpLen, cladesSet,
+                       considerContigWithNoScaff)
     print cons.getScaffoldsPrint()
     print cons.getGroupedScaffoldsPrint()
     cons.close()

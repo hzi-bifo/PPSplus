@@ -16,386 +16,444 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Note that we could have written some parts of this code in a nicer way,
-    but didn't have time. Be careful when reusing the source code.
 
+    ***********************************************************************
+    Manage the strains - reference data for a list of given species species.
 
-    Manage the strains - reference data for a species.
-
-    NCBI genomes and draft genomes downloaded using commands:
+    NCBI genomes and draft genomes downloaded using commands (for e.coli):
     wget -r --no-parent ftp://ftp.ncbi.nih.gov/genomes/Bacteria/Escherichia_coli*
     wget -r --no-parent ftp://ftp.ncbi.nih.gov/genomes/Bacteria_DRAFT/Escherichia_coli*
-
 
     Other links:
     http://www.ncbi.nlm.nih.gov/books/NBK44863/
     http://www.ncbi.nlm.nih.gov/genome/?term=escherichia+coli
 
+    Genetic code.
+    http://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi
+
     # Batch entrez
     http://www.ncbi.nlm.nih.gov/sites/batchentrez
 """
 import os
-import sys
-from Bio import Entrez
+# import sys
+# import re
 from Bio import SeqIO
-from Bio.SeqFeature import SeqFeature
+# from Bio.Seq import Seq
+# from Bio.Alphabet import generic_dna
+# from Bio.SeqFeature import SeqFeature
+# from Bio.SeqFeature import FeatureLocation
 from algbioi.com import taxonomy_ncbi
 from algbioi.com import csv
+from algbioi.com import fasta
+from algbioi.com import gbk
+from algbioi.hsim import comh
+from algbioi.com import parallel
 
-NCBI_TAXONOMY_FILE = '/Users/ivan/Documents/work/binning/taxonomy/20140916/ncbitax_sqlite.db'
-REFERENCE_DIR_ROOT = '/Volumes/VerbatimSSD/work/hsim01'
 
-#
+# common directory and file names
+GENOMES_DIR = 'bacteria_genomes'  # directory containing downloaded (decompressed) genomes gbk files
+DRAFT_GENOMES_DIR = 'bacteria_draft'  # directory containing downloaded (decompressed) draft genomes gbk files
+
+GENOMES_SOURCES_FILE_NAME = 'bacteria_genomes_sources.csv'  # contains a list of source files containing genomes
 
 
-def getBacteriaGenomesFileList(taxonomy):
+def _main():
     """
-        @type taxonomy: TaxonomyNcbi
+        Main function, choose steps you want to execute
     """
-    for directory in os.listdir(REFERENCE_DIR_ROOT):  # for each species
-        # is the directory an integer
-        try:
-            taxonId = int(directory)
-        except ValueError:
-            continue
+    assert os.path.isfile(comh.NCBI_TAXONOMY_FILE)
+    assert os.path.isdir(comh.REFERENCE_DIR_ROOT)
+    taxonomy = taxonomy_ncbi.TaxonomyNcbi(comh.NCBI_TAXONOMY_FILE, considerNoRank=True)
 
-        # does the directory represent species
-        if taxonomy.getRank(taxonId) != 'species':
-            print('The directory taxon id (%s) is not a species but "%s"!' % (taxonId, taxonomy.getRank(taxonId)))
-            continue
+    for spec in comh.SPECIES_LIST:
+        specDir = os.path.join(comh.REFERENCE_DIR_ROOT, spec)  # directory containing species data
+        assert comh.isSpeciesDirectory(specDir, taxonomy), "Not a species directory: %s" % specDir
 
-        speciesName = taxonomy.getScientificName(taxonId)
-        refGenomeDir = os.path.join(REFERENCE_DIR_ROOT, directory, 'bacteria_genomes')
-        # refDraftGenomeDir = os.path.join(REFERENCE_DIR_ROOT, directory, 'bacteria_draft')
-        genomeCount = len(os.listdir(refGenomeDir))
-        # draftCount = len(os.listdir(refDraftGenomeDir))
+        # Get a list of relevant files for each GENOME strain
+        if False:
+            getBacteriaGenomesFileList(specDir, taxonomy)
 
-        print("Species: %s" % speciesName)
-        print("Genome count: %s" % genomeCount)
-        # print("Draft genome count: %s" % draftCount)
+        # Extract DNA sequences: for each strain one file
+        if False:
+            storeGenomesAsFastaDNA(specDir, taxonomy)
 
-        # check genomes directory
-        gbkCompleteGenomeList = []
-        for genomeDir in os.listdir(refGenomeDir):  # for each genome in a directory
-            genomeDirPath = os.path.join(refGenomeDir, genomeDir)
-            gbkCompleteGenome = None
-            print('Processing: %s' % genomeDir)
-            for f in os.listdir(genomeDirPath):
+        # Extract DNA genes for genomes: for each gene one file
+        if False:
+            storeGenesAsFastaDNA(specDir, taxonomy)
 
-                if f.split('.')[-1] == 'gbk':  # for each gbk file
-                    pass
-                    # check whether contains "complete genome"
-                    records = []
-                    fPath = os.path.join(genomeDirPath, f)
-                    for record in SeqIO.parse(fPath, "genbank"):
-                        records.append(record)
+        # Decompress draft genome (gbk.tgz) files
+        if False:
+            decompressDraftGenomeFiles(specDir, suffixList=['gbk.tgz'])
 
-                    if len(records) > 1:
-                        print('File "%s" contains more than one record! (took first record)' % fPath)
-                    assert len(records) > 0, 'No record contained in file "%s' % fPath
-                    record = records[0]
-                    if 'complete genome' in str(record.description).lower():
-                        if gbkCompleteGenome is None:
-                            gbkCompleteGenome = fPath
+        # Extract draft genome DNA sequences: for each draft genome one file
+        if False:
+            storeDraftGenomesAsFastaDNA(specDir, taxonomy)
+
+        # Extract DNA genes for draft genomes: for each gene one file
+        if False:
+            storeDraftGenomeGenesAsFastaDNA(specDir, taxonomy)
+
+        # Pull genes from genomes and draft genomes together.
+        if False:
+            pullGenesFastaTogether(specDir)
+
+    taxonomy.close()
+
+
+def getBacteriaGenomesFileList(specDir, taxonomy):
+    """
+        Get a list of relevant files for each GENOME strain (importantly the gbk files).
+
+        Create file: GENOMES_SOURCES_FILE_NAME
+    """
+    taxonId = int(os.path.basename(specDir))
+    speciesName = taxonomy.getScientificName(taxonId)
+    genomesDir = os.path.join(specDir, GENOMES_DIR)
+    genomeCount = len(os.listdir(genomesDir))
+    print("Getting relevant gbk files for genomes")
+    print("Species id: %s name: %s" % (taxonId, speciesName))
+    print("Genome count: %s" % genomeCount)
+
+    # for each genome in a directory, get a gbk containing a "complete genome"
+    gbkCompleteGenomeList = []
+    count = 0.
+    for genomeDir in os.listdir(genomesDir):
+        genomeDirPath = os.path.join(genomesDir, genomeDir)
+        # print('Processing: %s' % genomeDir)
+        count += 1.
+        print 'Progress: ' + str(round((float(count)/genomeCount) * 100, 1)) + '%\r',
+
+        # for all files in the genome directory, search for a gbk file containing a "complete genome"
+        gbkCompleteGenome = None
+        for f in os.listdir(genomeDirPath):
+            if f.split('.')[-1] == 'gbk':  # got a gbk file
+                records = []  # get all records
+                fPath = os.path.join(genomeDirPath, f)
+                for record in SeqIO.parse(fPath, "genbank"):
+                    records.append(record)
+                if len(records) == 0:
+                    print('No record contained in file "%s' % fPath)
+                    continue
+                # get a record with a complete genome
+                record = None
+                for r in records:
+                    if 'complete genome' in str(r.description).lower():
+                        if record is None:
+                            record = r
                         else:
-                            print('There are at least two files describing a "complete genome": "%s" and "%s"' % (gbkCompleteGenome, fPath))
+                            print('File "%s" contains more than one record containing a complete genome!' % fPath)
+                # get a file containing a record with a complete genome
+                if record is not None:
+                    if gbkCompleteGenome is None:
+                        gbkCompleteGenome = fPath
+                    else:
+                        print('There are at least two gbk files describing a "complete genome" for one strain: '
+                              '"%s" and "%s" (the first one was taken)' % (gbkCompleteGenome, fPath))
+
+        # there is a gbk file containing a complete genome, get all corresponding relevant files
+        if gbkCompleteGenome is not None:
+            d = {}
+            for suffix in ['ptt', 'rpt', 'fna', 'gbk']:
+                f = ".".join(gbkCompleteGenome.split('.')[0:-1]) + '.' + suffix
+                if not os.path.isfile(f):
+                    print('File "%s" does not exists!' % f)
+                else:
+                    d[suffix] = os.path.sep.join(f.split(os.path.sep)[-4:])
+            gbkCompleteGenomeList.append(d)
+        else:
+            print('No file containing a complete genome found in "%s"' % genomeDirPath)
+
+    # write paths to the relevant (importantly gbk) files to a source file (relative to the root)
+    out = csv.OutFileBuffer(os.path.join(specDir, GENOMES_SOURCES_FILE_NAME))
+    for d in gbkCompleteGenomeList:
+        out.writeText(d.get('gbk') + ',' + d.get('ptt') + ',' + d.get('fna') + ',' + d.get('rpt') + '\n')
+    out.close()
 
 
-            if gbkCompleteGenome is None:
-                print('No file describing a complete genome found in "%s"' % genomeDirPath)
+def storeGenomesAsFastaDNA(specDir, taxonomy):
+    """
+        Get a FASTA file for each genome.
+
+        Create directory: comh.FASTA_GENOMES_DIR_NAME
+    """
+    print('Storing genomes as FASTA.')
+    # make the destination directory (to store genomes as FASTA) if it doesn't exists
+    dstDir = os.path.join(specDir, comh.FASTA_GENOMES_DIR_NAME)
+    if not os.path.isdir(dstDir):
+        os.mkdir(dstDir)
+
+    # get all gbk files containing genomes
+    gbkFilePathList = csv.getColumnAsList(os.path.join(specDir, GENOMES_SOURCES_FILE_NAME), colNum=0, sep=',')
+    # define tasks
+    taskList = []
+    for gbkFilePath in gbkFilePathList:
+        taskList.append(parallel.TaskThread(gbk.readFromGbkFile, (os.path.join(comh.REFERENCE_DIR_ROOT, gbkFilePath),
+                                                                  taxonomy, ['accession', 'acc_version', 'seq'])))
+    # extract genome sequences from gbk files
+    itemsList = parallel.runThreadParallel(taskList, maxThreads=comh.MAX_PROC)
+
+    # write genome sequences to files (one genome one FASTA file)
+    for items in itemsList:
+        assert len(items) == 1
+        accession = items[0]['accession']
+        accVersion = items[0]['acc_version']
+        seq = items[0]['seq']
+        out = csv.OutFileBuffer(os.path.join(dstDir, accession + '.fna'))
+        out.writeText('>' + accVersion + '\n' + seq)
+        out.close()
+
+
+def storeGenesAsFastaDNA(specDir, taxonomy):
+    """
+        Get a FASTA file for each gene for genomes. (Do not store multiple copies !!!)
+
+        Create directory: comh.FASTA_GENOMES_GENES_DIR_NAME
+    """
+    print("Storing genes as fasta for genomes")
+    # make the destination directory (to store a FASTA file for each gene) if it doesn't exists
+    dstDir = os.path.join(specDir, comh.FASTA_GENOMES_GENES_DIR_NAME)
+    if not os.path.isdir(dstDir):
+        os.mkdir(dstDir)
+
+    # get all gbk files containing genomes
+    gbkFilePathList = csv.getColumnAsList(os.path.join(specDir, GENOMES_SOURCES_FILE_NAME), colNum=0, sep=',')
+    # define tasks
+    taskList = []
+    for gbkFilePath in gbkFilePathList:
+        taskList.append(parallel.TaskThread(gbk.readFromGbkFile, (os.path.join(comh.REFERENCE_DIR_ROOT, gbkFilePath),
+                                                                  taxonomy, ['genes_annotation', 'accession'])))
+    # extract gene sequences from gbk files
+    itemsList = parallel.runThreadParallel(taskList, maxThreads=comh.MAX_PROC)
+
+    # for each genome, write gene sequences to files (one gene one FASTA file)
+    for items in itemsList:
+        assert len(items) == 1
+        genesAnnotation = items[0]['genes_annotation']
+        accession = items[0]['accession']
+
+        # for each gene, write gene sequence to a file
+        for annot in genesAnnotation.values():
+            filePath = os.path.join(dstDir, comh.getGeneNameToFileName(annot.geneName))
+            if os.path.isfile(filePath):
+                out = csv.OutFileBuffer(filePath, fileOpenMode='a')
+                out.writeText('\n')
             else:
-                # gbkCompleteGenomeList.append(gbkCompleteGenome)
+                out = csv.OutFileBuffer(filePath)
 
-                # check whether there are corresponding files for this record
-                # gbkCompleteGenome
-                d = {}
-                for suffix in ['ptt', 'rpt', 'fna', 'gbk']:
-
-                    f = ".".join(gbkCompleteGenome.split('.')[0:-1]) + '.' + suffix
-                    if not os.path.isfile(f):
-                        print('File "%s" does not exists!')
-                    d[suffix] = f
-                gbkCompleteGenomeList.append(d)
-
-            # write a file with the paths!!!
-            # directory
-            out = csv.OutFileBuffer(os.path.join(REFERENCE_DIR_ROOT, directory, 'bacteria_genomes_sources.csv'))
-            for d in gbkCompleteGenomeList:
-                out.writeText(d.get('gbk') + ',' + d.get('ptt') + ',' + d.get('fna') + ',' + d.get('rpt') + '\n')
+            out.writeText('>accVersion:%s;geneName:%s;locusTag:%s;src:genome;accession:%s\n%s'
+                          % (annot.sequenceAccessionVersion, annot.geneName, annot.locusTag, accession, annot.seqDNA))
             out.close()
 
 
-def readFromGbkFile(gbkFile, listOfFields=['gene_dict']):
+def decompressDraftGenomeFiles(specDir, suffixList=['gbk.tgz']):
     """
-        http://biopython.org/DIST/docs/api/Bio.SeqFeature.SeqFeature-class.html
-
-        Functionalities:
-        -description: record.description (DEFINITION)
-        -accession: record.annotations["accessions"] (ACCESSION) take the first one if more available
-        -gi: record.annotations["gi"] (GI)
-        -acc_version: record.id (VERSION), accesion version
-        -taxonId: feature source, feature.qualifiers['db_xref']
-        -seq: DNA sequence, str(record.seq)
-        -seq_rev: reverse complement DNA sequence, str(record.reverse_complement().seq)
-        -gene_name_list: list o gene names, feature gene, feature.qualifiers['gene'], (not including unnamed!)
-        -gene_dict: dict of dict of genes, feature CDS (not including unnamed)
-
-        @return: list of a dictionary of entries from the input list of fields for each record
-        @rtype: dict
+        Decompresses all draft genome gbk files with the given suffix,
+        does nothing in the case the decompressed directory already exists.
     """
-    retList = []
-    for record in SeqIO.parse(gbkFile, "genbank"):
-        retDict = {}
+    print("Decompressing draft genome gbk.tgz files")
+    draftDirRoot = os.path.join(specDir, DRAFT_GENOMES_DIR)
 
-        for item in listOfFields:
-            if item == 'description':
-                retDict[item] = record.description
-            elif item == 'accession':
-                accessionList = record.annotations['accessions']
-                retDict[item] = accessionList[0]
-                if len(accessionList) > 0:
-                    print('There are more than one accession: "%s", the first was taken!' % accessionList)
-            elif item == 'gi':
-                retDict[item] = record.annotations['gi']
-            elif item == 'acc_version':
-                retDict[item] = record.id
-            elif item == 'taxonId':
-                for feature in record.features:
-                    if feature.type == 'source':
-                        dbxref = feature.qualifiers['db_xref']
-                        assert len(dbxref) == 1, 'TaxonId: this list should be of length 1: "%s"' % dbxref
-                        taxon, taxonId = dbxref[0].split(':')
-                        assert taxon == 'taxon', 'This string should be "taxon", not "%s"' % taxon
-                        retDict[item] = int(taxonId)
-                        break
-                if item not in retDict:
-                    print('TaxonId not found for "%s" in "%s"' % (record.id, gbkFile))
-            elif item == 'seq':
-                retDict[item] = str(record.seq)
-            elif item == 'seq_rev':
-                retDict[item] = str(record.reverse_complement().seq)
-            elif item == 'gene_name_list':
-                retDict[item] = []
-                for feature in record.features:
-                    if feature.type == 'gene' and 'gene' in feature.qualifiers:
-                        retDict[item].append(feature.qualifiers['gene'])
-            elif item == 'gene_dict':
-                genesDict = {}
-                for feature in record.features:
-                    if feature.type == 'gene' and 'gene' in feature.qualifiers:
-                        # genesDict[feature.qualifiers['gene']] = {}
-                        print feature.location
+    # for each draft genome
+    for draft in os.listdir(draftDirRoot):
+        draftGenomeDir = os.path.join(draftDirRoot, draft)
+        assert os.path.isdir(draftGenomeDir)
+        taskList = []
+        # for each file in the draft genome directory
+        for f in os.listdir(draftGenomeDir):
+            # take files with the corresponding suffixes
+            for suffix in suffixList:
+                if f.endswith(suffix):
+                    # add task to a list (file will be decompressed)
+                    taskList.append(parallel.TaskThread(comh.extract, (os.path.join(draftGenomeDir, f),)))
+                    break
 
-                        # print genesDict
+        # decompress all files (a file won't be decompressed in the case it has already been decompressed)
+        parallel.runThreadParallel(taskList, maxThreads=comh.MAX_PROC)
 
 
-            elif item == 'gene_dict__':
-                dd = {}
-                for feature in record.features:
-                    if feature.type == 'CDS' and 'gene' in feature.qualifiers:
-                        d = {}
-                        gene = feature.qualifiers['gene']
-                        assert len(gene) == 1, 'This list should be of length 1: "%s"' % gene
-                        gene = gene[0]
-                        # d['gene'] = gene
+def storeDraftGenomesAsFastaDNA(specDir, taxonomy):
+    """
+        Get a FASTA file for each draft genome.
 
-                        loc = str(feature.location).replace(']', ':', 1).replace('(', '', 1).strip('[)').split(':')
-                        try:
-                            d['start'] = int(loc[0]) - 1
-                            d['stop'] = int(loc[1]) - 1
-                            d['strand'] = loc[2]
-                        except:
-                            print gene, feature.location, '-------------------'
+        Create directory: comh.FASTA_GENOMES_DRAFT_DIR_NAM
+    """
+    print('Storing draft genomes as FASTA.')
+    # make the destination directory (to store draft genomes as FASTA) if it doesn't exists
+    dstDir = os.path.join(specDir, comh.FASTA_GENOMES_DRAFT_DIR_NAME)
+    if not os.path.isdir(dstDir):
+        os.mkdir(dstDir)
 
+    draftGenomesRoot = os.path.join(specDir, DRAFT_GENOMES_DIR)
+    # for each draft genome
+    for draftGenome in os.listdir(draftGenomesRoot):
+        draftGenomeDir = os.path.join(draftGenomesRoot, draftGenome)
+        # find a gbk file and gbk dir
+        gbkFile = None
+        gbkDir = None
+        for f in os.listdir(draftGenomeDir):
+            filePath = os.path.join(draftGenomeDir, f)
+            if filePath.endswith('.gbk'):
+                if os.path.isfile(filePath):
+                    assert gbkFile is None, filePath
+                    gbkFile = filePath
+                elif os.path.isdir(filePath):
+                    assert gbkDir is None, filePath
+                    gbkDir = filePath
+                else:
+                    assert False, filePath
 
-                        d['prot'] = feature.qualifiers['translation']
-                        translTable = feature.qualifiers['transl_table']
-                        assert len(translTable) == 1, 'This list should be of length 1: "%s"' % translTable
-                        d['translTable'] = int(translTable[0])
+        if gbkFile is None or gbkDir is None:
+            print("Entry skipped, draft genome reference not complete! gbkFile: %s gbkDir: %s" % (gbkFile, gbkDir))
+            continue
 
+        # get the accession of this draft genome
+        item = gbk.readFromGbkFile(gbkFile, taxonomy, ['accession'])
+        assert len(item) == 1, 'More records: %s' % item
+        accession = item[0]['accession']
 
-                        # assert gene not in dd # !!!!!
-                        dd[gene] = d
-                retDict[item] = dd
+        # open a file to store DNA sequences (scaffolds) of this draft genome
+        out = csv.OutFileBuffer(os.path.join(dstDir, accession + '.fna'))
 
+        # for each scaffold of the draft genome, define task - read its sequence and accession version
+        taskList = []
+        for f in os.listdir(gbkDir):
+            gbkFilePath = os.path.join(gbkDir, f)
+            if gbkFilePath.endswith('.gbk'):
+                taskList.append(parallel.TaskThread(gbk.readFromGbkFile,
+                                                    (gbkFilePath, taxonomy, ['acc_version', 'seq'])))
+
+        # read all scaffold sequences
+        itemList = parallel.runThreadParallel(taskList, maxThreads=comh.MAX_PROC)
+
+        # write all scaffolds to a file
+        addNewLine = False
+        for item, task in zip(itemList, taskList):
+            assert len(item) == 1, 'More than one item: items: %s task args: %s' % (len(item), task.args)
+            accVersion = item[0]['acc_version']
+            seq = item[0]['seq']
+            if addNewLine:
+                out.writeText("\n")
             else:
-                print('Item "%s" not supported!' % item)
-                continue
+                addNewLine = True
+            out.writeText(">%s\n%s" % (accVersion, seq))
+        out.close()
 
 
+def storeDraftGenomeGenesAsFastaDNA(specDir, taxonomy):
+    """
+        Get a FASTA file for each gene for draft genomes. (Do not store multiple copies !!!)
+
+        Create directory: comh.FASTA_GENOMES_DRAFT_GENES_DIR_NAME
+    """
+    print("Storing genes as fasta for draft genomes")
+    # make the destination directory (to store a FASTA file for each gene) if it doesn't exists
+    dstDir = os.path.join(specDir, comh.FASTA_GENOMES_DRAFT_GENES_DIR_NAME)
+    if not os.path.isdir(dstDir):
+        os.mkdir(dstDir)
+
+    # for each draft genome
+    draftGenomesRoot = os.path.join(specDir, DRAFT_GENOMES_DIR)
+    for draftGenome in os.listdir(draftGenomesRoot):
+        draftGenomeDir = os.path.join(draftGenomesRoot, draftGenome)
+        # find a gbk file and gbk dir
+        gbkFile = None
+        gbkDir = None
+        for f in os.listdir(draftGenomeDir):
+            filePath = os.path.join(draftGenomeDir, f)
+            if f.endswith('.gbk'):
+                if os.path.isfile(filePath):
+                    assert gbkFile is None, filePath
+                    gbkFile = filePath
+                elif os.path.isdir(filePath):
+                    assert gbkDir is None, filePath
+                    gbkDir = filePath
+                else:
+                    assert False, filePath
+
+        if gbkFile is None or gbkDir is None:
+            print("Entry skipped, draft genome reference not complete! gbkFile: %s gbkDir: %s" % (gbkFile, gbkDir))
+            continue
+
+        # get the accession of this draft genome
+        item = gbk.readFromGbkFile(gbkFile, taxonomy, ['accession'])
+        assert len(item) == 1, 'More records: %s' % item
+        accession = item[0]['accession']
+
+        # for each scaffold of the draft genome, define task - read all its gene annotations
+        taskList = []
+        for f in os.listdir(gbkDir):
+            gbkFilePath = os.path.join(gbkDir, f)
+            if gbkFilePath.endswith('.gbk'):
+                taskList.append(parallel.TaskThread(gbk.readFromGbkFile, (gbkFilePath, taxonomy, ['genes_annotation'])))
+
+        # read all gene annotations
+        itemList = parallel.runThreadParallel(taskList, maxThreads=comh.MAX_PROC)
+
+        # store mapping: gene name -> list of gene records
+        geneToRecordList = {}
+        for item, task in zip(itemList, taskList):
+            assert len(item) == 1, 'More than one item: items: %s task args: %s' % (item, task.args)
+            for geneName, geneRecord in item[0]['genes_annotation'].iteritems():
+                if geneName in geneToRecordList:
+                    geneToRecordList[geneName].append(geneRecord)
+                else:
+                    geneToRecordList[geneName] = [geneRecord]
+
+        # check whether there is only one record for one gene, store single copy genes to files (one gene, one file)
+        for v in geneToRecordList.values():
+            if len(v) == 1:  # the gene is single copy
+                annot = v[0]
+                filePath = os.path.join(dstDir, comh.getGeneNameToFileName(annot.geneName))
+                if os.path.isfile(filePath):
+                    out = csv.OutFileBuffer(filePath, fileOpenMode='a')
+                    out.writeText('\n')
+                else:
+                    out = csv.OutFileBuffer(filePath)
+                out.writeText('>accVersion:%s;geneName:%s;locusTag:%s;src:draft;accession:%s\n%s'
+                              % (annot.sequenceAccessionVersion, annot.geneName, annot.locusTag, accession,
+                                 annot.seqDNA))
+                out.close()
+            else:
+                assert len(v) > 0, draftGenomeDir
 
 
+def pullGenesFastaTogether(specDir):
+    """
+        Pull genes from genomes and draft genomes together.
 
-        # print 'record.name (ACCESSION, LOCUS):', record.name
-        # print 'record.annotations["accessions"] (ACCESSION):', record.annotations['accessions']
-        # print 'record.id (VERSION):', record.id
-        # print 'record.annotations["gi"] (GI):', record.annotations['gi']
-        # for feature in record.features:
-        #     if feature.type == 'source':
-        #         print 'taxonId:', int(feature.qualifiers['db_xref'][0].split(':')[1])
-        #
-        #
-        #
-        # print 'seqLen:', len(record.seq)
-        # print 'reverse complement len:', len(record.reverse_complement().seq)
-        # print 'dbxrefs:', record.dbxrefs
-        # print 'features:', type(record.features[0])
-        # idx = 0
-        #
-        # for feature in record.features:
-        #
-        #     if feature.type == 'CDS' and 'gene' in feature.qualifiers:
-        #         idx += 1
-        #
-        #         print 'gene (%s): %s' % (idx, feature.qualifiers['gene'])
-        #         print feature.qualifiers['translation']  # take this translate to DNA using appropriate translation table, use the coordinates to get the string! and compare!!!
-        #         print feature.location  # take this translate to DNA using appropriate translation table, use the coordinates to get the string! and compare!!!
-        #         break
-        #
+        Create directory: comh.FASTA_PULL_GENES_DIR_NAME
+    """
+    print("Pulling genes from genomes and draft genomes together.")
+    # make the destination directory if it doesn't exists
+    dstDir = os.path.join(specDir, comh.FASTA_PULL_GENES_DIR_NAME)
+    if not os.path.isdir(dstDir):
+        os.mkdir(dstDir)
 
+    # get a set of all gene names contained in genomes or draft genomes (as the corresponding file names)
+    allFileNameSet = set()
+    srcDirList = [comh.FASTA_GENOMES_GENES_DIR_NAME, comh.FASTA_GENOMES_DRAFT_GENES_DIR_NAME]
+    for srcDir in srcDirList:
+        for f in os.listdir(os.path.join(specDir, srcDir)):
+            if f.endswith('.fna'):
+                allFileNameSet.add(f)
+            else:
+                print('file %s does not end with ".fna"' % f)
 
-                # break
-                # print features
-                # if idx > 10:
-                #     break
-
-        # try:
-        #     pass
-        # except:
-        #     pass
-        # try:
-        #     print 'id:', record.ID
-        # except:
-        #     pass
-        # try:
-        #     print 'annotation:', record.annotation
-        # except:
-        #     pass
-        # try:
-        #     print 'annotations:', record.annotations
-        # except:
-        #     pass
-        # try:
-        #     print 'subannotations:', record.subannotations
-        # except:
-        #     pass
-
-        retList.append(retDict)
-        # print retList
-    return retList
-
-
-# get genome meta data
-def getGenomeMetadata():
-    for directory in os.listdir(REFERENCE_DIR_ROOT):  # for each species
-        sourcesFilePath = os.path.join(REFERENCE_DIR_ROOT, directory, 'bacteria_genomes_sources.csv')
-        if os.path.isfile(sourcesFilePath):
-            print('Processing: %s' % sourcesFilePath)
-
-            out = csv.OutFileBuffer(os.path.join(REFERENCE_DIR_ROOT, directory, 'bacteria_genomes_metadata.csv'))
-            out.writeText('# Accession, AccessionVersion, GI, TaxonId, TaxonomyVersion, DataSource')
-            recordCount = 0
-            for line in open(sourcesFilePath):
-                recordCount += 1
-                gbk, ptt, fna, rpt = line.split(',')
-
-                # accession =
-
-                print line
-
-
-            out.close()
-            print('Records stored: %s' % recordCount)
-
-
-
-        # is the directory an integer
-        # try:
-        #     taxonId = int(directory)
-        # except ValueError:
-        #     continue
-
-        # does the directory represent species
-        # if taxonomy.getRank(taxonId) != 'species':
-        #     print('The directory taxon id (%s) is not a species but "%s"!' % (taxonId, taxonomy.getRank(taxonId)))
-        #     continue
-
+    # for each gene create a file and copy all sequences for this gene to this file
+    for f in allFileNameSet:
+        dstFile = csv.OutFileBuffer(os.path.join(dstDir, f))
+        firstLine = True
+        for srcDir in srcDirList:
+            filePath = os.path.join(specDir, srcDir, f)
+            if os.path.isfile(filePath):
+                for name, seq in fasta.fastaFileToDictWholeNames(filePath).iteritems():
+                    if firstLine:
+                        dstFile.writeText(">%s\n%s" % (name, seq))
+                        firstLine = False
+                    else:
+                        dstFile.writeText("\n>%s\n%s" % (name, seq))
+        dstFile.close()
 
 
 if __name__ == "__main__":
-    # Escherichia coli, 562, species
-
-    assert os.path.isfile(NCBI_TAXONOMY_FILE), "The taxonomy file does not exists!"
-    assert os.path.isdir(REFERENCE_DIR_ROOT), "The root of the reference does not exist!"
-    taxonomy = taxonomy_ncbi.TaxonomyNcbi(NCBI_TAXONOMY_FILE, considerNoRank=True)
-
-    if False:
-        getBacteriaGenomesFileList(taxonomy)
-
-    if False:
-    # if True:
-        getGenomeMetadata()
-
-    if True:
-        readFromGbkFile('/Volumes/VerbatimSSD/work/hsim01/562/bacteria_genomes/Escherichia_coli__BL21_Gold_DE3_pLysS_AG__uid59245/NC_012947.gbk')
-
-
-    taxonomy.close()
-
-
-
-
-
-
-
-
-
-
-# ---------------------------------------------------------
-
-def downloadStrains(taxonId, taxonomy, directory):
-    """
-        Given a species ncbi taxon id, download all strain sequences of that species.
-
-        @param taxonId:
-        @param taxonomy:
-        @type taxonomy: TaxonomyNcbi
-        @param directory:
-
-    """
-    pass
-
-    # is the taxon id a species id?
-    assert taxonomy.getRank(taxonId) == 'species', "Argument taxon Id (%s) is not a species!" % taxonId
-    assert os.path.isdir(directory), 'Path "%s" is not a directory!' % directory
-
-
-    # get all taxon ids of the species, print out how many, stop if no found
-    strainList = taxonomy.getChildrenNcbids(taxonId)
-    if strainList is None:
-        print('No strains found for species "%s"' % taxonId)
-        return
-    print('There are %s strains for species "%s" in the taxonomy' % (len(strainList), taxonId))
-
-
-    for strainId in strainList:
-        print strainId
-
-        break
-    # a different approach needed!!!
-
-
-
-
-
-def testDownloadStrains():
-    # Escherichia coli, 562, species
-    taxonId = 562
-    taxonomy = taxonomy_ncbi.TaxonomyNcbi('/Users/ivan/Documents/work/binning/taxonomy/20140916/ncbitax_sqlite.db', considerNoRank=True)
-    directory = '/Users/ivan/Documents/work/binning/database/hsim'
-
-    downloadStrains(taxonId, taxonomy, directory)
-
-    taxonomy.close()
-
-
+    _main()

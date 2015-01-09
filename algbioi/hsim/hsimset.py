@@ -30,11 +30,14 @@ import re
 import sys
 import time
 import numpy as np
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
 from algbioi.com import taxonomy_ncbi
 from algbioi.com import csv
 from algbioi.com import fasta as fas
 from algbioi.com import parallel
 from algbioi.com import rand
+from algbioi.com import sam
 from algbioi.hsim import comh
 
 
@@ -67,19 +70,20 @@ def _main():
             phyloClustering(specDir)
 
         # define random samples from clusters.
-        if True:
+        if False:
             defineRandomSamplesFromClusters(specDir, mode=1)  # mode 0 for testing
 
         # generate simulated reads for each sample
         if False:
             genSimulatedReadsForSamples(specDir)
 
-        # TODO: Get mapping (check: gzip.open) !!!
-
-
-        # TODO: Get some statistics !!!
+        # get error profiles and QS cutoffs
         if False:
-            getGenesStat(specDir)  # check, put to a new module, gzip everything !!!
+            getReadStatAndQSCutoff(specDir)
+
+
+        # getGenesStat(specDir)  # check, put to a new module, gzip everything !!!
+        # TODO: Get mapping (check: gzip.open) !!!
 
         ###
 
@@ -139,7 +143,7 @@ def _getAccIntersectAll(genesDir, geneList):
         S.t. each genome or draft genome, the accession of which is returned by this function, contain all
         the genes from the gene list
 
-        @param pullGenesDir: directory containing all the genes (one file for one gene)
+        @param genesDir: directory containing all the genes (one file for one gene)
         @param geneList: list of gene names
 
         @return: a list of accessions
@@ -416,12 +420,12 @@ def genSimulatedReadsForSamples(specDir):
     # define tasks for each sample
     for sampleDef in open(os.path.join(specDir, comh.SAMPLES_DIR, comh.SAMPLES_DEF_FILE)):
         # get a sample definition
-        id, accList, abundanceList = sampleDef.split('\t')
+        sampleId, accList, abundanceList = sampleDef.split('\t')
         accList = accList.split(',')
         abundanceList = map(lambda x: float(x.strip()), abundanceList.split(','))
         assert len(accList) == len(abundanceList)
         # create the sample directory
-        sampleDir = os.path.join(specDir, comh.SAMPLES_DIR, str(id))
+        sampleDir = os.path.join(specDir, comh.SAMPLES_DIR, str(sampleId))
         if not os.path.isdir(sampleDir):
            os.mkdir(sampleDir)
 
@@ -441,28 +445,89 @@ def genSimulatedReadsForSamples(specDir):
                 srcFna = draftGenomeFastaFile
             assert srcFna is not None
 
-            # filter out short sequences from the (draft) genome fasta files
-            srcNoShortSeq = os.path.join(strainSimDir, os.path.basename(srcFna))
-            fas.cpSeqNoShortSeq(srcFna, srcNoShortSeq, comh.ART_MIN_SEQ_LEN)
+            # there should be data for all libraries
+            assert len(comh.ART_READ_LEN) == len(comh.ART_INSERT_SIZE) == len(comh.ART_INSERT_SD) == \
+                len(comh.ART_MIN_SEQ_LEN)
 
-            # define the read generation command
-            # TODO add: gzip pair1.fq; gzip pair2.fq; gzip pair.sam; gzip pair1.aln; gzip pair2.aln
-            cmd = "%s -i %s -f %s -rs %s -l %s -m %s -s %s -p -o pair -sam " \
-                  % (comh.ART_ILLUMINA_BINARY, srcNoShortSeq, coverage,
-                     rand.strToRandInt(str(comh.SAMPLES_DEF_RAND_SEED) + acc + str(round(coverage))
-                                       + str(os.path.getsize(srcNoShortSeq))),
-                     comh.ART_READ_LEN, comh.ART_INSERT_SIZE, comh.ART_INSERT_SD)
+            count = 0
+            for readLen, insertSize, insertSD, minSeqLen in zip(comh.ART_READ_LEN, comh.ART_INSERT_SIZE,
+                                                                comh.ART_INSERT_SD, comh.ART_MIN_SEQ_LEN):
+                # filter out short sequences from the (draft) genome fasta files
+                srcNoShortSeq = os.path.join(strainSimDir, str(count) + '_' + os.path.basename(srcFna))
+                fas.cpSeqNoShortSeq(srcFna, srcNoShortSeq, minSeqLen)
 
-            # define the logging file for stdout
-            stdoutLog = os.path.join(strainSimDir, 'art_log.txt')
-            taskList.append(parallel.TaskCmd(cmd, strainSimDir, stdout=stdoutLog))
-            # print cmd
+                # define the read generation command
+                cmd = "%s -i %s -f %s -rs %s -l %s -m %s -s %s -p -o %s_pair -na -sam; " \
+                      "gzip %s_pair1.fq; gzip %s_pair2.fq; gzip %s_pair.sam; gzip %s" \
+                      % (comh.ART_ILLUMINA_BINARY, srcNoShortSeq, coverage,
+                         rand.strToRandInt(str(comh.SAMPLES_DEF_RAND_SEED) + acc + str(round(coverage))
+                                           + str(os.path.getsize(srcNoShortSeq))), readLen, insertSize, insertSD,
+                         count, count, count, count, srcNoShortSeq)
+
+                # define the logging file for stdout
+                stdoutLog = os.path.join(strainSimDir, '%s_art_log.txt' % count)
+                taskList.append(parallel.TaskCmd(cmd, strainSimDir, stdout=stdoutLog))
+                # print cmd
+                count += 1
 
     # generate all simulated reads, run the simulator in parallel
     parallel.reportFailedCmd(parallel.runCmdParallel(taskList, maxProc=comh.MAX_PROC))
 
 
-######
+def getReadStatAndQSCutoff(specDir):
+    """
+        Get read statistics and QS cutoff
+    """
+    print('Getting read statistics and QS cutoff')
+    # list of SAM and reference FASTA files to compute the statistics
+    fileTupleList = []
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+    # output profile file
+    outFilePathProfile = os.path.join(samplesDir, comh.SAMPLES_ERROR_PROFILE)
+    # output QS cutoff file
+    outFilePathQSCutoff = os.path.join(samplesDir, comh.SAMPLES_ERROR_QS_CUTOFF)
+
+    # collect all files to compute the statistics and QS cutoff
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        # get FASTA and SAM files for all libraries of one strain
+                        fastaD = {}
+                        samD = {}
+                        for f in os.listdir(strainDir):
+                            i = f.split('_', 1)[0]
+                            if i.isdigit():
+                                if f.endswith('.fna.gz'):
+                                    fastaD[int(i)] = os.path.join(strainDir, f)
+                                elif f.endswith('.sam.gz'):
+                                    samD[int(i)] = os.path.join(strainDir, f)
+                        assert len(samD) == len(fastaD)
+                        for i, fastaFilePath in fastaD.iteritems():
+                            samFilePath = samD[i]
+                            # store the files and param (SAM file path, reference FASTA file path, readLen, qsArrayLen)
+                            fileTupleList.append(
+                                (samFilePath, fastaFilePath, comh.ART_READ_LEN[i], comh.ART_QS_MAX[i]))
+    # compute the statistics (profile and QS cutoff)
+    sam.getErrorStatAndQSCutoff(fileTupleList, outFilePathProfile, outFilePathQSCutoff, maxCpu=comh.MAX_PROC)
+
+
+
+def _tmp():
+    # test ..
+    readLen = 100
+    qsArrayLen = 64
+    fq1 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_pair1.fq'
+    fq2 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_pair2.fq'
+    samFile = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_pair.sam'
+    # samFile = '/Users/ivan/Documents/nobackup/hsim01/562/samples/5/NZ_AIHP00000000/0_pair.sam'
+    fasFile = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_NZ_AIEZ00000000.fna'
+    # _getStatSam(samFile)
 
 
 # TODO: get the mapping !!!

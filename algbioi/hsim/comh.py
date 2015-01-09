@@ -26,6 +26,7 @@ import os
 import sys
 import re
 import tarfile
+# import numpy as np
 import multiprocessing as mp
 from algbioi.com import parallel
 
@@ -33,10 +34,13 @@ from algbioi.com import parallel
 SPECIES_LIST = ["562"]  # Escherichia coli, 562, species
 
 # Art simulator setting
-ART_READ_LEN = 100
-ART_INSERT_SIZE = 450  # try 180 and 5000
-ART_INSERT_SD = 25  # 5 and 50
-ART_MIN_SEQ_LEN = 350
+ART_READ_LEN = [100, 100]
+ART_INSERT_SIZE = [180, 5000] # 450  # try 180 and 5000
+ART_INSERT_SD = [18, 500]  # 5? and 50? "10 %"
+ART_MIN_SEQ_LEN = [350, 5000]
+ART_QS_MAX = [42, 42]  # maximum quality score
+
+
 
 # maximum number of CPUs to be used
 MAX_PROC = mp.cpu_count()
@@ -69,10 +73,12 @@ CLUSTER_MOTHUR_CWD = 'mothur_cwd'
 
 SAMPLES_DIR = 'samples'
 SAMPLES_DEF_FILE = 'samples_definitions.txt'  # individual sample definitions
+SAMPLES_ERROR_PROFILE = 'samples_error_profile.csv'
+SAMPLES_ERROR_QS_CUTOFF = 'samples_error_qs_cutoffs.csv'
 
-SAMPLES_DEF_STRAIN_COUNT_LIST = (3, 4, 5, 6, 7, 8, 9)  # (3,)  # (3, 4, 5, 6, 7, 8, 9)
+SAMPLES_DEF_STRAIN_COUNT_LIST = (3,)  # (3, 4, 5, 6, 7, 8, 9)
 SAMPLES_DEF_IDENTITY_CUTOFF = 0.002
-SAMPLES_DEF_MAX_SAMPLES_PER_CLUSTER = 3  # 1
+SAMPLES_DEF_MAX_SAMPLES_PER_CLUSTER = 1  # 3
 SAMPLES_DEF_RAND_SEED = 1
 SAMPLES_DEF_LOGNORM_MEAN = 1
 SAMPLES_DEF_LOGNORM_SD = 2

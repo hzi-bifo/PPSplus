@@ -23,6 +23,7 @@ import sys
 import os
 import re
 import types
+import gzip
 from Bio import SeqIO
 
 from algbioi.com.csv import OutFileBuffer
@@ -237,7 +238,10 @@ def fastaFileToDictWholeNames(filePath):
     seqIdToSeq = {}
     f = None
     try:
-        f = open(os.path.normpath(filePath), 'r')
+        if filePath.endswith('.gz'):
+            f = gzip.open(os.path.normpath(filePath))
+        else:
+            f = open(os.path.normpath(filePath), 'r')
     except Exception:
         print "Cannot open file:", filePath
         raise

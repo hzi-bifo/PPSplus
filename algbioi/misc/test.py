@@ -562,6 +562,21 @@ def getDuplicate():
         else:
             print 'k not in d2: ' + str(k)
 
+
+def getColumnAsList(filePath, colNum=0):
+    """
+        Reads a column of a file as a list.
+
+        @param filePath: input tab separated file
+        @param colNum: number of the column to be read (0 based)
+        @return: a particular column as a list
+    """
+    for i in open(filePath):
+        print i.split(maxsplit=colNum)
+    return None
+
+
+
 if __name__ == "__main__":
     #getListAcc()
     #filterRank()

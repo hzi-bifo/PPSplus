@@ -38,6 +38,7 @@ from algbioi.com import fasta as fas
 from algbioi.com import parallel
 from algbioi.com import rand
 from algbioi.com import sam
+from algbioi.com import fq
 from algbioi.hsim import comh
 
 
@@ -81,12 +82,19 @@ def _main():
         if False:
             getReadStatAndQSCutoff(specDir)
 
+        # join overlapping pair end reads
+        if True:
+            joinPairEndReads(specDir)
+
+        # filter reads given QS cutoffs
+        # if False:
+        #     filterReadsQS(specDir)
+
 
         # getGenesStat(specDir)  # check, put to a new module, gzip everything !!!
         # TODO: Get mapping (check: gzip.open) !!!
 
         ###
-
     taxonomy.close()
 
 
@@ -427,7 +435,7 @@ def genSimulatedReadsForSamples(specDir):
         # create the sample directory
         sampleDir = os.path.join(specDir, comh.SAMPLES_DIR, str(sampleId))
         if not os.path.isdir(sampleDir):
-           os.mkdir(sampleDir)
+            os.mkdir(sampleDir)
 
         # for each strain, define a run of the simulator
         for acc, coverage in zip(accList, abundanceList):
@@ -450,19 +458,29 @@ def genSimulatedReadsForSamples(specDir):
                 len(comh.ART_MIN_SEQ_LEN)
 
             count = 0
-            for readLen, insertSize, insertSD, minSeqLen in zip(comh.ART_READ_LEN, comh.ART_INSERT_SIZE,
-                                                                comh.ART_INSERT_SD, comh.ART_MIN_SEQ_LEN):
+            for readLen, insertSize, insertSD, minSeqLen, qProfile in zip(comh.ART_READ_LEN, comh.ART_INSERT_SIZE,
+                                                                comh.ART_INSERT_SD, comh.ART_MIN_SEQ_LEN,
+                                                                comh.ART_Q_PROFILE):
                 # filter out short sequences from the (draft) genome fasta files
                 srcNoShortSeq = os.path.join(strainSimDir, str(count) + '_' + os.path.basename(srcFna))
                 fas.cpSeqNoShortSeq(srcFna, srcNoShortSeq, minSeqLen)
 
+                # use a particular error profile
+                qP1, qP2 = qProfile
+                if qP1 is not None:
+                    qP1 = ' -1 %s ' % qP1
+                else:
+                    qP1 = ''
+                if qP2 is not None:
+                    qP2 = ' -2 %s ' % qP2
+
                 # define the read generation command
-                cmd = "%s -i %s -f %s -rs %s -l %s -m %s -s %s -p -o %s_pair -na -sam; " \
+                cmd = "%s -i %s -f %s -rs %s -l %s -m %s -s %s -p -o %s_pair -na -sam %s %s; " \
                       "gzip %s_pair1.fq; gzip %s_pair2.fq; gzip %s_pair.sam; gzip %s" \
                       % (comh.ART_ILLUMINA_BINARY, srcNoShortSeq, coverage,
                          rand.strToRandInt(str(comh.SAMPLES_DEF_RAND_SEED) + acc + str(round(coverage))
                                            + str(os.path.getsize(srcNoShortSeq))), readLen, insertSize, insertSD,
-                         count, count, count, count, srcNoShortSeq)
+                         count, qP1, qP2, count, count, count, srcNoShortSeq)
 
                 # define the logging file for stdout
                 stdoutLog = os.path.join(strainSimDir, '%s_art_log.txt' % count)
@@ -516,6 +534,118 @@ def getReadStatAndQSCutoff(specDir):
     # compute the statistics (profile and QS cutoff)
     sam.getErrorStatAndQSCutoff(fileTupleList, outFilePathProfile, outFilePathQSCutoff, maxCpu=comh.MAX_PROC)
 
+
+def joinPairEndReads(specDir):
+    """
+        Join overlapping pair end reads.
+    """
+    print('Joining overlapping pair end reads.')
+
+    # collect all libraries with overlapping reads
+    librarySet = set()
+    for i in range(len(comh.ART_INSERT_SD)):
+        if (comh.ART_INSERT_SIZE[i] + comh.ART_INSERT_SD[i]) < 2 * comh.ART_READ_LEN[i]:
+            librarySet.add(i)
+
+    # collect files for the joining
+    fileTupleList = []
+
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect all files to join the reads
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        # get fq1 and fq2 files for all libraries of one strain
+                        fq1D = {}
+                        fq2D = {}
+                        for f in os.listdir(strainDir):
+                            i = f.split('_', 1)[0]
+                            if i.isdigit() and (int(i) in librarySet):
+                                if f.endswith('pair1.fq.gz'):
+                                    fq1D[int(i)] = os.path.join(strainDir, f)
+                                elif f.endswith('pair2.fq.gz'):
+                                    fq2D[int(i)] = os.path.join(strainDir, f)
+                        assert len(fq1D) == len(fq2D)
+                        for i, fq1Path in fq1D.iteritems():
+                            fq2Path = fq2D[i]
+                            fqJoinPath = os.path.join(os.path.dirname(fq1Path), '%s_join.fq.gz' % i)
+                            # store the files and param (fq1, fq2, fqJoin, readLen, insert, sd, qsMax)
+                            fileTupleList.append(
+                                (fq1Path, fq2Path, fqJoinPath, comh.ART_READ_LEN[i], comh.ART_INSERT_SIZE[i],
+                                 comh.ART_INSERT_SD[i], comh.ART_QS_MAX[i]))
+    # join pair end reads
+    r = fq.joinPairEnd(fileTupleList,
+                       minOverlap=comh.SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP,
+                       minOverlapIdentity=comh.SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY)
+    print("Not joined: %s %%" % r)
+
+
+def filterReadsQS(specDir):
+    """
+        Filter reads according to the QS cutoffs
+        @attention: TODO: not ready yet !
+    """
+    assert False  # TODO: not ready yet !
+    print("Filtering reads according to the QS cutoffs")
+
+    # get the QS cutoff arrays for each library
+    qsArrayD = {}
+    for cutoff, readLen, i in zip(comh.SAMPLES_READ_TRIM_CUTOFFS, comh.ART_READ_LEN, range(len(comh.ART_READ_LEN))):
+        qsArrayD[i] = sam.readCutoffArray(os.path.join(specDir, comh.SAMPLES_DIR, comh.SAMPLES_ERROR_QS_CUTOFF),
+                                          cutoff, readLen)
+
+    # list of (pair1.fq, pair2.fq, filtered.fq, qsArray, readLen, trimRemain)
+    fileTupleList = []
+
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect all pairs of (fq1, fq2) files, define the output file
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        # get fq1 and fq2 files for all libraries of one strain
+                        fq1D = {}
+                        fq2D = {}
+                        for f in os.listdir(strainDir):
+                            i = f.split('_', 1)[0]
+                            if i.isdigit():
+                                if f.endswith('1.fq.gz'):
+                                    fq1D[int(i)] = os.path.join(strainDir, f)
+                                elif f.endswith('2.fq.gz'):
+                                    fq2D[int(i)] = os.path.join(strainDir, f)
+                        assert len(fq1D) == len(fq2D)
+                        for i, fq1 in fq1D.iteritems():
+                            fq2 = fq2D[i]
+                            # store the files and param (pair1.fq, pair2.fq, filtered.fq, qsArray, readLen, trimRemain)
+                            fileTupleList.append((fq1, fq2, os.path.join(os.path.dirname(fq1),
+                                                                         '%s_filtered_qs.fq.gz' % i),
+                                                                         qsArrayD[i], comh.ART_READ_LEN[i],
+                                                                         comh.SAMPLES_READ_TRIM_REMAIN[i]))
+    # filter reads according to the QS cutoffs
+    fq.qsFilter(fileTupleList)
+
+
+    # SAMPLES_READ_TRIM_CUTOFFS = [0.07, 0.07]
+    # ART_READ_LEN = [100, 100]
+    # SAMPLES_ERROR_QS_CUTOFF = 'samples_error_qs_cutoffs.csv'
+    # implement in the SAM file
+
+    # define it as a task.. create com. fq.py !!! implementing the reading from fq and filtering
+
+    # output filtering report..
 
 
 def _tmp():
@@ -580,15 +710,6 @@ def getGenesStat(specDir):
     #
     # print geneCount
     # print count
-
-
-
-
-
-
-
-
-
 
 def fun():
     specList = ["562"]

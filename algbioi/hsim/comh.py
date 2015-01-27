@@ -35,12 +35,18 @@ SPECIES_LIST = ["562"]  # Escherichia coli, 562, species
 
 # Art simulator setting
 ART_READ_LEN = [100, 100]
-ART_INSERT_SIZE = [180, 5000] # 450  # try 180 and 5000
-ART_INSERT_SD = [18, 500]  # 5? and 50? "10 %"
-ART_MIN_SEQ_LEN = [350, 5000]
-ART_QS_MAX = [42, 42]  # maximum quality score
-
-
+ART_INSERT_SIZE = [150, 5000] # 450  # try 180 and 5000
+ART_INSERT_SD = [15, 500]  # 5? and 50? "10 %"
+ART_MIN_SEQ_LEN = [200, 5000]
+ART_QS_MAX = [60, 60]  # maximum quality score
+if sys.platform == 'darwin':
+    ART_Q_PROFILE = [('/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR1.txt',
+                      '/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR2.txt'),
+                     ('/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR1.txt',
+                      '/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR2.txt')]
+else:
+    assert False
+    # TODO: add paths on the system
 
 # maximum number of CPUs to be used
 MAX_PROC = mp.cpu_count()
@@ -84,6 +90,14 @@ SAMPLES_DEF_LOGNORM_MEAN = 1
 SAMPLES_DEF_LOGNORM_SD = 2
 SAMPLES_DEF_MIN_COVERAGE = 1
 SAMPLES_DEF_MAX_COVERAGE = 50
+
+# for read filtering .. not used?
+SAMPLES_READ_TRIM_CUTOFFS = [0.25, 0.25]  # for each library: levels at which the QS cutoffs will be considered
+SAMPLES_READ_TRIM_REMAIN = [0.5, 0.5]  # this continuous part of a read must remain, else it's thrown away
+
+# joining pair end
+SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP = 0.05
+SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY = 0.9
 
 # Binary locations
 if sys.platform == 'darwin':

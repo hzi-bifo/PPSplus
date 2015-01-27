@@ -140,7 +140,7 @@ def getErrorStatAndQSCutoff(inFileTupleList, outFilePathProfile, outFilePathQSCu
             pqe = pqeD[readLen]
             pqa = pqaD[readLen]
             # compute qs cutoff for different error cutoffs
-            for cutoff in np.arange(0.01, 0.202, 0.002):
+            for cutoff in np.arange(0.01, 1.002, 0.002):
                 line = [str(readLen), str(cutoff), str(None)]
                 support = sys.maxint
                 # different positions
@@ -162,6 +162,41 @@ def getErrorStatAndQSCutoff(inFileTupleList, outFilePathProfile, outFilePathQSCu
                     line[2] = str(round((float(support) / float(readCountD[readLen])) * 100., 2))
                 out.writeText(', '.join(line) + '\n')
         out.close()
+
+
+def readCutoffArray(cutoffFile, cutoff, readLen):
+    """
+        For each read position, get min QS, s.t. the probability of error at this position is at most cutoff (in %).
+
+        @param cutoffFile: file containing QS cutoffs for different errors and read lengths
+        @param cutoff: max error (%) allowed per read position
+        @return: array of min QS for each read position corresponding to the given error (or None)
+    """
+    lastLine = None
+    for line in open(cutoffFile):
+        line = line.strip()
+        # line not a comment or empty string
+        if not line.startswith('#') and len(line) != 0:
+            readLenF, cutoffF, supportF, valF = line.split(',', 3)
+            cutoffF = float(cutoffF)
+            # correct readLen, support for all read positions defined
+            if int(readLenF) == readLen and supportF.strip() != 'None':
+                # the entry corresponding to the cutoff found
+                if np.isclose(float(cutoffF), cutoff):
+                    return np.array(map(lambda x: int(x), valF.split(',')), dtype=np.uint16)
+                # the entry corresponding to the exact cutoff not found, take the last (more strict) one
+                elif cutoffF > cutoff:
+                    # take the previous one
+                    if lastLine is None:
+                        return None
+                    else:
+                        readLenF, cutoffF, supportF, valF = lastLine.split(',', 3)
+                        sys.stderr.write('sam.readCutoffArray: cutoff %s instead of %s taken' % (cutoffF, cutoff))
+                        return np.array(map(lambda x: int(x), valF.split(',')), dtype=np.uint16)
+                else:
+                    lastLine = line
+    # no suitable entry found
+    return None
 
 
 def _getErrorMAllMReadCount(samFilePath, fastaFilePath, readLen, qsArrayLen):

@@ -25,6 +25,9 @@ import numpy as np
 import parallel
 import fasta as fas
 import csv
+import fq
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
 
 
 def getErrorStatAndQSCutoff(inFileTupleList, outFilePathProfile, outFilePathQSCutoff=None, maxCpu=2):
@@ -230,7 +233,7 @@ def _getErrorMAllMReadCount(samFilePath, fastaFilePath, readLen, qsArrayLen):
         cigarSymbolCharList = ['=', 'X', 'I', 'D']
 
         if samFilePath.endswith('.gz'):
-            samOpen = gzip.open(samFilePath)
+            samOpen = gzip.open(samFilePath, mode='r')
         else:
             samOpen = open(samFilePath)
         for line in samOpen:
@@ -322,15 +325,21 @@ def _getProfilePrint(pqe, pqa, qsArrayLen, readLen, readCount):
         @param pqe: error matrix (a number of reads having an error at this position and QS)
         @param pqa: all matrix (a number of all reads having this QS at this position)
         @param qsArrayLen: length of quality scores (i.e. QS ~ 0 .. max quality score - 1)
+        @param readCount: a readCount (or None then the counts are taken from the first row of pqa representing
+        all counts at that position)
         @rtype: str
     """
     lineList = []
     for i in range(qsArrayLen):
         line = ""
         for j in range(readLen):
+            if readCount is None:
+                rc = pqa[0][j]
+            else:
+                rc = readCount
             if pqa[i][j] > 0:
                 line += '%s : %s, ' % (round((float(pqe[i][j]) / float(pqa[i][j])) * 100., 3),
-                                       round((float(pqa[i][j]) / float(readCount)) * 100., 1))
+                                       round((float(pqa[i][j]) / float(rc)) * 100., 1))
             else:
                 line += ', '
                 assert pqe[i][j] == pqa[i][j] == 0
@@ -338,11 +347,397 @@ def _getProfilePrint(pqe, pqa, qsArrayLen, readLen, readCount):
     return '\n'.join(lineList)
 
 
-def getMatrixList(rowNum, colNum, matrixCount=1):
+def getMatrixList(rowNum, colNum, matrixCount=1, dtype=np.int64):
     """
         Get a list of zeroed matrices of the same given dimensions.
     """
     matrixList = []
     for e in range(matrixCount):
-        matrixList.append(np.zeros((rowNum, colNum), dtype=np.int64))
+        matrixList.append(np.zeros((rowNum, colNum), dtype=dtype))
     return matrixList
+
+
+def createSamFileForJoinedPairEndReads(fileTupleList, maxCpu):
+    """
+        Create a SAM files for all joined pair-end reads given a FASTQ file with joined pair end reads,
+        a SAM file for the pair-end reads and an output SAM file.
+
+        @param fileTupleList: a list of tuples (fqJoinPath, pairEndSamPath, joinSamPath)
+        @return: sum of the number of entries in the resulting SAM files
+    """
+    taskList = []
+    for fqJoinPath, pairEndSamPath, joinSamPath in fileTupleList:
+        taskList.append(parallel.TaskThread(_createSamForJoinedReads, (fqJoinPath, pairEndSamPath, joinSamPath)))
+
+    rl = parallel.runThreadParallel(taskList, maxThreads=maxCpu)
+    return sum(rl)
+
+
+def _createSamForJoinedReads(fqJoinPath, pairEndSamPath, joinSamPath):
+    """
+        Create a SAM file for the joined pair end reads
+
+        @param fqJoinPath: FASTQ file with joined pair-end reads
+        @param pairEndSamPath: a SAM file for the pair-end reads
+        @param joinSamPath: output file path for the resulting SAM file
+        @return: number of entries in the output SAM file
+    """
+    try:
+        # open SAM file for pair-end reads reading
+        if pairEndSamPath.endswith('.gz'):
+            samGen = gzip.open(pairEndSamPath, mode='r')
+        else:
+            samGen = open(pairEndSamPath)
+
+        # open SAM file for writing
+        samOut = fq.WriteFq(joinSamPath)
+
+        # Write the header of the input SAM file to the output SAM file
+        for line in samGen:
+            if line.startswith('@PG'):
+                break
+
+        # for each entry in the FASTQ file containing joined reads, write a mapping entry to the out SAM file
+        count = 0
+        for name, dna, p, qs in fq.ReadFqGen(fqJoinPath):
+            name = name.lstrip('@')
+            seg1Tokens = None
+            seg2Tokens = None
+
+            # find corresponding entries for the segment 1 and 2 of the joined reads
+            while True:
+                seg1Tokens = samGen.next().split('\t', 4)
+                seg2Tokens = samGen.next().split('\t', 4)
+                if seg1Tokens[0] == name:
+                    assert seg1Tokens[0] == seg2Tokens[0], str(seg1Tokens[0] + ' ' + seg2Tokens[0])
+                    break
+
+            # QNAME
+            qName = name
+
+            # get segment flags
+            flagSeg1 = int(seg1Tokens[1])
+            flagSeg2 = int(seg2Tokens[1])
+
+            assert flagSeg1 & 0x40 != 0  # first segment
+            assert flagSeg2 & 0x80 != 0  # last segment
+
+            # reverse complement
+            if flagSeg1 & 0x10 == 0:
+                revCompl = False
+            else:
+                revCompl = True
+
+            # FLAG
+            flag = 0
+            flag += 0x2  # segment properly aligned
+            flag += 0x4  # segment mapped
+            if revCompl:
+                flag += 0x10
+            flag += 0x40  # first segment in the tamplate
+
+            # RNAME
+            rname = seg1Tokens[2]
+            assert rname == seg2Tokens[2]
+
+            # POS (1based, left most)
+            if revCompl:
+                pos = seg2Tokens[3]
+            else:
+                pos = seg1Tokens[3]
+
+            mapq = 255  # MAPQ (mapping quality not available)
+            cigar = '*'  # CIGAR not available
+            rnext = '*'  # RNEXT not available
+            pnext = 0  # PNEXT not available
+
+            if revCompl:
+                tlen = - len(dna)  # TLEN tamplate size
+            else:
+                tlen = len(dna)
+            seq = '*'  # SEQ not stored
+            qual = '*'  # QUAL not stored
+
+            # write an entry to the SAM file
+            entry = str('%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n'
+                        % (qName, flag, rname, pos, mapq, cigar, rnext, pnext, tlen, seq, qual))
+            samOut.write(entry)
+            count += 1
+
+        # close files, important for the writing !!!
+        samOut.close()
+        samGen.close()
+
+    # Catch any exception
+    except Exception as e:
+        print type(e)
+        print e.message
+        print e.args
+        raise e
+    return count
+
+
+def getJoinedReadStat(fileTupleList, profileOutPath, maxCpu=2):
+    """
+        Compute error profile for the joined pair-end reads, for different read lengths.
+        The error profile corresponds to the situation as if we considered both joined reads as if they were disjoined.
+
+        @param fileTupleList: list of (refPath, fqJoinedPath, samPath, readLen, qsMax)
+        @param profileOutPath: resulting file path containing the error profiles
+    """
+    # _checkSamEntryNum(fileTupleList)
+    # _checkfqEntryNum(fileTupleList)
+    taskList = []
+    readLenSet = set()  # set of different (pair-end) read lengths being considered
+    readLenToQsMax = {}  # map readLen to a max QS
+
+    # define tasks - to compute error for each FASTQ file
+    for refPath, fqJoinedPath, samPath, readLen, qsMax in fileTupleList:
+        taskList.append(parallel.TaskThread(_getErrorMJoinedRead, (refPath, fqJoinedPath, samPath, readLen, qsMax)))
+        readLenSet.add(readLen)
+        if readLen not in readLenToQsMax:
+            readLenToQsMax[readLen] = qsMax
+        elif qsMax > readLenToQsMax[readLen]:
+            readLenToQsMax[readLen] = qsMax
+
+    # compute the error in parallel
+    rValList = parallel.runThreadParallel(taskList, maxCpu)
+
+    # get empty matrices for each read length
+    pqeD = {}  # error count (for a particular read length [QS][position])
+    pqaD = {}  # all count (for a particular read length)
+    errorSumD = {}
+    allPairSumD = {}
+    readCountD = {}
+    readCountTotal = 0
+    for readLen in readLenSet:
+        pqeD[readLen], pqaD[readLen] = getMatrixList(readLenToQsMax[readLen], readLen, matrixCount=2, dtype=np.float64)
+        errorSumD[readLen] = 0.
+        allPairSumD[readLen] = 0.
+        readCountD[readLen] = 0.
+
+    # sum up all matrices
+    for pqe, pqa, readLen, qsMax, error, allPair, readCount in rValList:
+        pqeS = pqeD[readLen]
+        pqaS = pqaD[readLen]
+        for i in range(qsMax):
+            for j in range(readLen):
+                pqeS[i][j] += pqe[i][j]
+                pqaS[i][j] += pqa[i][j]
+        errorSumD[readLen] += error
+        allPairSumD[readLen] += allPair
+        readCountD[readLen] += readCount
+        readCountTotal += readCount
+
+    # compute cumulative values
+    for readLen in readLenSet:
+        pqeS = pqeD[readLen]
+        pqaS = pqaD[readLen]
+        for i in range(readLenToQsMax[readLen] - 2, -1, -1):
+            for j in range(readLen):
+                pqeS[i][j] += pqeS[i+1][j]
+                pqaS[i][j] += pqaS[i+1][j]
+
+    # compute cumulative values row-wise (for each row ~ QS, get two values: error and allPair ), for each readLen
+    rowCumulErrorD = {}
+    rowCumulAllD = {}
+    for readLen in readLenSet:
+        qsMax = readLenToQsMax[readLen]
+        errorA = np.zeros(qsMax, dtype=np.float64)
+        allA = np.zeros(qsMax, dtype=np.float64)
+        rowCumulErrorD[readLen] = errorA
+        rowCumulAllD[readLen] = allA
+        pqeS = pqeD[readLen]
+        pqaS = pqaD[readLen]
+        for i in range(qsMax):
+            for j in range(readLen):
+                errorA[i] += pqeS[i][j]
+                allA[i] += pqaS[i][j]
+
+    # output profiles to a file
+    out = csv.OutFileBuffer(profileOutPath)
+
+    for readLen in readLenSet:
+        qsMax = readLenToQsMax[readLen]
+        error = errorSumD[readLen]
+        allPair = allPairSumD[readLen]
+        errorA = rowCumulErrorD[readLen]
+        allA = rowCumulAllD[readLen]
+        pqeS = pqeD[readLen]
+        pqaS = pqaD[readLen]
+
+        # write overall error
+        out.writeText('# Overall Substitution error (readLen: %s)\n' % readLen)
+        out.writeText('%s\n' % round((float(error) / float(allPair)) * 100., 3))
+        out.writeText('-\n')
+
+        # write error per QS cumulative (and readLen)
+        out.writeText('# Substitution error per QS cumul. (readLen %s)\n' % readLen)
+        out.writeText('QS, ' + ', '.join(map(lambda x: str(x), range(qsMax))) + '\n')
+        out.writeText('Error %, ' + ', '.join(map(lambda (x, y): str(round((x / y) * 100., 3)), zip(errorA, allA))))
+        out.writeText('\n-\n')
+
+        # write cumulative error
+        out.writeText('# Cumulative error (readLen: %s)\n' % readLen)
+        out.writeText(_getProfilePrint(pqeS, pqaS, qsMax, readLen, None))
+        out.writeText('\n-\n')
+
+    out.close()
+    return readCountTotal
+
+
+def _checkSamEntryNum(fileTupleList):  # a test function
+    count = 0
+    for refPath, fqJoinedPath, samPath, readLen, qsMax in fileTupleList:
+        print samPath
+        for line in gzip.open(samPath, mode='r'):
+            if not line.startswith('@'):
+                count += 1
+    print count
+
+
+def _checkfqEntryNum(fileTupleList):  # a test function
+    count = 0
+    for refPath, fqJoinedPath, samPath, readLen, qsMax in fileTupleList:
+        for e in fq.ReadFqGen(fqJoinedPath):
+            count += 1
+
+    print count
+
+
+def _getErrorMJoinedRead(refPath, fqJoinedPath, samPath, readLen, qsMax):
+    """
+        Compute the error profile for joined pair-end reads.
+
+        @param refPath: FASTA file containing the reference sequences
+        @param fqJoinedPath: FASTAQ file containing joined pair-end reads
+        @param samPath: corresponding SAM file
+        @param readLen: pair-end read length (not the joint read length!)
+        @param qsMax: maximum QS
+        @return: tuple (pqe, pqa, readLen, qsMax, error, allPair, readCount)
+    """
+    try:
+        # get two zeroed matrices
+        pqe, pqa = getMatrixList(qsMax, readLen, matrixCount=2, dtype=np.float64)
+
+        # read in reference sequences
+        seqNameToSeq = fas.fastaFileToDictWholeNames(refPath)
+
+        # open a SAM file for reading
+        if samPath.endswith('.gz'):
+            samGen = gzip.open(samPath, mode='r')
+        else:
+            samGen = open(samPath)
+
+        # open FASTQ file with joined pair-end reads
+        fqReadGen = fq.ReadFqGen(fqJoinedPath)
+
+        # read a SAM file line by line
+        error = 0.  # all mismatches found (in the overlapping regions, counts as + 0.5, not +1)
+        allPair = 0.  # all total counts
+        readCount = 0.
+        for line in samGen:
+            # skip SAM comments
+            if line.startswith('@'):
+                continue
+
+            # read the SAM file fields
+            tokens = line.split('\t', 4)
+            if len(tokens) != 5:
+                break
+            qName = tokens[0]
+            flag = int(tokens[1])
+            rName = tokens[2]
+            pos = int(tokens[3]) - 1
+            if flag & 0x10 == 0:
+                revCompl = False
+            else:
+                revCompl = True
+
+            # read in a joined pair-end read (@name, DNA string, +, QS string)
+            name, dna, p, qs = fqReadGen.next()
+
+            # remove trailing white space
+            name = name[1:].strip()  # remove starting @
+            dna = dna.rstrip()
+            dnaLen = len(dna)
+            qs = qs.rstrip()
+            assert len(dna) == len(qs)
+            assert name == qName
+
+            # get the reference sequence
+            refSeq = seqNameToSeq[rName]
+            refSeq = refSeq[pos:(pos + dnaLen)]
+            # consider reverse complement of the reference
+            if revCompl:
+                refSeq = str(Seq(refSeq, generic_dna).reverse_complement())
+
+            # segment 1
+            dnaS1 = dna[:readLen]
+            qsS1 = qs[:readLen]
+            refS1 = refSeq[:readLen]
+
+            # segment 2
+            dnaS2 = dna[dnaLen - readLen:]
+            qsS2 = qs[dnaLen - readLen:]
+            refS2 = refSeq[dnaLen - readLen:]
+            assert len(dnaS1) == len(dnaS2) == readLen, str(dnaS1 + ' ' + dnaS2 + ' ' + str(readLen))
+
+            # compute errors and occurrences at positions [QS][0..readLen-1] (count only as +0.5 if overlapping region)
+            j = readLen - 1
+            plus = 1.
+            for i in range(readLen):
+                if i == dnaLen - readLen:  # i and j going over the overlapping regions
+                    plus = 0.5
+                # segment 1
+                qsValS1 = ord(qsS1[i]) - 33
+                if dnaS1[i] != refS1[i]:
+                    pqe[qsValS1][i] += plus
+                    error += plus
+                pqa[qsValS1][i] += plus
+
+                # segment 2
+                qsValS2 = ord(qsS2[j]) - 33
+                if dnaS2[j] != refS2[j]:
+                    pqe[qsValS2][i] += plus
+                    error += plus
+                pqa[qsValS2][i] += plus
+
+                allPair += 2 * plus
+                j -= 1
+            assert j == -1
+            readCount += 1.
+        samGen.close()
+
+    # Catch any exception
+    except Exception as e:
+        print type(e)
+        print e.message
+        print e.args
+        raise e
+
+    return pqe, pqa, readLen, qsMax, error, allPair, readCount
+
+
+def _testJoinedReadsStat():
+
+    print getJoinedReadStat([('/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017635/0_NC_017635.fna.gz',
+                              '/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017635/0_join.fq.gz',
+                              '/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017635/0_join.sam.gz', 100, 60),
+                             ('/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017660/0_NC_017660.fna.gz',
+                              '/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017660/0_join.fq.gz',
+                              '/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017660/0_join.sam.gz', 100, 60)],
+                            '/Users/ivan/Documents/nobackup/hsim01/562/samples/samples_join_error_profile.csv')
+    pass
+
+
+def _testSamForJoinedReads():
+    print _createSamForJoinedReads('/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017660/0_join.fq.gz',
+                                   '/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017660/0_pair.sam.gz',
+                                   '/Users/ivan/Documents/nobackup/hsim01/562/samples/9/NC_017660/0_join.sam.gz')
+
+
+if __name__ == "__main__":
+    # _testSamForJoinedReads()
+    # _testJoinedReadsStat()
+    pass

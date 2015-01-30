@@ -37,7 +37,7 @@ class ReadFqGen():
         """
         if fqFilePath.strip().endswith('.gz'):
             # reading from a compressed file
-            self._fqOpen = gzip.open(fqFilePath)
+            self._fqOpen = gzip.open(fqFilePath, mode='r')
         else:
             self._fqOpen = open(fqFilePath)
 
@@ -75,7 +75,7 @@ class WriteFq():
             @param blockSize: writing large blocks to a gzipped file is much faster than writing entry by entry
         """
         if fqFileOut.endswith('.gz'):
-            self._outFq = gzip.open(fqFileOut, 'wb', compressLevel)
+            self._outFq = gzip.open(fqFileOut, 'w', compressLevel)
         else:
             self._outFq = open(fqFileOut, 'w')
         self._blocks = []
@@ -311,7 +311,7 @@ def _testJoin():
     fileTupleList = (('/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_pair1.fq.gz',
                       '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_pair2.fq.gz',
                       '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_join.fq.gz',
-                      100, 150, 60),)
+                      100, 150, 15, 60),)
     print joinPairEnd(fileTupleList)
     # a = DnaOverlapConcensus()
 

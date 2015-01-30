@@ -81,6 +81,7 @@ SAMPLES_DIR = 'samples'
 SAMPLES_DEF_FILE = 'samples_definitions.txt'  # individual sample definitions
 SAMPLES_ERROR_PROFILE = 'samples_error_profile.csv'
 SAMPLES_ERROR_QS_CUTOFF = 'samples_error_qs_cutoffs.csv'
+SAMPLES_JOIN_ERROR_PROFILE = 'samples_join_error_profile.csv'
 
 SAMPLES_DEF_STRAIN_COUNT_LIST = (3,)  # (3, 4, 5, 6, 7, 8, 9)
 SAMPLES_DEF_IDENTITY_CUTOFF = 0.002

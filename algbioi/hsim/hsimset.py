@@ -82,9 +82,17 @@ def _main():
         if False:
             getReadStatAndQSCutoff(specDir)
 
-        # join overlapping pair end reads
-        if True:
+        # join overlapping pair-end reads
+        if False:
             joinPairEndReads(specDir)
+
+        # create a SAM file for the joined pair-end reads
+        if False:
+            createSamFileForJoinedPairEndReads(specDir)
+
+        # compute error profile for the joined pair-end reads
+        if True:
+            getJoinedReadsStat(specDir)
 
         # filter reads given QS cutoffs
         # if False:
@@ -583,8 +591,87 @@ def joinPairEndReads(specDir):
     # join pair end reads
     r = fq.joinPairEnd(fileTupleList,
                        minOverlap=comh.SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP,
-                       minOverlapIdentity=comh.SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY)
+                       minOverlapIdentity=comh.SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY,
+                       maxCpu=comh.MAX_PROC)
     print("Not joined: %s %%" % r)
+
+
+def createSamFileForJoinedPairEndReads(specDir):
+    """
+        Create SAM files for the joined pair-end reads.
+    """
+    print('Creating SAM files for the joined pair-end reads')
+    # all files for the SAM files creation
+    fileTupleList = []
+
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect all files for the SAM files creation
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        for f in os.listdir(strainDir):
+                            i, name = f.split('_', 1)
+                            if i.isdigit() and name.startswith('join'):
+                                fqJoinPath = os.path.join(strainDir, f)
+                                pairEndSamPath = os.path.join(strainDir, '%s_pair.sam.gz' % i)
+                                joinSamPath = os.path.join(strainDir, "%s_join.sam.gz" % i)
+                                assert os.path.isfile(pairEndSamPath)
+                                fileTupleList.append((fqJoinPath, pairEndSamPath, joinSamPath))
+    # create SAM files for all joined pair end reads
+    r = sam.createSamFileForJoinedPairEndReads(fileTupleList, maxCpu=comh.MAX_PROC)
+    print('SAM files for "%s" joined pair end reads created' % r)
+
+
+def getJoinedReadsStat(specDir):
+    """
+        Compute error profile for the joined pair-end reads.
+
+    """
+    print("Computing error profile for the joined pair-end reads.")
+    # all files for the error profile computation
+    fileTupleList = []
+
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect all files for the error profile computation (refPath, fqJoinedPath, samPath, readLen)
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        for f in os.listdir(strainDir):
+                            i, name = f.split('_', 1)
+                            if i.isdigit() and name.endswith('.fna.gz'):
+                                refPath = os.path.join(strainDir, f)
+                                fqJoinPath = os.path.join(strainDir, '%s_join.fq.gz' % i)
+                                if os.path.isfile(fqJoinPath):
+                                    joinSamPath = os.path.join(strainDir, '%s_join.sam.gz' % i)
+                                    assert os.path.isfile(joinSamPath)
+                                    fileTupleList.append((refPath, fqJoinPath, joinSamPath,
+                                                          comh.ART_READ_LEN[int(i)], comh.ART_QS_MAX[int(i)]))
+    # compute error profiles
+    rc = sam.getJoinedReadStat(fileTupleList, os.path.join(samplesDir, comh.SAMPLES_JOIN_ERROR_PROFILE), comh.MAX_PROC)
+    print('Statistics for "%s" joined pair-end reads counted' % rc)
+
+
+# def getGeneMapping(specDir):
+#     """
+#         Getting gene mapping for the reads.
+#     """
+#     print('Getting gene mapping for the reads.')
+#     pass
+
 
 
 def filterReadsQS(specDir):

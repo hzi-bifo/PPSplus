@@ -52,7 +52,7 @@ import os
 import sys
 import signal
 import string
-import subprocess
+# import subprocess
 import shutil
 
 from Bio import SeqIO
@@ -61,7 +61,7 @@ from Bio.Seq import Seq
 from algbioi.com import csv
 from algbioi.com import fasta
 from algbioi.com import common
-
+from algbioi.com import parallel
 
 def printStatDbk():
     """
@@ -164,10 +164,14 @@ def mergeSequences(mapFilePathList, fastaFilePathList, outputDir):
         seqCount = 0
         storedSeqCount = 0
 
-        seqIdToSeq = fasta.fastaFileToDict(fastaFilePath)
+        # seqIdToSeq = fasta.fastaFileToDict(fastaFilePath)
         seqIdToNcbidList = csv.getMapping(mapFilePath, 0, 1, sep='\t', comment='#')
 
-        for seqId, seq in seqIdToSeq.iteritems():
+        # for seqId, seq in seqIdToSeq.iteritems():
+        for record in SeqIO.parse(fastaFilePath, "fasta"):
+            seqId = str(record.id)
+            seq = str(record.seq)
+
             seqCount += 1
             if seqId in seqIdSet:
                 totalIdenticalSeqCount += 1
@@ -185,7 +189,7 @@ def mergeSequences(mapFilePathList, fastaFilePathList, outputDir):
             taxonIdToOutBuffer[taxonId].close()
             storedSeqCount += 1
 
-            if len(string.replace(common.noNewLine(seq),'N','')) == 0:
+            if len(string.replace(common.noNewLine(seq), 'N', '')) == 0:
                 print 'zeros', seqId, fastaFilePath, len(common.noNewLine(seq))
 
         # for buff in taxonIdToOutBuffer.values():
@@ -225,14 +229,19 @@ def sortSeqDesc(usearch5, usearch6, mergedDir, sortedDir, mapFilePathList):
 
     # sort sequences, longer first
     for inFile, outFile in zip(inFilePathList, sortedFilePathList):
-        sortCmd = str(usearch5 + ' -sort ' + inFile + ' -output ' + outFile + ' --maxlen ' + str(int(getMaxLen(inFile) + 1000)) + ' --minlen 10')
+        if os.path.isfile(inFile):
+            fasta.sortSeqDesc(inFile, outFile)
+        else:
+            print('File does not exist: %s' % inFile)
+        # sortCmd = str(usearch5 + ' -sort ' + inFile + ' -output ' + outFile + ' --maxlen ' + str(int(getMaxLen(inFile) + 1000)) + ' --minlen 10')
         #sortCmd = str(usearch6 + ' -sortbylength ' + inFile + ' -output ' + outFile) # + ' -maxqt ' + str(int(getMaxLen(inFile))))
-        print sortCmd
-        sortProc = subprocess.Popen(sortCmd, shell=True, cwd=os.path.dirname(usearch6), bufsize=-1)
-        sortProc.wait()
-        if sortProc.returncode != 0:
-            sys.stderr.write(str('Cmd: ' + sortCmd + ' ended with return code: ' + str(sortProc.returncode) + '\n'))
-            return
+
+        # print sortCmd
+        # sortProc = subprocess.Popen(sortCmd, shell=True, cwd=os.path.dirname(usearch6), bufsize=-1)
+        # sortProc.wait()
+        # if sortProc.returncode != 0:
+        #     sys.stderr.write(str('Cmd: ' + sortCmd + ' ended with return code: ' + str(sortProc.returncode) + '\n'))
+        #     return
     print 'sequences sorted'
 
 
@@ -249,8 +258,15 @@ def toCentroids(sortedDir, centroidsDir, mapFilePathList):
         centroidsFilePathList.append(os.path.join(centroidsDir, str(str(taxonId) + '.fna')))
 
     # get centroids
+    taskList = []
     for inFile, outFile in zip(sortedFilePathList, centroidsFilePathList):
-        getSeeds(inFile, outFile)
+        if os.path.isfile(inFile):
+            taskList.append(parallel.TaskThread(getSeeds, (inFile, outFile)))
+            # getSeeds(inFile, outFile)
+        else:
+            print('File does not exist: %s' % inFile)
+
+    parallel.runThreadParallel(taskList)
 
         # cdHit = None  # '/net/metagenomics/projects/PPSmg/tools/cd-hit-v4.6.1-2012-08-27$ ./cd-hit-est'
         # usearch1 = None  # '/net/programs/Debian-6.0-x86_64/uclust-1.1.579/uclust'
@@ -317,9 +333,9 @@ def filterOutSequencesBatch(taxonIdSet, srcDir, dstDir, notAllowedSeqIdSet):
 
         seqIdDict = fasta.getSequenceToBpDict(srcFilePath)
         allowedNamesSet = set()
-        for id in seqIdDict.iterkeys():
-            if id not in notAllowedSeqIdSet:
-                allowedNamesSet.add(id)
+        for i in seqIdDict.iterkeys():
+            if i not in notAllowedSeqIdSet:
+                allowedNamesSet.add(i)
 
         fasta.filterOutSequences(srcFilePath, dstFilePath, allowedNamesSet)
 
@@ -334,8 +350,8 @@ def getAllTaxonIdSet(mapFilePathList):
 def _main():
     mergeS = False
     sortS = False
-    clusterS = False
-    filterOutSeq = True  # this is optional, e.g. to remove plasmids
+    clusterS = True
+    filterOutSeq = False  # this is optional, e.g. to remove plasmids
 
     # handle broken pipes
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -360,24 +376,32 @@ def _main():
     #                      ]
 
     # input files
-    mapFilePathList = ['/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-genomes-bacteria_20140428/dna_acc.tax',
-                        '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-draftgenomes-bacteria_20140508/dna-scaffolds_acc.tax',
-                        '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-hmp_20131125/dna-contigs_acc.tax',
-                        '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-hmp_20131125/dna-scaffolds_acc.tax',
-                        '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-refseq-microbial_64/dna_acc.tax'
-                        ]
+    # mapFilePathList = ['/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-genomes-bacteria_20140428/dna_acc.tax',
+    #                     '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-draftgenomes-bacteria_20140508/dna-scaffolds_acc.tax',
+    #                     '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-hmp_20131125/dna-contigs_acc.tax',
+    #                     '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-hmp_20131125/dna-scaffolds_acc.tax',
+    #                     '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-refseq-microbial_64/dna_acc.tax'
+    #                     ]
+    #
+    # fastaFilePathList = ['/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-genomes-bacteria_20140428/dna_acc.fna',
+    #                      '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-draftgenomes-bacteria_20140508/dna-scaffolds_acc.fna',
+    #                      '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-hmp_20131125/dna-contigs_acc.fna',
+    #                      '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-hmp_20131125/dna-scaffolds_acc.fna',
+    #                      '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-refseq-microbial_64/dna_acc.fna'
+    #                      ]
 
-    fastaFilePathList = ['/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-genomes-bacteria_20140428/dna_acc.fna',
-                         '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-draftgenomes-bacteria_20140508/dna-scaffolds_acc.fna',
-                         '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-hmp_20131125/dna-contigs_acc.fna',
-                         '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-hmp_20131125/dna-scaffolds_acc.fna',
-                         '/net/refdata/static/nonredundant-microbial_20140513/nobackup/ncbi-refseq-microbial_64/dna_acc.fna'
-                         ]
+    mapFilePathList = ['/local/igregor/ref_cami_1/bacteria.fna.acc_tax.csv',
+                       '/local/igregor/ref_cami_1/bacteria_draft.fna.acc_tax.csv',
+                       '/local/igregor/ref_cami_1/complete.fna.acc_tax.csv']
+
+    fastaFilePathList = ['/local/igregor/ref_cami_1/bacteria.fna',
+                         '/local/igregor/ref_cami_1/bacteria_draft.fna',
+                         '/local/igregor/ref_cami_1/complete.fna']
 
     # output dirs
-    mergedDir = '/net/refdata/static/nonredundant-microbial_20140513/nobackup/merged'  # '/local/igregor/ref_20121122/nobackup/merged'
-    sortedDir = '/net/refdata/static/nonredundant-microbial_20140513/nobackup/sorted'  # '/local/igregor/ref_20121122/nobackup/sorted'
-    centroidsDir = '/net/refdata/static/nonredundant-microbial_20140513/nobackup/centroids'  # '/local/igregor/ref_20121122/nobackup/centroids_1_0'
+    mergedDir = '/local/igregor/ref_cami_1/merged' # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/merged'  # '/local/igregor/ref_20121122/nobackup/merged'
+    sortedDir = '/local/igregor/ref_cami_1/sorted' # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/sorted'  # '/local/igregor/ref_20121122/nobackup/sorted'
+    centroidsDir = '/local/igregor/ref_cami_1/centroids' # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/centroids'  # '/local/igregor/ref_20121122/nobackup/centroids_1_0'
     # clustersDir = '/net/refdata/static/nonredundant-microbial_20140513/nobackup/clusters'  # '/local/igregor/ref_20121122/nobackup/clusters_1_0'
 
     # tools

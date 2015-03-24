@@ -656,33 +656,33 @@ def _getErrorMJoinedRead(refPath, fqJoinedPath, samPath, readLen, qsMax):
 
             # read in a joined pair-end read (@name, DNA string, +, QS string)
             name, dna, p, qs = fqReadGen.next()
-
-            # remove trailing white space
-            name = name[1:].strip()  # remove starting @
+            # remove trailing white space and starting @
+            name = name[1:].strip()
             dna = dna.rstrip()
             dnaLen = len(dna)
             qs = qs.rstrip()
             assert len(dna) == len(qs)
             assert name == qName
-
             # get the reference sequence
             refSeq = seqNameToSeq[rName]
             refSeq = refSeq[pos:(pos + dnaLen)]
             # consider reverse complement of the reference
             if revCompl:
                 refSeq = str(Seq(refSeq, generic_dna).reverse_complement())
+            if dnaLen != len(refSeq):
+                print('Joined read "%s" has a different length than its reference sequence (seqLen:%s, refLen:%s), '
+                      'possible wrong join, line skipped!' % (qName, dnaLen, len(refSeq)))
+                continue
 
             # segment 1
             dnaS1 = dna[:readLen]
             qsS1 = qs[:readLen]
             refS1 = refSeq[:readLen]
-
             # segment 2
             dnaS2 = dna[dnaLen - readLen:]
             qsS2 = qs[dnaLen - readLen:]
             refS2 = refSeq[dnaLen - readLen:]
             assert len(dnaS1) == len(dnaS2) == readLen, str(dnaS1 + ' ' + dnaS2 + ' ' + str(readLen))
-
             # compute errors and occurrences at positions [QS][0..readLen-1] (count only as +0.5 if overlapping region)
             j = readLen - 1
             plus = 1.
@@ -711,6 +711,7 @@ def _getErrorMJoinedRead(refPath, fqJoinedPath, samPath, readLen, qsMax):
 
     # Catch any exception
     except Exception as e:
+        print refPath, fqJoinedPath, samPath, readLen, qsMax
         print type(e)
         print e.message
         print e.args
@@ -740,4 +741,5 @@ def _testSamForJoinedReads():
 if __name__ == "__main__":
     # _testSamForJoinedReads()
     # _testJoinedReadsStat()
+    print _getErrorMJoinedRead('/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_NZ_AKLB00000000.fna.gz', '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_join.fq.gz', '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_join.sam.gz', 150, 60)
     pass

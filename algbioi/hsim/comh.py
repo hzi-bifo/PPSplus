@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-    Copyright (C) 2014  Ivan Gregor
+    Copyright (C) 2015  Ivan Gregor
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -29,24 +29,25 @@ import tarfile
 # import numpy as np
 import multiprocessing as mp
 from algbioi.com import parallel
+import platform
 
 # list of species to be processed
 SPECIES_LIST = ["562"]  # Escherichia coli, 562, species
 
 # Art simulator setting
-ART_READ_LEN = [100, 100]
-ART_INSERT_SIZE = [150, 5000] # 450  # try 180 and 5000
-ART_INSERT_SD = [15, 500]  # 5? and 50? "10 %"
-ART_MIN_SEQ_LEN = [200, 5000]
+ART_READ_LEN = [150, 150]  # changed from 150
+ART_INSERT_SIZE = [225, 5000]  # 150, 180, 450  # try 180 and 5000
+ART_INSERT_SD = [23, 500]  # 5? and 50? "10 %"
+ART_MIN_SEQ_LEN = [200, 5000] # this should be handled by art !!!
 ART_QS_MAX = [60, 60]  # maximum quality score
-if sys.platform == 'darwin':
-    ART_Q_PROFILE = [('/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR1.txt',
-                      '/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR2.txt'),
-                     ('/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR1.txt',
-                      '/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR2.txt')]
-else:
-    assert False
-    # TODO: add paths on the system
+ART_Q_PROFILE = [(None, None), (None, None)]  # the default profiles are taken !
+# if sys.platform == 'darwin':
+#     ART_Q_PROFILE = [('/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR1.txt',
+#                       '/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR2.txt'),
+#                      ('/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR1.txt',
+#                       '/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR2.txt')]
+# else:
+#     assert False  # add paths on the system ?
 
 # maximum number of CPUs to be used
 MAX_PROC = mp.cpu_count()
@@ -57,9 +58,13 @@ if sys.platform == 'darwin':
     REFERENCE_DIR_ROOT = '/Users/ivan/Documents/nobackup/hsim01'  # local disk !!!
     NCBI_TAXONOMY_FILE = '/Users/ivan/Documents/work/binning/taxonomy/20140916/ncbitax_sqlite.db'
 else:
-    assert sys.platform == 'linux2'
-    REFERENCE_DIR_ROOT = '/net/metagenomics/projects/PPSmg/hsim/hsim01'
-    NCBI_TAXONOMY_FILE = '/net/metagenomics/projects/PPSmg/taxonomy/20140916/ncbitax_sqlite.db'
+    if platform.dist()[0] == 'Ubuntu':
+        REFERENCE_DIR_ROOT = '/home/igregor/Documents/work/hsim'
+        NCBI_TAXONOMY_FILE = '/home/igregor/Documents/work/taxonomy/20140916/ncbitax_sqlite.db'
+    else:
+        assert sys.platform == 'linux2'
+        REFERENCE_DIR_ROOT = '/net/metagenomics/projects/PPSmg/hsim/hsim01'
+        NCBI_TAXONOMY_FILE = '/net/metagenomics/projects/PPSmg/taxonomy/20140916/ncbitax_sqlite.db'
 
 # Directory names
 FASTA_GENOMES_DIR_NAME = 'fasta_genomes'
@@ -104,13 +109,18 @@ SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY = 0.9
 if sys.platform == 'darwin':
     MUSCLE_BINARY = '/Users/ivan/Documents/work/tools/muscle/muscle3.8.31_i86darwin64'
     MOTHUR_BINARY = '/Users/ivan/Documents/work/tools/mothur/mothur/mothur'
-    ART_ILLUMINA_BINARY = '/Users/ivan/Documents/work/tools/art/art_bin_VanillaIceCreamOSX/art_illumina'
+    ART_ILLUMINA_BINARY = '/Users/ivan/Documents/work/tools/art/art_bin_ChocolateCherriesOSX/art_illumina'
 
 else:
-    assert sys.platform == 'linux2'
-    MUSCLE_BINARY = '/net/metagenomics/projects/PPSmg/hsim/muscle3.8.31_i86linux64'
-    MOTHUR_BINARY = '/net/metagenomics/projects/PPSmg/tools/mothur/mothur_1_333/mothur'
-    ART_ILLUMINA_BINARY = '/net/metagenomics/projects/PPSmg/tools/art/art_bin_VanillaIceCreamLinux/art_illumina'
+    if platform.dist()[0] == 'Ubuntu':
+        MUSCLE_BINARY = '/home/igregor/Documents/work/tools/muscle/muscle3.8.31_i86linux64'
+        MOTHUR_BINARY = '/home/igregor/Documents/work/tools/mothur/mothur'
+        ART_ILLUMINA_BINARY = '/home/igregor/Documents/work/tools/art/art_bin_ChocolateCherriesLinux/art_illumina'
+    else:
+        assert sys.platform == 'linux2'
+        MUSCLE_BINARY = '/net/metagenomics/projects/PPSmg/hsim/muscle3.8.31_i86linux64'
+        MOTHUR_BINARY = '/net/metagenomics/projects/PPSmg/tools/mothur/mothur_1_333/mothur'
+        ART_ILLUMINA_BINARY = '/net/metagenomics/projects/PPSmg/tools/art/art_bin_ChocolateCherriesLinux/art_illumina'
 
 
 # Common functionality

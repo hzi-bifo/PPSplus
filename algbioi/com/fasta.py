@@ -31,6 +31,25 @@ from algbioi.com.common import removeNonDna
 from algbioi.com.common import noNewLine
 
 
+def sortSeqDesc(inFasta, outFasta):
+    """
+        Sort sequences in a descending order.
+
+        @param inFasta: input fasta file
+        @param outFasta: output sorted fasta file
+    """
+    tupleList = []
+    for seqName, seq in getSequencesToList(inFasta):
+        tupleList.append((seqName, seq, len(seq)))
+    # sort
+    tupleList.sort(key=lambda x: x[2], reverse=True)
+
+    out = OutFileBuffer(outFasta)
+    for seqName, seq, bp in tupleList:
+        out.writeText('>%s\n%s\n' % (seqName, seq))
+    out.close()
+
+
 def cmpSeqFiles(filePath1, filePath2, verbose=False, format='fastq'):
     """
         Compares two sequence files.
@@ -239,7 +258,7 @@ def fastaFileToDictWholeNames(filePath):
     f = None
     try:
         if filePath.endswith('.gz'):
-            f = gzip.open(os.path.normpath(filePath))
+            f = gzip.open(os.path.normpath(filePath), mode='r')
         else:
             f = open(os.path.normpath(filePath), 'r')
     except Exception:
@@ -294,7 +313,7 @@ def _forEachRecord(filePath, parser, formatName="fasta"):
     try:
         f = open(os.path.normpath(filePath), 'r')
     except Exception:
-        sys.stderr.write('Cannot open a ' + formatName + ' file for reading: ' + filePath + '\n')
+        sys.stderr.write('Cannot open a %s file for reading: %s\n' % (formatName, filePath))
         raise
     else:
         try:
@@ -317,6 +336,7 @@ def _forEachRecord(filePath, parser, formatName="fasta"):
 # def _test():
 #     filterOutNonDna('/Users/ivan/Documents/work/binning/data/Reindeer/927658.1.fas',
 #         '/Users/ivan/Documents/work/binning/data/Reindeer/nonDnaRemoved/927658.1.fas')
-
+#     sortSeqDesc('/Users/ivan/Documents/nobackup/tmp9/a.fna', '/Users/ivan/Documents/nobackup/tmp9/b.fna')
+#
 # if __name__ == "__main__":
 #     _test()

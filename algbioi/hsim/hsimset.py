@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-    Copyright (C) 2014  Ivan Gregor
+    Copyright (C) 2015  Ivan Gregor
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,6 +40,7 @@ from algbioi.com import rand
 from algbioi.com import sam
 from algbioi.com import fq
 from algbioi.hsim import comh
+from algbioi.hsim import gene_map
 
 
 def _main():
@@ -91,8 +92,12 @@ def _main():
             createSamFileForJoinedPairEndReads(specDir)
 
         # compute error profile for the joined pair-end reads
-        if True:
+        if False:
             getJoinedReadsStat(specDir)
+
+        # Get gene mapping
+        if True:
+            getGeneMapping(specDir)
 
         # filter reads given QS cutoffs
         # if False:
@@ -481,6 +486,8 @@ def genSimulatedReadsForSamples(specDir):
                     qP1 = ''
                 if qP2 is not None:
                     qP2 = ' -2 %s ' % qP2
+                else:
+                    qP2 = ''
 
                 # define the read generation command
                 cmd = "%s -i %s -f %s -rs %s -l %s -m %s -s %s -p -o %s_pair -na -sam %s %s; " \
@@ -665,13 +672,38 @@ def getJoinedReadsStat(specDir):
     print('Statistics for "%s" joined pair-end reads counted' % rc)
 
 
-# def getGeneMapping(specDir):
-#     """
-#         Getting gene mapping for the reads.
-#     """
-#     print('Getting gene mapping for the reads.')
-#     pass
+def getGeneMapping(specDir):
+    """
+        Getting gene mapping for the reads.
+    """
+    print('Getting gene mapping for the reads.')
 
+    # directory containing all genes
+    genesDir = os.path.join(specDir, comh.FASTA_PULL_GENES_DIR_NAME)
+
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect all files: FNA references for the joined pair-end reads and the corresponding SAM files
+    refList = []  # list of reference FNA files
+    samList = []  # list of SAM file tuples (input SAM, output SAM)
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        for f in os.listdir(strainDir):
+                            i, name = f.split('_', 1)
+                            if i.isdigit() and name.endswith('.fna.gz'):
+                                samPath = os.path.join(strainDir, str(i) + '_join.sam.gz')
+                                if os.path.isfile(samPath):
+                                    outSamPath = os.path.join(strainDir, str(i) + "_join_gmap.sam.gz")
+                                    samList.append((samPath, outSamPath))
+                                    refList.append(os.path.join(strainDir, f))
+    gene_map.getReadsToGenesMap(refList, samList, genesDir)
 
 
 def filterReadsQS(specDir):
@@ -746,8 +778,6 @@ def _tmp():
     fasFile = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_NZ_AIEZ00000000.fna'
     # _getStatSam(samFile)
 
-
-# TODO: get the mapping !!!
 
 def getGenesStat(specDir):
     srcDir = os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_ALIGN_DIR_NAME)

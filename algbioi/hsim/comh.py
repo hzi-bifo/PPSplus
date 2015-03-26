@@ -57,14 +57,17 @@ if sys.platform == 'darwin':
     # REFERENCE_DIR_ROOT = '/Volumes/VerbatimSSD/work/hsim01'  # external storage !!!
     REFERENCE_DIR_ROOT = '/Users/ivan/Documents/nobackup/hsim01'  # local disk !!!
     NCBI_TAXONOMY_FILE = '/Users/ivan/Documents/work/binning/taxonomy/20140916/ncbitax_sqlite.db'
+    PFAM = '/Volumes/VerbatimSSD/work/pfam/Pfam-A.hmm'
 else:
     if platform.dist()[0] == 'Ubuntu':
         REFERENCE_DIR_ROOT = '/home/igregor/Documents/work/hsim'
         NCBI_TAXONOMY_FILE = '/home/igregor/Documents/work/taxonomy/20140916/ncbitax_sqlite.db'
+        PFAM = '/home/igregor/Documents/work/db/pfamV27'
     else:
         assert sys.platform == 'linux2'
         REFERENCE_DIR_ROOT = '/net/metagenomics/projects/PPSmg/hsim/hsim01'
         NCBI_TAXONOMY_FILE = '/net/metagenomics/projects/PPSmg/taxonomy/20140916/ncbitax_sqlite.db'
+        PFAM = '/net/metagenomics/projects/PPSmg/database/pfamV27'
 
 # Directory names
 FASTA_GENOMES_DIR_NAME = 'fasta_genomes'
@@ -76,6 +79,10 @@ FASTA_PULL_GENES_DIR_NAME = 'fasta_pull_genes'
 
 FASTA_PULL_GENES_PHYLO_DIR_NAME = 'fasta_pull_genes_phylo'
 FASTA_PULL_GENES_PHYLO_ALIGN_DIR_NAME = 'fasta_pull_genes_phylo_align'
+FASTA_PULL_GENES_PHYLO_PROT_DIR_NAME = 'fasta_pull_genes_phylo_prot'
+FASTA_PULL_GENES_PHYLO_PFAM_TO_GENE_NAME = 'fasta_pull_genes_pfam_to_gene_name.csv'
+FASTA_PULL_GENES_PHYLO_GENE_NAME_TO_PFAM = 'fasta_pull_genes_gene_name_to_pfam.csv'
+
 
 CLUSTER_PHYLO_DIR = 'cluster_phylo'
 CLUSTER_PHYLO_STRAINS_FNA = 'genes_concat_align.fna'
@@ -110,18 +117,19 @@ if sys.platform == 'darwin':
     MUSCLE_BINARY = '/Users/ivan/Documents/work/tools/muscle/muscle3.8.31_i86darwin64'
     MOTHUR_BINARY = '/Users/ivan/Documents/work/tools/mothur/mothur/mothur'
     ART_ILLUMINA_BINARY = '/Users/ivan/Documents/work/tools/art/art_bin_ChocolateCherriesOSX/art_illumina'
-
+    HMMER_BINARY = '/Users/ivan/Documents/work/tools/hmmer/hmmer-3.0-macosx-intel/binaries'
 else:
     if platform.dist()[0] == 'Ubuntu':
         MUSCLE_BINARY = '/home/igregor/Documents/work/tools/muscle/muscle3.8.31_i86linux64'
         MOTHUR_BINARY = '/home/igregor/Documents/work/tools/mothur/mothur'
         ART_ILLUMINA_BINARY = '/home/igregor/Documents/work/tools/art/art_bin_ChocolateCherriesLinux/art_illumina'
+        HMMER_BINARY = '/home/igregor/Documents/work/tools/hmmer-3.0/binaries'
     else:
         assert sys.platform == 'linux2'
         MUSCLE_BINARY = '/net/metagenomics/projects/PPSmg/hsim/muscle3.8.31_i86linux64'
         MOTHUR_BINARY = '/net/metagenomics/projects/PPSmg/tools/mothur/mothur_1_333/mothur'
         ART_ILLUMINA_BINARY = '/net/metagenomics/projects/PPSmg/tools/art/art_bin_ChocolateCherriesLinux/art_illumina'
-
+        HMMER_BINARY = '/net/metagenomics/projects/PPSmg/tools/hmmer-3.0/binaries'
 
 # Common functionality
 
@@ -219,8 +227,3 @@ def extract(compressedFile):
         tar = tarfile.open(compressedFile, 'r:gz')
         for item in tar:
             tar.extract(item, dstDir)
-
-
-
-
-

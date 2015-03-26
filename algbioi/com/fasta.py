@@ -25,10 +25,27 @@ import re
 import types
 import gzip
 from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
 
 from algbioi.com.csv import OutFileBuffer
 from algbioi.com.common import removeNonDna
 from algbioi.com.common import noNewLine
+
+
+def dnaToProt(inFastaDna, outFastaProt, translTable=11):
+    """
+        Translates DNA sequences to PROT sequences.
+
+        @param inFastaDna: input fasta file containing DNA sequences
+        @param outFastaProt: output fasta file containing sequences translated to protein sequences
+        @param translTable: default 11 for bacteria and archaea (http://www.ncbi.nlm.nih.gov/Taxonomy/Utils/wprintgc.cgi)
+    """
+    out = OutFileBuffer(outFastaProt)
+    for seqName, seqDna in fastaFileToDictWholeNames(inFastaDna).iteritems():
+        seqProt = Seq(seqDna, generic_dna).translate(table=translTable, stop_symbol='', cds=True)
+        out.writeText('>%s\n%s\n' % (seqName, seqProt))
+    out.close()
 
 
 def sortSeqDesc(inFasta, outFasta):

@@ -23,6 +23,7 @@
 """
 import os
 import sys
+# import itertools
 
 from algbioi.com import parallel
 from algbioi.com import fasta as fas
@@ -45,8 +46,12 @@ def _main():
             searchForGeneFam(specDir)
 
         # get mapping between geneName and domainName
-        if True:
+        if False:
             getMapGeneNameAndPfamDomainName(specDir)
+
+        # get ambiguous domains
+        if True:
+            getAmbiguousDomains(specDir)
 
 
 def dnaToProt(specDir):
@@ -127,9 +132,10 @@ def getMapGeneNameAndPfamDomainName(specDir):
 
                 # parse a line
                 tokens = line.split()
-                assert len(tokens) == 23
+                assert len(tokens) == 23, '%s, %s, %s' % (f, tokens, len(tokens))
+
                 targetName, accession1, tlen, queryName, accession2, qlen, eValue, score1, bias, r1, r2, cEvalue, \
-                iEvalue, score2, bias, from1, to1, from2, to2, from3, to3, acc, descriptionOfTarget = tokens
+                    iEvalue, score2, bias, from1, to1, from2, to2, from3, to3, acc, descriptionOfTarget = tokens
 
                 # get the gene name
                 if geneName is None:
@@ -243,6 +249,57 @@ def getMapGeneNameAndPfamDomainName(specDir):
     domToGeneNameOut.close()
     print('geneName -> domName distr: %s' % str(geneNameDist))
     print('domName -> geneName distr: %s' % str(domNameDist))
+
+
+def getAmbiguousDomains(specDir):
+    """
+        For Pfam families to which more than one gene-name maps, check, whether both (all) of the gene-names are
+        contained in one genome. Add a third column!
+    """
+    print('Getting ambiguous domains')
+    out = csv.OutFileBuffer(os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_PFAM_TO_GENE_NAME_AMBIGUOUS))
+    totalDomains = 0
+    domainAmbiguous = 0
+    # for each mapping: dom-name -> list of (gene-name, score)
+    for line in open(os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_PFAM_TO_GENE_NAME)):
+        line = line.strip()
+        domName, geneList = line.split('\t')[:2]
+        geneList = geneList.split(',')
+        ambiguous = False
+
+        # this dom-name maps to at least two gene-names
+        if len(geneList) > 3:
+            geneToScore = {}
+            for i in range(len(geneList) / 2):
+                geneToScore[geneList[2*i]] = float(geneList[2*i+1])
+
+            # map: gene-name -> set of (draft) genomes reference accessions
+            geneToRefSet = {}
+            geneList = []
+            for gene in geneToScore.keys():
+                geneList.append(gene)
+                filePath = os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_DIR_NAME,
+                                        comh.getGeneNameToFileName(gene))
+                accSet = set()
+                for header in fas.fastaFileToDictWholeNames(filePath).keys():
+                    accSet.add(comh.getSeqNameToDict(header)['accession'])
+                geneToRefSet[gene] = accSet
+
+            # find intersections, two genes from one dom mapped to the same reference
+            for i in range(len(geneList) - 1):
+                gene1 = geneList[i]
+                for gene2 in geneList[i+1:]:
+                    # two genes maps to the same reference
+                    if not geneToRefSet[gene1].isdisjoint(geneToRefSet[gene2]):
+                        # write entry to the file
+                        out.writeText('%s\t%s\t%s\t%s\n' % (domName, gene1, gene2,
+                                                    ','.join(geneToRefSet[gene1].intersection(geneToRefSet[gene2]))))
+                        ambiguous = True
+        if ambiguous:
+            domainAmbiguous += 1
+        totalDomains += 1
+    print('Total: %s, Ambiguous: %s' % (totalDomains, domainAmbiguous))
+    out.close()
 
 
 if __name__ == "__main__":

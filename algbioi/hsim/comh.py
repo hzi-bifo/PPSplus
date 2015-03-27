@@ -81,6 +81,7 @@ FASTA_PULL_GENES_PHYLO_DIR_NAME = 'fasta_pull_genes_phylo'
 FASTA_PULL_GENES_PHYLO_ALIGN_DIR_NAME = 'fasta_pull_genes_phylo_align'
 FASTA_PULL_GENES_PHYLO_PROT_DIR_NAME = 'fasta_pull_genes_phylo_prot'
 FASTA_PULL_GENES_PHYLO_PFAM_TO_GENE_NAME = 'fasta_pull_genes_pfam_to_gene_name.csv'
+FASTA_PULL_GENES_PHYLO_PFAM_TO_GENE_NAME_AMBIGUOUS = 'fasta_pull_genes_pfam_to_gene_name_ambiguous.csv'
 FASTA_PULL_GENES_PHYLO_GENE_NAME_TO_PFAM = 'fasta_pull_genes_gene_name_to_pfam.csv'
 
 

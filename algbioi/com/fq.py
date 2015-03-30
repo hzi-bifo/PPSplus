@@ -316,6 +316,35 @@ def _testJoin():
     # a = DnaOverlapConcensus()
 
 
+def readsToProt(inFq, outFasta, translTable=11):
+    """
+        Translates reads from the input file to all six reading frames and stores them as a compressed FASTA file.
+    """
+    out = WriteFq(outFasta)
+
+    for name, seq, p, qs in ReadFqGen(inFq):
+        sLen = len(seq)
+        revSeq = str(Seq(seq, generic_dna).reverse_complement())
+
+        assert len(seq) == len(revSeq)
+
+        out.write('>%s_1\n%s\n' % (name, Seq(seq[:(sLen / 3) * 3], generic_dna).translate(table=translTable)))
+        out.write('>%s_2\n%s\n' % (name, Seq(seq[1:((sLen - 1) / 3) * 3 + 1], generic_dna).translate(table=translTable)))
+        out.write('>%s_3\n%s\n' % (name, Seq(seq[2:((sLen - 2) / 3) * 3 + 2], generic_dna).translate(table=translTable)))
+
+        out.write('>%s_4\n%s\n' % (name, Seq(revSeq[:(sLen / 3) * 3], generic_dna).translate(table=translTable)))
+        out.write('>%s_5\n%s\n' % (name, Seq(revSeq[1:((sLen - 1) / 3) * 3 + 1], generic_dna).translate(table=translTable)))
+        out.write('>%s_6\n%s\n' % (name, Seq(revSeq[2:((sLen - 2) / 3) * 3 + 2], generic_dna).translate(table=translTable)))
+
+    out.close()
+
+
+def _testReadsToProt():
+    inFq = '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_join.fq.gz'
+    outFasta = '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_join_prot.fna.gz'
+    readsToProt(inFq, outFasta, 11)
+
+
 def qsFilter(fileTupleList):
     """
         Filter reads according to the QS cutoffs.
@@ -471,4 +500,5 @@ def _fqReadWriteTest():
 if __name__ == "__main__":
     # _fqReadWriteTest()
     # _testFilter()
-    _testJoin()
+    # _testJoin()
+    _testReadsToProt()

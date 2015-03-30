@@ -96,8 +96,15 @@ def _main():
             getJoinedReadsStat(specDir)
 
         # Get gene mapping
-        if True:
+        if False:
             getGeneMapping(specDir)
+
+        if False:
+            translateJoinedReadsToProt(specDir)
+
+        # Get Pfam annotation (for joined reads)
+        if True:
+            getPfamAnnotation(specDir)
 
         # filter reads given QS cutoffs
         # if False:
@@ -704,6 +711,73 @@ def getGeneMapping(specDir):
                                     samList.append((samPath, outSamPath))
                                     refList.append(os.path.join(strainDir, f))
     gene_map.getReadsToGenesMap(refList, samList, genesDir)
+
+
+def translateJoinedReadsToProt(specDir):
+    """
+        Translate reads to all 6 reading frames.
+
+        TODO: not implemented yet !
+    """
+    print('Translating joined reads into 6 reading frames')
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        for f in os.listdir(strainDir):
+                            i, name = f.split('_', 1)
+                            if i.isdigit() and name == 'join.fq.gz':
+                                inFq = os.path.join(strainDir, f)
+                                outFasta = os.path.join(strainDir, str(i) + '_join_prot.fna.gz')
+                                taskList.append(parallel.TaskThread(fq.readsToProt, (inFq, outFasta)))
+    # run tasks in parallel
+    parallel.runThreadParallel(taskList, comh.MAX_PROC)
+
+
+def getPfamAnnotation(specDir):
+    """
+        Get the Pfam annotation for all the joined pair-end reads.
+        TODO: not implemented yet !
+    """
+    print('Searching through PROT read sequences')
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        for f in os.listdir(strainDir):
+                            i, name = f.split('_', 1)
+                            if i.isdigit() and name == 'join_prot.fna.gz':
+                                protReadsInGzip = os.path.join(strainDir, f)
+                                assert protReadsInGzip.endswith('fna.gz')
+                                protReadsIn = protReadsInGzip[:-3]
+                                domOut = os.path.join(strainDir, str(i) + '_join_prot.domtblout')
+                                cmd = 'zcat %s > %s;%s/hmmsearch -o /dev/null --noali --domtblout %s -E 0.01 ' \
+                                      '--cpu 1 %s %s;rm %s;gzip %s' \
+                                      % (protReadsInGzip, protReadsIn, comh.HMMER_BINARY, domOut,
+                                         os.path.join(comh.PFAM, 'Pfam-A.hmm'), protReadsIn, protReadsIn, domOut)
+                                cwd = os.path.dirname(protReadsIn)
+                                taskList.append(parallel.TaskCmd(cmd, cwd))
+
+    # search reads again the Pfam database in parallel
+    parallel.runCmdParallel(taskList, comh.MAX_PROC)
 
 
 def filterReadsQS(specDir):

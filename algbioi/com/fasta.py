@@ -35,7 +35,7 @@ from algbioi.com.common import noNewLine
 
 def dnaToProt(inFastaDna, outFastaProt, translTable=11):
     """
-        Translates DNA sequences to PROT sequences.
+        Translates DNA gene! sequences to PROT sequences.
 
         @param inFastaDna: input fasta file containing DNA sequences
         @param outFastaProt: output fasta file containing sequences translated to protein sequences

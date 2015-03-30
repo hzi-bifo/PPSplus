@@ -57,7 +57,7 @@ if sys.platform == 'darwin':
     # REFERENCE_DIR_ROOT = '/Volumes/VerbatimSSD/work/hsim01'  # external storage !!!
     REFERENCE_DIR_ROOT = '/Users/ivan/Documents/nobackup/hsim01'  # local disk !!!
     NCBI_TAXONOMY_FILE = '/Users/ivan/Documents/work/binning/taxonomy/20140916/ncbitax_sqlite.db'
-    PFAM = '/Volumes/VerbatimSSD/work/pfam/Pfam-A.hmm'
+    PFAM = '/Volumes/VerbatimSSD/work/pfam'
 else:
     if platform.dist()[0] == 'Ubuntu':
         REFERENCE_DIR_ROOT = '/home/igregor/Documents/work/hsim'
@@ -67,7 +67,7 @@ else:
         assert sys.platform == 'linux2'
         REFERENCE_DIR_ROOT = '/net/metagenomics/projects/PPSmg/hsim/hsim01'
         NCBI_TAXONOMY_FILE = '/net/metagenomics/projects/PPSmg/taxonomy/20140916/ncbitax_sqlite.db'
-        PFAM = '/net/metagenomics/projects/PPSmg/database/pfamV27'
+        PFAM = '/net/metagenomics/projects/PPSmg/database/pfamV27/nobackup/pub/databases/Pfam/releases/Pfam27.0'
 
 # Directory names
 FASTA_GENOMES_DIR_NAME = 'fasta_genomes'

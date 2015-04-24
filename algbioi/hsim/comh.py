@@ -95,6 +95,10 @@ SAMPLES_DEF_FILE = 'samples_definitions.txt'  # individual sample definitions
 SAMPLES_ERROR_PROFILE = 'samples_error_profile.csv'
 SAMPLES_ERROR_QS_CUTOFF = 'samples_error_qs_cutoffs.csv'
 SAMPLES_JOIN_ERROR_PROFILE = 'samples_join_error_profile.csv'
+SAMPLES_JOIN_PFAM_MAP_QUALITY = 'samples_join_pfam_map_quality.csv'
+SAMPLES_PFAM_PARTITIONED_DIR = 'sample_partitioned'
+SAMPLES_PFAM_PARTITIONED_STAT_FILE = 'sample_partitioned_stat.csv'
+SAMPLES_SHUFFLE_RAND_SEED = 1
 
 SAMPLES_DEF_STRAIN_COUNT_LIST = (3,)  # (3, 4, 5, 6, 7, 8, 9)
 SAMPLES_DEF_IDENTITY_CUTOFF = 0.002
@@ -112,6 +116,9 @@ SAMPLES_READ_TRIM_REMAIN = [0.5, 0.5]  # this continuous part of a read must rem
 # joining pair end
 SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP = 0.05
 SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY = 0.9
+
+SAMPLES_PFAM_EVAN_MIN_SCORE = 40
+SAMPLES_PFAM_EVAN_MIN_ACCURACY = 0.6
 
 # Binary locations
 if sys.platform == 'darwin':

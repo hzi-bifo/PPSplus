@@ -27,11 +27,11 @@
 """
 import os
 import re
-import sys
-import time
+# import sys
+# import time
 import numpy as np
-from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
+# from Bio.Seq import Seq
+# from Bio.Alphabet import generic_dna
 from algbioi.com import taxonomy_ncbi
 from algbioi.com import csv
 from algbioi.com import fasta as fas
@@ -41,6 +41,7 @@ from algbioi.com import sam
 from algbioi.com import fq
 from algbioi.hsim import comh
 from algbioi.hsim import gene_map
+from algbioi.hsim import pfam
 
 
 def _main():
@@ -103,16 +104,29 @@ def _main():
             translateJoinedReadsToProt(specDir)
 
         # Get Pfam annotation (for joined reads)
-        if True:
+        if False:
             getPfamAnnotation(specDir)
+
+        # Get the precision/recall of the pfam-annotations.
+        if False:
+            getAnnotationAccuracy(specDir)
+
+        # Partition reads into Pfam-domains
+        if False:
+            partitionReadsToPfamDom(specDir)
+
+        # Get Stat for partitioned reads into Pfam-domains
+        if True:
+            getStatPartitionedReadsPfamDom(specDir)
+
 
         # filter reads given QS cutoffs
         # if False:
         #     filterReadsQS(specDir)
 
 
-        # getGenesStat(specDir)  # check, put to a new module, gzip everything !!!
-        # TODO: Get mapping (check: gzip.open) !!!
+        # getGenesStat(specDir)  # check, put to a new module,
+
 
         ###
     taxonomy.close()
@@ -746,7 +760,6 @@ def translateJoinedReadsToProt(specDir):
 def getPfamAnnotation(specDir):
     """
         Get the Pfam annotation for all the joined pair-end reads.
-        TODO: not implemented yet !
     """
     print('Searching through PROT read sequences')
     # directory containing all samples
@@ -778,6 +791,79 @@ def getPfamAnnotation(specDir):
 
     # search reads again the Pfam database in parallel
     parallel.runCmdParallel(taskList, comh.MAX_PROC)
+
+
+def getAnnotationAccuracy(specDir):
+    """
+        Getting the precision/recall of the Pfam annotations.
+    """
+    print('Getting the precision and recall of the Pfam read annotations.')
+    # directory containing all samples
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                # for all strains of one sample
+                for strain in os.listdir(sampleDir):
+                    strainDir = os.path.join(sampleDir, strain)
+                    if os.path.isdir(strainDir):
+                        for f in os.listdir(strainDir):
+                            i, name = f.split('_', 1)
+                            if i.isdigit() and name == 'join_prot.domtblout.gz':
+                                taskList.append(parallel.TaskThread(pfam.getHmmAnnotationAccuracy,
+                                    (os.path.join(strainDir, f),
+                                     os.path.join(specDir,comh.FASTA_PULL_GENES_PHYLO_PFAM_TO_GENE_NAME),
+                                     comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
+                                     comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY)))
+
+    rl = parallel.runThreadParallel(taskList, comh.MAX_PROC)
+    pfam.mergeResultsHmmAnnotationAccuracy(rl, os.path.join(samplesDir, comh.SAMPLES_JOIN_PFAM_MAP_QUALITY),
+                                           comh.SAMPLES_PFAM_EVAN_MIN_SCORE, comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY)
+
+
+def partitionReadsToPfamDom(specDir):
+    """
+        Partition reads into Pfam-domains.
+    """
+    print('Partitioning reads into the individual Pfam-domains.')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                taskList.append(parallel.TaskThread(pfam.partitionReads, (sampleDir, comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
+                                    comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY, comh.SAMPLES_SHUFFLE_RAND_SEED,
+                                    comh.SAMPLES_PFAM_PARTITIONED_DIR)))
+    parallel.runThreadParallel(taskList, comh.MAX_PROC)
+
+
+
+def getStatPartitionedReadsPfamDom(specDir):
+    """
+        Get statistics for the partitioned reads into the Pfam-domains
+    """
+    print('Getting statistics for the partitioned reads into Pfam-domains.')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            if os.path.isdir(sampleDir):
+                taskList.append(parallel.TaskThread(pfam.getStatPartitionedReads,
+                                                    (sampleDir,
+                                                     comh.SAMPLES_PFAM_PARTITIONED_DIR,
+                                                     comh.SAMPLES_PFAM_PARTITIONED_STAT_FILE)))
+
+    parallel.runThreadParallel(taskList, comh.MAX_PROC)
 
 
 def filterReadsQS(specDir):

@@ -62,6 +62,7 @@ from algbioi.com import csv
 from algbioi.com import fasta
 from algbioi.com import common
 from algbioi.com import parallel
+from algbioi.com import taxonomy_ncbi
 
 def printStatDbk():
     """
@@ -429,8 +430,6 @@ def _main():
         filterOutSequencesBatch(taxonIdSet, srcDir, dstDir, notAllowedSet)
 
 
-
-
 def move(dirFasta):
     for f in os.listdir(dirFasta):
         src = os.path.join(dirFasta, f)
@@ -438,11 +437,45 @@ def move(dirFasta):
         shutil.move(src, dst)
 
 
+def takeSubset(inDir='/local/igregor/ref_cami_1/centroids',
+               outDir='/local/igregor/ref_cami_1/bac_arch_centroids',
+               taxonomyDb='/net/metagenomics/projects/PPSmg/database/NCBI201502/nobackup/mg5/taxonomy/ncbitax_sqlite.db',
+               rank='superkingdom',
+               valTuple=('bacteria', 'archaea')):
+
+    # scientific name set
+    valSet = set(map(lambda x: x.lower(), valTuple))
+    tax = taxonomy_ncbi.TaxonomyNcbi(taxonomyDb)
+    toParent = {}
+
+    # for each file in the directory
+    for f in os.listdir(inDir):
+
+        taxId = f.split('.')[0]
+        if taxId.isdigit():
+            taxId = int(taxId)
+
+            while tax.getRank(taxId) != rank and taxId != 1 and taxId is not None:
+                if taxId in toParent:
+                    taxId = toParent[taxId]
+                else:
+                    taxIdP = tax.getParentNcbid(taxId)
+                    toParent[taxId] = taxIdP
+                    taxId = taxIdP
+
+            if taxId is not None and tax.getScientificName(taxId).lower() in valSet:
+                # copy taxon ids that has a particular name on a particular rank
+                shutil.copy2(os.path.join(inDir, f), outDir)
+
+    tax.close()
 
 
 # MAIN
 if __name__ == "__main__":
-    _main()
+    # _main()
+
+    takeSubset()
+
     # move('/net/refdata/static/nonredundant-microbial_20140513/nobackup/centroidsmv')
 
     #getSeeds('/Users/ivan/Documents/nobackup/stringMatchTest/888741.fna',

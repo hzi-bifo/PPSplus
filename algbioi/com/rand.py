@@ -19,10 +19,12 @@
     This module performs all tasks related to the randomness.
 """
 import sys
+import gzip
 import cPickle
 import tempfile
 import time
 import numpy as np
+from algbioi.com import fq
 # from algbioi.com import fasta as fas
 
 
@@ -51,7 +53,11 @@ def shuffleLines(inFilePath, outFilePath, linesPerRecord=4, randomSeed=1, record
     # to store one record
     record = []
     # read records one by one
-    for line in open(inFilePath):
+    if inFilePath.strip().endswith('.gz'):
+        inFileOpen = gzip.open(inFilePath, mode='r')
+    else:
+        inFileOpen = open(inFilePath)
+    for line in inFileOpen:
         record.append(line)
         if len(record) == linesPerRecord:
             # store one record
@@ -66,7 +72,7 @@ def shuffleLines(inFilePath, outFilePath, linesPerRecord=4, randomSeed=1, record
         tmpFileList.append(_storePermutationToTmpFile(recordList, rand))
 
     # open a file for writing
-    outFile = open(outFilePath, 'w')
+    outFile = fq.WriteFq(outFilePath)
     # write one record to the output from a randomly chosen file in each iteration
     if len(tmpFileList) > 0:
         while True:

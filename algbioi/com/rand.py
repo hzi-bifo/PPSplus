@@ -231,8 +231,9 @@ if __name__ == "__main__":
     # _testShuffleLines()
     # print getRandLognormNumbers([3, 5, 7])
     # print getRandSubsets(['A', 'B', 'C', 'D', 'E'], subsetSizes=(3,4,5), maxSubsetsPerSize=4)
-    print strToRandInt('0NC_0130082.05528149')
-    print strToRandInt('0NC_0130082.05528149')
-    print strToRandInt('0NC_0130083.05528149')
-    print strToRandInt('0NC_0130083.05528149')
+    # print strToRandInt('0NC_0130082.05528149')
+    # print strToRandInt('0NC_0130082.05528149')
+    # print strToRandInt('0NC_0130083.05528149')
+    # print strToRandInt('0NC_0130083.05528149')
+    # print getRandLognormNumbers([500], mean=1, sd=2, minVal=1., maxVal=50., randomSeed=1, rand=None)
     pass

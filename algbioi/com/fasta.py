@@ -48,6 +48,34 @@ def dnaToProt(inFastaDna, outFastaProt, translTable=11):
     out.close()
 
 
+def getSeqFromDir(seqId, dirList, baseFileName):
+    """
+        Search for a sequence (seqId) in all files defined by a baseFileName and a list of directories,
+        return the first sequence found.
+
+        @param seqId: sequence id of the sequence contained in one of the files defined by (dirList, baseFileName)
+        @param dirList: list of directories in which it searches for the fasta file containing the seqId
+        @param baseFileName: defines the fasta files for the search (directory/baseFileName.fna[.gz])
+        @type seqId: str
+        @type dirList: list[str]
+        @type baseFileName: str
+        @return: a sequence or None
+        @rtype: str
+    """
+    for d in dirList:
+        assert os.path.isdir(d)
+        filePath = os.path.join(d, baseFileName + '.fna')
+        if not os.path.isfile(filePath):
+            filePath += '.gz'
+            if not os.path.isfile(filePath):
+                filePath = None
+        if filePath is not None:
+            seqIdToSeq = fastaFileToDictWholeNames(filePath)
+            if seqId in seqIdToSeq:
+                return seqIdToSeq[seqId]
+    return None
+
+
 def sortSeqDesc(inFasta, outFasta):
     """
         Sort sequences in a descending order.

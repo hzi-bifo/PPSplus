@@ -20,3 +20,67 @@
 """
 
 # TODO: implement joining of the reads
+
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
+
+
+def getTripletMap(translTable=11):
+    """
+        Gets a mapping between nucleotide triplets and aminoacids
+
+        @return: map: dna-triplet -> aminoacid
+        @rtype: dict[str, str]
+    """
+    nucL = ['A', 'T', 'G', 'C']
+    tripletToAmino = {}
+    for p1 in nucL:
+        for p2 in nucL:
+            for p3 in nucL:
+                dna = p1 + p2 + p3
+                prot = str(Seq(dna, generic_dna).translate(table=translTable))
+                assert dna not in tripletToAmino
+                tripletToAmino[dna] = prot
+
+    return tripletToAmino
+
+
+def getCodingTable(translTable=11):
+    nucL = ['A', 'T', 'G', 'C']
+    buff = ''
+    aToN = {}
+    for p1 in nucL:
+        for p2 in nucL:
+            for p3 in nucL:
+                dna = p1 + p2 + p3
+                prot = str(Seq(dna, generic_dna).translate(table=translTable))
+
+                # try:
+                #     prot = str(Seq(dna + 'TAG', generic_dna).translate(table=translTable, stop_symbol='', cds=True))
+                #     print 'Start:' + dna + ' : ' +  prot
+                # except Exception as e:
+                #     print e.message
+                    # pass
+                if prot not in aToN:
+                    aToN[prot] = []
+                aToN[prot].append(dna)
+
+                # buff += '%s : %s\n' % (dna, prot)
+    for k, v in aToN.iteritems():
+        buff += k + ': ' + ','.join(v) + '\n'
+
+    return buff
+
+
+def testStartCodon(translTable=11):
+    dnaL = ['ATG', 'GTG', 'TTG', 'CTG', 'ATT', 'ATC', 'ATA']
+
+    for dna in dnaL:
+        prot = str(Seq(dna + dna + 'TAG', generic_dna).translate(table=translTable, stop_symbol='', cds=True))
+        print dna + ': ' + prot
+
+
+if __name__ == "__main__":
+    print getCodingTable()
+    print getTripletMap()
+    # testStartCodon()

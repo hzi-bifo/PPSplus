@@ -86,7 +86,7 @@ def searchForGeneFam(specDir):
         Running hmmsearch to match genes and Pfam domains.
         Very time consuming!
     """
-    print('Searching for Pfam gene families')
+    print('Searching for Pfam gene families and AMPHORA2 genes')
     srcProtGeneDir = os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_PROT_DIR_NAME)
     taskList = []
     # for each gene DNA fasta file
@@ -104,7 +104,7 @@ def searchForGeneFam(specDir):
                str(basePath + '.domtblout'),
                0.01,
                1,
-               os.path.join(comh.PFAM, 'Pfam-A.hmm'),
+               os.path.join(comh.PFAM, 'Pfam-A_and_Amphora2.hmm'),
                filePath)
         taskList.append(parallel.TaskCmd(cmd, cwd=srcProtGeneDir))
 
@@ -676,6 +676,9 @@ def dnaHitInfo(hit, dnaSeq, protSeq=None, translTable=11):
     """
         Given the hit entry from the domtblout file for a prot sequence, return the hit coordinates on the dna sequence.
 
+        @type hit: list[str]
+        @type dnaSeq: str
+
         @param protSeq: if equal to a sequence, verification is performed (no verification if None)
 
         @return: tuple (startOnRead, overlapLen, strain, score, acc)
@@ -713,6 +716,11 @@ def dnaHitInfo(hit, dnaSeq, protSeq=None, translTable=11):
         # get the prot sequence based on the position on the DNA read
         if protSeq is not None:
             subStrRev = str(Seq(dnaSeq[startOnRead:(startOnRead + overlapLen)], generic_dna).reverse_complement())
+
+            startOnRead2 = len(dnaSeq) - startOnRead - overlapLen
+            subStrRev2 = str(Seq(dnaSeq, generic_dna).reverse_complement())[startOnRead2:(startOnRead2 + overlapLen)]
+            assert subStrRev == subStrRev2
+
             translSeq = str(Seq(subStrRev, generic_dna).translate(translTable))
 
     # verify that the translated part of the DNA sequence really correspond to the substring of the prot sequence
@@ -767,6 +775,8 @@ def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed
                             if line.startswith('#'):
                                 continue
                             readName = line.split('\t', 1)[0]
+                            if len(line.split('\t')) == 11:  # lines with only 11 entries will be padded with * to 12
+                                line += '\t*'
                             readNameToSam[readName] = line
 
                         # go over all reads !!!
@@ -848,6 +858,12 @@ def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed
         rand.shuffleLines(fqSamOutO, fqSamOutR, 1, shuffleRandSeed)
         rand.shuffleLines(fqDomOutO, fqDomOutR, 1, shuffleRandSeed)
 
+        # delete ordered files (keep only the shuffled ones)
+        os.remove(fqOutO)
+        os.remove(fqProtOutO)
+        os.remove(fqSamOutO)
+        os.remove(fqDomOutO)
+
 
 def getStatPartitionedReads(sampleDir, pfamPartitionedDir, pfamPartitionedStatFile):
 
@@ -855,7 +871,7 @@ def getStatPartitionedReads(sampleDir, pfamPartitionedDir, pfamPartitionedStatFi
     lineList = []
 
     for f in os.listdir(samplePartDir):
-        if f.startswith('o_') and f.endswith('prot.domtblout.gz'):
+        if f.startswith('r_') and f.endswith('prot.domtblout.gz'):
             domFile = os.path.join(samplePartDir, f)
             fTokens = f.split('_')
             gsamFile = os.path.join(samplePartDir, '_'.join(fTokens[:-1]) + '_gmap.sam.gz')

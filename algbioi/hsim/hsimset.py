@@ -42,6 +42,8 @@ from algbioi.com import fq
 from algbioi.hsim import comh
 from algbioi.hsim import gene_map
 from algbioi.hsim import pfam
+from algbioi.haplo import hmain
+from algbioi.haplo import heval
 
 
 def _main():
@@ -116,8 +118,14 @@ def _main():
             partitionReadsToPfamDom(specDir)
 
         # Get Stat for partitioned reads into Pfam-domains
-        if True:
+        if False:
             getStatPartitionedReadsPfamDom(specDir)
+
+        if False:
+            assembleContigs(specDir)
+
+        if True:
+            computePerBaseAssemblyError(specDir)
 
 
         # filter reads given QS cutoffs
@@ -783,7 +791,7 @@ def getPfamAnnotation(specDir):
                                 protReadsIn = protReadsInGzip[:-3]
                                 domOut = os.path.join(strainDir, str(i) + '_join_prot.domtblout')
                                 cmd = 'zcat %s > %s;%s/hmmsearch -o /dev/null --noali --domtblout %s -E 0.01 ' \
-                                      '--cpu 1 %s %s;rm %s;gzip %s' \
+                                      '--cpu 1 %s %s;rm %s;gzip -f %s' \
                                       % (protReadsInGzip, protReadsIn, comh.HMMER_BINARY, domOut,
                                          os.path.join(comh.PFAM, 'Pfam-A.hmm'), protReadsIn, protReadsIn, domOut)
                                 cwd = os.path.dirname(protReadsIn)
@@ -816,7 +824,7 @@ def getAnnotationAccuracy(specDir):
                             if i.isdigit() and name == 'join_prot.domtblout.gz':
                                 taskList.append(parallel.TaskThread(pfam.getHmmAnnotationAccuracy,
                                     (os.path.join(strainDir, f),
-                                     os.path.join(specDir,comh.FASTA_PULL_GENES_PHYLO_PFAM_TO_GENE_NAME),
+                                     os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_PFAM_TO_GENE_NAME),
                                      comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
                                      comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY)))
 
@@ -844,7 +852,6 @@ def partitionReadsToPfamDom(specDir):
     parallel.runThreadParallel(taskList, comh.MAX_PROC)
 
 
-
 def getStatPartitionedReadsPfamDom(specDir):
     """
         Get statistics for the partitioned reads into the Pfam-domains
@@ -864,6 +871,77 @@ def getStatPartitionedReadsPfamDom(specDir):
                                                      comh.SAMPLES_PFAM_PARTITIONED_STAT_FILE)))
 
     parallel.runThreadParallel(taskList, comh.MAX_PROC)
+
+
+def assembleContigs(specDir):
+    """
+        Assemble contigs of each simulated dataset.
+    """
+    print('Running the contig assembly.')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
+            if os.path.isdir(partitionedDir):
+                for f in os.listdir(partitionedDir):
+                    fPath = os.path.join(partitionedDir, f)
+                    if f.endswith('fq.gz') and os.path.isfile(fPath):
+                        base = fPath[:-6]
+                        inFq = fPath
+                        inDomtblout = '%s_prot.domtblout.gz' % base
+                        inProtFna = '%s_prot.fna.gz' % base
+                        outPath = '%s_read_rec.pkl.gz' % base
+                        taskList.append(parallel.TaskThread(hmain.buildSuperReads, (inFq, inDomtblout,
+                            comh.ART_READ_LEN[0], inProtFna, outPath, comh.TRANSLATION_TABLE,
+                            comh.ASSEMBLY_MAX_MISMATCH_QS_ALLOWED, comh.ASSEMBLY_MIN_SCORE_REQIURED,
+                            comh.ASSEMBLY_MIN_ANNOT_OVERLAP_SCORE, comh.ASSEMBLY_SCORE_STOP_SEARCH,
+                            comh.ASSEMBLY_MAX_QS)))
+
+    parallel.runThreadParallel(taskList, comh.MAX_PROC)
+
+
+def computePerBaseAssemblyError(specDir):
+    """
+        Compute the per base assembly error.
+    """
+    print('Computing the per-base assembly error')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    refGenomesDraftGDirList = [os.path.join(specDir, comh.FASTA_GENOMES_DIR_NAME),
+                           os.path.join(specDir, comh.FASTA_GENOMES_DRAFT_DIR_NAME)]
+
+    # collect tasks
+    taskList = []
+    # rList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
+            if os.path.isdir(partitionedDir):
+                for f in os.listdir(partitionedDir):
+                    fPath = os.path.join(partitionedDir, f)
+                    if f.endswith('join_read_rec.pkl.gz') and os.path.isfile(fPath):
+                        base = fPath[:-21]
+                        readRecPkl = fPath
+                        gmapSam = '%s_join_gmap.sam.gz' % base
+                        assert os.path.isfile(gmapSam)
+
+                        taskList.append(parallel.TaskThread(heval.getPerBaseErrorPkl,
+                                                            (readRecPkl, gmapSam, refGenomesDraftGDirList, 30,
+                                                             comh.TRANSLATION_TABLE)))
+
+                        # a = heval.getPerBaseErrorPkl(readRecPkl, gmapSam, refGenomesDraftGDirList, 30, comh.TRANSLATION_TABLE)
+                        # rList.append(a)
+                        # heval.getAssemblyReport([a], maxCov=30)
+
+    rList = parallel.runThreadParallel(taskList, comh.MAX_PROC)
+    out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_INIT))
+    report = heval.getAssemblyReport(rList, maxCov=30)
+    out.writeText(report)
+    out.close()
+    print report
 
 
 def filterReadsQS(specDir):

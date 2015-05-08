@@ -216,8 +216,11 @@ def f(i):
         return str(i)
 
 
-class QsMultMatrix():
+class QsMultMatrix(object):
     def __init__(self, qsMax=62):
+        """
+            @type qsMax: int
+        """
         # probability multiplication matrix Qs x Qs -> char(Qs + 33)
         self._qsMulMatrix = np.zeros((qsMax, qsMax), dtype=np.uint8)
 
@@ -229,15 +232,36 @@ class QsMultMatrix():
         for i in range(qsMax):
             for j in range(qsMax):
                 self._qsMulMatrix[i][j] = min(qsMax - 1, self._probToQs(qsToProb[i] * qsToProb[j])) + 33
+        self._qsMax = qsMax
 
     def _probToQs(self, prob):
+        """
+            @type prob: float
+            @rtype: int
+        """
         return int((-10.) * np.log10(prob))
 
     def _qsMul(self, qs1, qs2, qsMax):
+        """
+            @type qs1: str
+            @type qs2: str
+            @type qsMax: int
+            @rtype: int
+        """
         return min(qsMax + 32, self._qsMulMatrix[ord(qs1) - 33][ord(qs2) - 33])
 
-    def getConsensus(self, dna1, dna2, qs1, qs2, qsMax):
+    def getConsensus(self, dna1, dna2, qs1, qs2, qsMax=None):
+        """
+            @type dna1: str
+            @type dna2: str
+            @type qs1: str
+            @type qs2: str
+            @type qsMax: int
+            @rtype: (str, str)
+        """
         assert len(dna1) == len(dna2) == len(qs1) == len(qs2)
+        if qsMax is None:
+            qsMax = self._qsMax
 
         consDna = np.zeros(len(dna1), dtype=np.uint8)
 

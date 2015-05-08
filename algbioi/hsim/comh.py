@@ -38,7 +38,7 @@ SPECIES_LIST = ["562"]  # Escherichia coli, 562, species
 ART_READ_LEN = [150, 150]  # changed from 150
 ART_INSERT_SIZE = [225, 5000]  # 150, 180, 450  # try 180 and 5000
 ART_INSERT_SD = [23, 500]  # 5? and 50? "10 %"
-ART_MIN_SEQ_LEN = [200, 5000] # this should be handled by art !!!
+ART_MIN_SEQ_LEN = [200, 5000]  # this should be handled by art !!!
 ART_QS_MAX = [60, 60]  # maximum quality score
 ART_Q_PROFILE = [(None, None), (None, None)]  # the default profiles are taken !
 # if sys.platform == 'darwin':
@@ -50,7 +50,9 @@ ART_Q_PROFILE = [(None, None), (None, None)]  # the default profiles are taken !
 #     assert False  # add paths on the system ?
 
 # maximum number of CPUs to be used
-MAX_PROC = mp.cpu_count()
+MAX_PROC = min(40, mp.cpu_count())
+
+TRANSLATION_TABLE = 11
 
 # Data locations
 if sys.platform == 'darwin':
@@ -119,6 +121,14 @@ SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY = 0.9
 
 SAMPLES_PFAM_EVAN_MIN_SCORE = 40
 SAMPLES_PFAM_EVAN_MIN_ACCURACY = 0.6
+
+# Assembly parameters
+ASSEMBLY_MAX_MISMATCH_QS_ALLOWED = 9
+ASSEMBLY_MIN_SCORE_REQIURED = 75
+ASSEMBLY_MIN_ANNOT_OVERLAP_SCORE = 40
+ASSEMBLY_SCORE_STOP_SEARCH = 100
+ASSEMBLY_MAX_QS = 94
+ASSEMBLY_SUPER_READ_EVAL_INIT = 'super_read_init_eval.txt'
 
 # Binary locations
 if sys.platform == 'darwin':

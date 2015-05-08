@@ -181,6 +181,47 @@ def getNewick(node):
             childNewickList.append(getNewick(child))
         return '(' + ','.join(childNewickList) + ')' + node.label
 
+
+def binarySearch(objList, obj, fun=lambda x: x):
+    """
+        Implements a simple binary search, returns a list of matching indices.
+
+        @param objList: a list of items
+        @param obj: an item we search
+        @param fun: a function that extracts a value from an object for the comparison
+        @return: a list of indices or an empty list
+        @rtype: list[int]
+    """
+    first = 0
+    last = len(objList) - 1
+    objFun = fun(obj)
+
+    while first <= last:
+        midpoint = (first + last) / 2
+        midpointFun = fun(objList[midpoint])
+
+        if midpointFun == objFun:
+            while midpoint > 0:
+                if fun(objList[midpoint - 1]) == objFun:
+                    midpoint -= 1
+                else:
+                    break
+            retIdxList = []
+            while midpoint < len(objList):
+                if fun(objList[midpoint]) == objFun:
+                    retIdxList.append(midpoint)
+                    midpoint += 1
+                else:
+                    break
+            assert len(retIdxList) > 0
+            return retIdxList
+        else:
+            if objFun < midpointFun:
+                last = midpoint - 1
+            else:
+                first = midpoint + 1
+    return []
+
 # if __name__ == "__main__":
 #     inputFastaFilePath = '/net/metagenomics/projects/PPSmg/tests/V35/07/working/contigsMappedBlast1000.fna.ids.23S_rRNA.fna'
 #     refTaxonomyFilePath = '/net/metagenomics/projects/PPSmg/data/silva/lsuparc_silva106_ncbitax.bacteria+archaea.tax'

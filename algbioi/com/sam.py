@@ -300,7 +300,7 @@ def _getErrorMAllMReadCount(samFilePath, fastaFilePath, readLen, qsArrayLen):
                             posErrProfile = readLen - 1 - j
                         else:
                             posErrProfile = j
-                        if read[j] != refSeq[j]:
+                        if j >= len(refSeq) or read[j] != refSeq[j]:
                             pqe[i][posErrProfile] += 1
                         pqa[i][posErrProfile] += 1
 

@@ -33,6 +33,7 @@ from algbioi.com import fasta as fas
 from algbioi.com import csv
 from algbioi.com import fq
 from algbioi.com import rand
+from algbioi.com import common as com
 
 from algbioi.hsim import comh
 
@@ -639,27 +640,27 @@ def mergeResultsHmmAnnotationAccuracy(resultHolderList, outFile=None, scoreThres
         out.writeText('# FamName, CF_P, CF_R, IF_P, IF_R, NA, NA_count\n')
         tupleList = []
         for famName, f in rh.famInfoDict.iteritems():
-            if np.isclose(0, f.cfCa + f.cfIa):
+            if com.isclose(0, f.cfCa + f.cfIa):
                 a1 = 'NA'
             else:
                 a1 = round((f.cfCa / (f.cfCa + f.cfIa)) * 100., 2)
 
-            if np.isclose(0, f.cfTa):
+            if com.isclose(0, f.cfTa):
                 a2 = 'NA'
             else:
                 a2 = round((f.cfCa / f.cfTa) * 100., 2)
 
-            if np.isclose(0, f.ifCa + f.ifIa):
+            if com.isclose(0, f.ifCa + f.ifIa):
                 a3 = 'NA'
             else:
                 a3 = round((f.ifCa / (f.ifCa + f.ifIa)) * 100., 2)
 
-            if np.isclose(0, f.ifTa):
+            if com.isclose(0, f.ifTa):
                 a4 = 'NA'
             else:
                 a4 = round((f.ifCa / f.ifTa) * 100., 2)
 
-            if np.isclose(0, f.ngAnnotatedTotalBp):
+            if com.isclose(0, f.ngAnnotatedTotalBp):
                 a5 = 0.
             else:
                 a5 = round((f.ngAnnotatedTotalBp / (f.ngAnnotatedTotalBp + f.cfCa + f.cfIa + f.ifCa + f.ifIa)) * 100., 2)

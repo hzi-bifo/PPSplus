@@ -229,9 +229,19 @@ class QsMultMatrix(object):
         for i in range(qsMax):
             qsToProb[i] = np.power(10, ((-1.) * i) / 10.)
 
+        # fill in the multiplication matrix
         for i in range(qsMax):
             for j in range(qsMax):
                 self._qsMulMatrix[i][j] = min(qsMax - 1, self._probToQs(qsToProb[i] * qsToProb[j])) + 33
+
+        # for different bases, resolve consensus Qs, map: Qs1, Qs2 -> QS
+        # self._qsMismatchMatrix = np.zeros((qsMax, qsMax), dtype=np.uint8)
+
+        # for i in range(qsMax):  # values stored only for i <= j
+        #     for j in range(i, qsMax):
+                # QS = 1 - [ (1 - qs1) * qs2/3 ]
+                # self._qsMismatchMatrix[i][j] = self._probToQs(1 - ((1 - qsToProb[j]) * (qsToProb[i] / 3.)))
+
         self._qsMax = qsMax
 
     def _probToQs(self, prob):
@@ -239,7 +249,7 @@ class QsMultMatrix(object):
             @type prob: float
             @rtype: int
         """
-        return int((-10.) * np.log10(prob))
+        return int(round((-10.) * np.log10(prob)))
 
     def _qsMul(self, qs1, qs2, qsMax):
         """
@@ -249,6 +259,36 @@ class QsMultMatrix(object):
             @rtype: int
         """
         return min(qsMax + 32, self._qsMulMatrix[ord(qs1) - 33][ord(qs2) - 33])
+
+
+    # def _qsMismatchMul(self, qs1, qs2):
+    #     """
+    #         @type qs1: str
+    #         @type qs2: str
+    #         @rtype: int
+    #     """
+    #     q1 = ord(qs1) - 33
+    #     q2 = ord(qs2) - 33
+    #     return self._qsMismatchMatrix[min(q1, q2)][max(q1, q2)]
+
+    # def _getPosLogProb(qsMax):  # qs1, qs2, qsMax, match=True):
+    #     """
+    #         Get log-probability that two positions overlap, given their quality scores and whether they match or not.
+    #         @type qs1: int
+    #         @type qs2: int
+    #         @type qsMax: int
+    #         @type match: bool
+    #         @rtype: ndarray
+    #         @return:
+    #     """
+    #     pass
+        # logProb = np.zeros((2, qsMax, qsMax), dtype=np.float256)
+        # for i in range(qsMax):
+        #     for j in range(i, qsMax):
+        #
+        #         logProb[0][i][j] =
+        #
+        #         logProb[1][i][j] =
 
     def getConsensus(self, dna1, dna2, qs1, qs2, qsMax=None):
         """
@@ -278,6 +318,17 @@ class QsMultMatrix(object):
                 # print 'mismatch_', i
                 consDna[i] = ord(dna2[i])
                 consQs[i] = ord(qs2[i])
+
+            # else:
+            #     consQs[i] = self._qsMismatchMul(qs1[i], qs2[i])
+            #     if ord(qs1[i]) >= ord(qs2[i]):
+            #         consDna[i] = ord(dna1[i])
+            #     else:
+            #         consDna[i] = ord(dna2[i])
+                # consQs[i] = ord(qs1[i])
+            # else:
+                # consDna[i] = ord(dna2[i])
+                # consQs[i] = ord(qs2[i])
 
         return ''.join(map(lambda x: chr(x), consDna)), ''.join(map(lambda x: chr(x), consQs))
 
@@ -520,9 +571,15 @@ def _fqReadWriteTest():
     print("%s, %s" % (c, c*4))
     out.close()
 
+# def _testQSMismatch():
+#
+#     q = QsMultMatrix(62)
+    # print q._qsMismatchMatrix
 
 if __name__ == "__main__":
+    pass
     # _fqReadWriteTest()
     # _testFilter()
     # _testJoin()
-    _testReadsToProt()
+    # _testReadsToProt()
+    # _testQSMismatch()

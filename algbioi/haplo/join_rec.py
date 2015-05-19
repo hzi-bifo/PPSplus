@@ -80,7 +80,14 @@ def testStartCodon(translTable=11):
         print dna + ': ' + prot
 
 
+def f():
+    aminoacids = ['K', 'N', 'T', 'R', 'S', 'I', 'M', 'H', 'Q', 'P', 'L', 'E', 'D', 'A', 'G', 'V', '*', 'Y', 'C', 'W', 'F']
+
+    # TODO: precompute probabilities
+
+
 if __name__ == "__main__":
-    print getCodingTable()
-    print getTripletMap()
+    # print getCodingTable()
+    # print getTripletMap()
     # testStartCodon()
+    pass

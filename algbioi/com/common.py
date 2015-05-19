@@ -19,6 +19,20 @@
 
 import os
 import re
+import numpy as np
+
+
+def isclose(a, b, epsilon=0.00000001):
+    """
+        Analogy to numpy.isclose(a, b)
+    """
+    try:
+        return np.isclose(a, b)
+    except AttributeError:
+        if abs(a - b) < epsilon:
+            return True
+        else:
+            return False
 
 
 def removeNonDna(seq):

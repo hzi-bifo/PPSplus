@@ -27,6 +27,7 @@ from Bio.Alphabet import generic_dna
 from Bio.Seq import Seq
 
 from algbioi.com import fasta as fas
+from algbioi.com import common as com
 from algbioi.hsim import comh
 from algbioi.haplo import hmain
 from algbioi.haplo import hio
@@ -239,12 +240,19 @@ def getError(dnaSeq, refSeq, covArray, maxCov, annotStart, annotLen, tripletMap)
     return totalErrorA, error, correct, codonError
 
 
-def getPerBaseErrorPkl(recListFile, refGmap, refDirList, maxCov, translTable):
-    recSet = set(hio.loadReadRec(recListFile))
-    return getPerBaseError(recSet, refGmap, refDirList, maxCov, translTable)
+def getPerBaseErrorPkl(recListFile, refGmap, refSeqBuff, maxCov, translTable):
+    try:
+        recSet = set(hio.loadReadRec(recListFile))
+        return getPerBaseError(recSet, refGmap, refSeqBuff, maxCov, translTable)
+    except Exception as e:
+        print "Exception in heval.getPerBaseErrorPkl"
+        print recListFile, refGmap, 'buffer here', maxCov, translTable
+        print e.message
+        print type(e)
+        return None
 
 
-def getPerBaseError(recSet, refGmap, refDirList, maxCov=20, translTable=11):
+def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11):
     """
         Get the per position, per coverage error.
 
@@ -252,9 +260,8 @@ def getPerBaseError(recSet, refGmap, refDirList, maxCov=20, translTable=11):
 
         @param recSet: a set of records for which the per-base error is computed
         @param refGmap: reference file containing the true mapping for each read
-        @param refDirList: list of directories in which the reference (draft-)genome files are contained
+        @param refSeqBuff: mapping for reference sequenceing map: (strainId, seqId) -> sequence
         @param maxCov: higher coverages will be mapped to this one
-
         @type recSet: set[read_rec.ReadRec]
         @type refGmap: str
         @type refDirList: list[str]
@@ -272,8 +279,11 @@ def getPerBaseError(recSet, refGmap, refDirList, maxCov=20, translTable=11):
     # the result error array (1st row ~ total count, 2nd row error count, 3rd row codon error); array length ~ coverage
     errorA = np.zeros((3, maxCov + 1), dtype=np.uint64)
 
-    # buffer the reference sequences
-    refSeqBuff = {}
+    # examined settings (strainId, seqId, startPos, strain{1,-1})
+    examinedSet = set()
+
+    # second buffer for frequently retrieved entries
+    refSeqBuff2 = {}
 
     # sum up the error for all read-records
     for rec in recSet:
@@ -290,36 +300,49 @@ def getPerBaseError(recSet, refGmap, refDirList, maxCov=20, translTable=11):
 
             strainId, seqId = gmap[recP.recordId][:2]
 
-            # get the reference sequence
-            if (seqId, strainId) in refSeqBuff:
-                refSeq = refSeqBuff[(seqId, strainId)]
-            else:
-                refSeq = fas.getSeqFromDir(seqId, refDirList, strainId)
-                refSeqBuff[(seqId, strainId)] = refSeq
-            assert refSeq is not None
+            if (strainId, seqId, startPos, 1) not in examinedSet:
 
-            # get the reference contig
-            refContig = getRefContig(refSeq, startPos, len(rec.dnaSeq))
-            # compute error
-            totalErrorA, error, correct, codonError = getError(rec.dnaSeq, refContig, rec.posCovArray, maxCov,
-                                                               rec.annotStart, rec.annotLen, tripletMap)
-            # store error
-            errList.append((totalErrorA, error, codonError, correct, refContig, refSeq, seqId))
-            if error == 0:
-                break
+                # get the reference sequence
+                refSeq = refSeqBuff2.get((strainId, seqId))
+                if refSeq is None:
+                    refSeq = refSeqBuff[(strainId, seqId)]
+                    refSeqBuff2[(strainId, seqId)] = refSeq
+
+                # get the reference contig
+                refContig = getRefContig(refSeq, startPos, len(rec.dnaSeq))
+
+                # compute error
+                totalErrorA, error, correct, codonError = getError(rec.dnaSeq, refContig, rec.posCovArray, maxCov,
+                                                                   rec.annotStart, rec.annotLen, tripletMap)
+                # store error
+                errList.append((totalErrorA, error, codonError, correct, refContig, refSeq, seqId))
+                if error == 0:
+                    break
+                examinedSet.add((strainId, seqId, startPos, 1))
+            else:
+                refSeq = None
 
             # try reverse complement
             startPos = gmap[recP.recordId][2] - 1 - (len(rec.dnaSeq) - (len(recP.dnaSeq) + recP.posWithinContig))
 
-            refContig = getRefContig(refSeq, startPos, len(rec.dnaSeq))
+            if (strainId, seqId, startPos, -1) not in examinedSet:
 
-            totalErrorA, error, correct, codonError = getError(str(Seq(rec.dnaSeq, generic_dna).reverse_complement()),
-                                                               refContig, rec.posCovArray, maxCov, rec.annotStart,
-                                                               rec.annotLen, tripletMap)
+                if refSeq is None:
+                    refSeq = refSeqBuff2.get((strainId, seqId))
+                    if refSeq is None:
+                        refSeq = refSeqBuff[(strainId, seqId)]
+                        refSeqBuff2[(strainId, seqId)] = refSeq
 
-            errList.append((totalErrorA, error, codonError, correct, refContig, refSeq, seqId))
-            if error == 0:
-                break
+                refContig = getRefContig(refSeq, startPos, len(rec.dnaSeq))
+
+                totalErrorA, error, correct, codonError = getError(str(Seq(rec.dnaSeq, generic_dna).reverse_complement()),
+                                                                   refContig, rec.posCovArray, maxCov, rec.annotStart,
+                                                                   rec.annotLen, tripletMap)
+
+                errList.append((totalErrorA, error, codonError, correct, refContig, refSeq, seqId))
+                if error == 0:
+                    break
+                examinedSet.add((strainId, seqId, startPos, -1))
 
         # get the results from the smallest error
         errList.sort(key=lambda x: x[2])
@@ -337,21 +360,34 @@ def getAssemblyReport(errorAList, maxCov=20):
         @type errorAList: list[ndarray]
         @return:
     """
-    # TODO: don't print the report, return it !!!
     errorASum = np.zeros((3, maxCov + 1), dtype=np.uint64)
     for e in errorAList:
-        errorASum += e
+        if e is not None:
+            errorASum += e
+        else:
+            print('Warning: None in heval.getAssemblyReport')
 
     buff = ''
     buff += str('Error per coverage total:\n%s\n\n' % errorASum)
-    buff += str('Error per coverage %%\n\n')
+    buff += str('@01:(' + ', '.join(map(lambda x: str(x), errorASum[0])) + ')\n')
+    buff += str('@02:(' + ', '.join(map(lambda x: str(x), errorASum[1])) + ')\n')
+    buff += str('@03:(' + ', '.join(map(lambda x: str(x), errorASum[2])) + ')\n\n')
+    buff += str('Error per coverage %%\n')
+    eList = []
     for i in range(1, maxCov + 1):
-        if not np.isclose(0, float(errorASum[0][i])):
-            buff += str('Cov: %s\tErr: %s%%\n' % (i, (float(errorASum[1][i]) / float(errorASum[0][i])) * 100.))
-    buff += str('\nError-codon per coverage')
+        if not com.isclose(0, float(errorASum[0][i])):
+            v = (float(errorASum[1][i]) / float(errorASum[0][i])) * 100.
+            buff += str('Cov: %s\tErr: %s%%\n' % (i, v))
+            eList.append(str(v))
+    buff += str('@04:(' + ', '.join(eList) + ')\n\n')
+    buff += str('\nError-codon per coverage\n')
+    eList = []
     for i in range(1, maxCov + 1):
-        if not np.isclose(0, float(errorASum[0][i])):
-            buff += str('Cov: %s\tErr: %s%%\n' % (i, (float(errorASum[2][i]) / float(errorASum[0][i])) * 100.))
+        if not com.isclose(0, float(errorASum[0][i])):
+            v = (float(errorASum[2][i]) / float(errorASum[0][i])) * 100.
+            buff += str('Cov: %s\tErr: %s%%\n' % (i, v))
+            eList.append(str(v))
+    buff += str('@05:(' + ', '.join(eList) + ')\n\n')
 
     # compute cumulative error values:
     for i in range(maxCov, 1, -1):
@@ -360,14 +396,28 @@ def getAssemblyReport(errorAList, maxCov=20):
         errorASum[2][i - 1] += errorASum[2][i]
 
     buff += str('Error per coverage cumulative total:\n%s\n\n' % errorASum)
+    buff += str('@06:(' + ', '.join(map(lambda x: str(x), errorASum[0])) + ')\n')
+    buff += str('@07:(' + ', '.join(map(lambda x: str(x), errorASum[1])) + ')\n')
+    buff += str('@08:(' + ', '.join(map(lambda x: str(x), errorASum[2])) + ')\n\n')
     buff += str('Error per coverage cumulative %%\n')
+    eList = []
     for i in range(1, maxCov + 1):
-        if not np.isclose(0, float(errorASum[0][i])):
-            buff += str('Cov: %s\tErr: %s%%\n' % (i, (float(errorASum[1][i]) / float(errorASum[0][i])) * 100.))
+        if not com.isclose(0, float(errorASum[0][i])):
+            v = (float(errorASum[1][i]) / float(errorASum[0][i])) * 100.
+            buff += str('Cov: %s\tErr: %s%%\n' % (i, v))
+            eList.append(str(v))
+    buff += str('@09:(' + ', '.join(eList) + ')\n\n')
     buff += str('\nError-codon per coverage cumulative %%\n')
+    eList = []
     for i in range(1, maxCov + 1):
-        if not np.isclose(0, float(errorASum[0][i])):
-            buff += str('Cov: %s\tErr: %s%%\n' % (i, (float(errorASum[2][i]) / float(errorASum[0][i])) * 100.))
+        if not com.isclose(0, float(errorASum[0][i])):
+            v = (float(errorASum[2][i]) / float(errorASum[0][i])) * 100.
+            buff += str('Cov: %s\tErr: %s%%\n' % (i, v))
+            eList.append(str(v))
+    buff += str('@10:(' + ', '.join(eList) + ')\n\n')
+
+    buff += str('@11:(' + ', '.join(map(lambda x: str(x), range(1, maxCov + 1))) + ')')
+
     return buff
 
 
@@ -483,10 +533,10 @@ def _test():
                     pairEndReadLen=150)
     refGmap = os.path.join(baseDir, 'r_%s_join_gmap.sam.gz' % gf)
 
-    refGenomesDraftGDirList = [os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DIR_NAME),
-                               os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DRAFT_DIR_NAME)]
+    refSeqBuff = fas.getSequenceBuffer([os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DIR_NAME),
+                               os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
 
-    errA = getPerBaseError(recSet, refGmap, refGenomesDraftGDirList, maxCov=10)
+    errA = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=10)
 
     print getAssemblyReport([errA], maxCov=10)
 

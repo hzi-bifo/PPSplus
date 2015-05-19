@@ -24,6 +24,7 @@ import os
 import re
 import types
 import gzip
+import multiprocessing
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna
@@ -74,6 +75,34 @@ def getSeqFromDir(seqId, dirList, baseFileName):
             if seqId in seqIdToSeq:
                 return seqIdToSeq[seqId]
     return None
+
+
+def getSequenceBuffer(dirList):
+    """
+        Reads all fasta files in the list of directories and stores the mapping in a dictionary (thread safe).
+        Here a fasta file name (without suffix ".fna" or ".fna.gz") is interpreted as a strain id.
+
+        @param dirList: list of directories containing fasta files
+        @type dirList: list[str]
+        @rtype: dict[(str,str),str]
+        @return: map: (strainId, seqId) -> sequence
+    """
+    man = multiprocessing.Manager()
+    mapping = man.dict()
+    for d in dirList:
+        assert os.path.isdir(d)
+        for f in os.listdir(d):
+            path = os.path.join(d, f)
+            if os.path.isfile(path) and (path.endswith('.fna') or path.endswith('.fna.gz')):
+                if path.endswith('.fna'):
+                    strainId = f[:-4]
+                else:
+                    strainId = f[:-7]
+                for seqName, seq in fastaFileToDictWholeNames(path).iteritems():
+                    k = (strainId, seqName)
+                    assert k not in mapping
+                    mapping[k] = seq
+    return mapping
 
 
 def sortSeqDesc(inFasta, outFasta):
@@ -385,3 +414,5 @@ def _forEachRecord(filePath, parser, formatName="fasta"):
 #
 # if __name__ == "__main__":
 #     _test()
+    # getSequenceBuffer(['/home/igregor/Documents/work/hsim/562/fasta_genomes',
+    #                    '/home/igregor/Documents/work/hsim/562/fasta_draft_genomes'])

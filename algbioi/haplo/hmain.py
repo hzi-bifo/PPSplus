@@ -100,28 +100,36 @@ def buildSuperReads(inFq, inDomtblout, pairEndReadLen, inProtFna=None, outFile=N
 
     # TODO: make prot sequence voluntary
 
-    # 1. read in read records
-    recList = hio.parse(inFq, inDomtblout, inProtFna, pairEndReadLen)
+    try:
+        # 1. read in read records
+        recList = hio.parse(inFq, inDomtblout, inProtFna, pairEndReadLen)
 
-    # 2. sort read record list according to the HMM start positions
-    recList.sort(key=lambda x: x.hmmCoordStart)
+        # 2. sort read record list according to the HMM start positions
+        recList.sort(key=lambda x: x.hmmCoordStart)
 
-    # 3. build the alignment coverage array
-    aliCovArray = getHmmCovArray(recList)
+        # 3. build the alignment coverage array
+        aliCovArray = getHmmCovArray(recList)
 
-    # 4. find the hotspot (starting seed)
-    seedList = findSeed(recList, aliCovArray)
+        # 4. find the hotspot (starting seed)
+        seedList = findSeed(recList, aliCovArray)
 
-    # print("Record list input length: %s" % len(recList))
+        # print("Record list input length: %s" % len(recList))
 
-    # 5. run the snowball alg.
-    recSet = runSnowball(recList, seedList, translTable, maxMismatchQSAllowed, minScoreReqiured,
-                         minAnnotOverlapScore, scoreStopSearch, maxQS)
+        # 5. run the snowball alg.
+        recSet = runSnowball(recList, seedList, translTable, maxMismatchQSAllowed, minScoreReqiured,
+                             minAnnotOverlapScore, scoreStopSearch, maxQS)
 
-    if outFile is not None:
-        hio.storeReadRec(list(recSet), outFile)
-
-    return recSet
+        if outFile is not None:
+            hio.storeReadRec(list(recSet), outFile)
+            return None
+        else:
+            return recSet
+    except Exception as e:
+        print('Exception in buildSuperReads:')
+        print inFq, inDomtblout, pairEndReadLen, inProtFna, outFile, translTable, maxMismatchQSAllowed, minScoreReqiured, minAnnotOverlapScore, scoreStopSearch, maxQS
+        print e.message
+        print type(e)
+        print e.args
 
 
 # TODO: 6. clean up discart low support contigs, output results

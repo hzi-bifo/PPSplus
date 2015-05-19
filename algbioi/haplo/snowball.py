@@ -170,14 +170,16 @@ def inspectOverlap(rec1, rec2, overlapIdx, tripletMap, maxMismatchQSAllowed):
             # get the frame offset, the triplet start-position, the triplet
             offset = (r1 - rec1.annotStart) % 3
             start = r1 - offset
-            triplet1 = dna1[start:start+3]
+            # triplet1 = dna1[start:start+3]
+            amino1 = tripletMap.get(dna1[start:start+3])
 
             offset = (r2 - rec2.annotStart) % 3
             start = r2 - offset
-            triplet2 = dna2[start:start+3]
+            # triplet2 = dna2[start:start+3]
+            amino2 = tripletMap.get(dna2[start:start+3])
             # TODO: check index out of range !!!
             # both triplets encode the same aminoacid
-            if tripletMap[triplet1] == tripletMap[triplet2]:
+            if amino1 is not None and amino1 == amino2:
                 aminoMatchMismatch += 1
             else:
                 # mismatch found

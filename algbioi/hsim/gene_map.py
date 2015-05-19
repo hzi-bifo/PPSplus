@@ -116,11 +116,11 @@ class _RefAccVersRec():
                 if gPos <= rPos:
                     rPosOnRead = 0
                     rPosOnGene = rPos - gPos
-                    overlapLen = gPos + gLen - rPos
+                    overlapLen = min(rPos + rLen, gPos + gLen) - rPos
                 else:
                     rPosOnRead = gPos - rPos
                     rPosOnGene = 0
-                    overlapLen = rPos + rLen - gPos
+                    overlapLen = min(rPos + rLen, gPos + gLen) - gPos
                 entry = (rPosOnRead, rPosOnGene, overlapLen, gStrain, gName)
 
                 if retList is None:
@@ -278,7 +278,9 @@ def getReadsToGenesMap(refList, samList, genesDir):
     # print 'genes', g
 
     # get mapping: accVersion -> _RefAccVersRec
-    accVtoR = {}  # mp.Manager().dict()
+    # man = mp.Manager()
+    # accVtoR = man.dict()  # too slow with the manager
+    accVtoR = {}
     for refRecord in accToRefRecord.values():  # for all ref records
         refRecordD = refRecord.getAccVtoR()
         sizeI = len(refRecordD)

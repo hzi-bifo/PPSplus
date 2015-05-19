@@ -910,9 +910,9 @@ def computePerBaseAssemblyError(specDir):
     print('Computing the per-base assembly error')
     samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
 
-    refGenomesDraftGDirList = [os.path.join(specDir, comh.FASTA_GENOMES_DIR_NAME),
-                           os.path.join(specDir, comh.FASTA_GENOMES_DRAFT_DIR_NAME)]
-
+    # buffer the reference sequences
+    refSeqBuff = fas.getSequenceBuffer([os.path.join(specDir, comh.FASTA_GENOMES_DIR_NAME),
+                           os.path.join(specDir, comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
     # collect tasks
     taskList = []
     # rList = []
@@ -929,19 +929,18 @@ def computePerBaseAssemblyError(specDir):
                         assert os.path.isfile(gmapSam)
 
                         taskList.append(parallel.TaskThread(heval.getPerBaseErrorPkl,
-                                                            (readRecPkl, gmapSam, refGenomesDraftGDirList, 30,
+                                                            (readRecPkl, gmapSam, refSeqBuff, 30,
                                                              comh.TRANSLATION_TABLE)))
 
                         # a = heval.getPerBaseErrorPkl(readRecPkl, gmapSam, refGenomesDraftGDirList, 30, comh.TRANSLATION_TABLE)
                         # rList.append(a)
                         # heval.getAssemblyReport([a], maxCov=30)
-
     rList = parallel.runThreadParallel(taskList, comh.MAX_PROC)
-    out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_INIT))
     report = heval.getAssemblyReport(rList, maxCov=30)
+    print report
+    out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_INIT))
     out.writeText(report)
     out.close()
-    print report
 
 
 def filterReadsQS(specDir):

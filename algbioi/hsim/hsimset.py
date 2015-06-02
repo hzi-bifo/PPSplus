@@ -102,12 +102,12 @@ def _main():
         if False:
             getGeneMapping(specDir)
 
-        if False:
-            translateJoinedReadsToProt(specDir)
+        if True:
+            translateReadsToProt(specDir, translateJoined=False, translateNotJoined=True)
 
-        # Get Pfam annotation (for joined reads)
+        # Get HMM annotation
         if False:
-            getPfamAnnotation(specDir)
+            getHmmAnnotation(specDir, considerJoined=False, considerNotJoined=True)
 
         # Get the precision/recall of the pfam-annotations.
         if False:
@@ -124,7 +124,7 @@ def _main():
         if False:
             assembleContigs(specDir)
 
-        if True:
+        if False:
             computePerBaseAssemblyError(specDir)
 
 
@@ -735,13 +735,11 @@ def getGeneMapping(specDir):
     gene_map.getReadsToGenesMap(refList, samList, genesDir)
 
 
-def translateJoinedReadsToProt(specDir):
+def translateReadsToProt(specDir, translateJoined=False, translateNotJoined=False):
     """
         Translate reads to all 6 reading frames.
-
-        TODO: not implemented yet !
     """
-    print('Translating joined reads into 6 reading frames')
+    print('Translating reads into 6 reading frames (joined: %s, notJoined: %s)' % (translateJoined, translateNotJoined))
     # directory containing all samples
     samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
 
@@ -757,19 +755,28 @@ def translateJoinedReadsToProt(specDir):
                     if os.path.isdir(strainDir):
                         for f in os.listdir(strainDir):
                             i, name = f.split('_', 1)
-                            if i.isdigit() and name == 'join.fq.gz':
+                            if i.isdigit():
                                 inFq = os.path.join(strainDir, f)
-                                outFasta = os.path.join(strainDir, str(i) + '_join_prot.fna.gz')
-                                taskList.append(parallel.TaskThread(fq.readsToProt, (inFq, outFasta)))
+                                if translateJoined and name == 'join.fq.gz':
+                                    outFasta = os.path.join(strainDir, str(i) + '_join_prot.fna.gz')
+                                    taskList.append(parallel.TaskThread(fq.readsToProt, (inFq, outFasta)))
+                                elif translateNotJoined and (name == 'pair1.fq.gz' or name == 'pair2.fq.gz') \
+                                        and not os.path.isfile(os.path.join(strainDir, str(i) + '_join.fq.gz')):
+                                    if name.startswith('pair1'):
+                                        outFasta = os.path.join(strainDir, str(i) + '_pair1_prot.fna.gz')
+                                    else:
+                                        outFasta = os.path.join(strainDir, str(i) + '_pair2_prot.fna.gz')
+                                    taskList.append(parallel.TaskThread(fq.readsToProt, (inFq, outFasta)))
+
     # run tasks in parallel
     parallel.runThreadParallel(taskList, comh.MAX_PROC)
 
 
-def getPfamAnnotation(specDir):
+def getHmmAnnotation(specDir, considerJoined=False, considerNotJoined=False):
     """
-        Get the Pfam annotation for all the joined pair-end reads.
+        Get the Hmm annotation for all the joined pair-end reads or the not joined pair end reads.
     """
-    print('Searching through PROT read sequences')
+    print('Running Hmm search.')
     # directory containing all samples
     samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
 
@@ -785,17 +792,29 @@ def getPfamAnnotation(specDir):
                     if os.path.isdir(strainDir):
                         for f in os.listdir(strainDir):
                             i, name = f.split('_', 1)
-                            if i.isdigit() and name == 'join_prot.fna.gz':
+                            if i.isdigit():
                                 protReadsInGzip = os.path.join(strainDir, f)
-                                assert protReadsInGzip.endswith('fna.gz')
                                 protReadsIn = protReadsInGzip[:-3]
-                                domOut = os.path.join(strainDir, str(i) + '_join_prot.domtblout')
-                                cmd = 'zcat %s > %s;%s/hmmsearch -o /dev/null --noali --domtblout %s -E 0.01 ' \
-                                      '--cpu 1 %s %s;rm %s;gzip -f %s' \
-                                      % (protReadsInGzip, protReadsIn, comh.HMMER_BINARY, domOut,
-                                         os.path.join(comh.PFAM, 'Pfam-A.hmm'), protReadsIn, protReadsIn, domOut)
-                                cwd = os.path.dirname(protReadsIn)
-                                taskList.append(parallel.TaskCmd(cmd, cwd))
+                                appendTask = False
+                                if considerJoined and name == 'join_prot.fna.gz':
+                                    assert protReadsInGzip.endswith('prot.fna.gz')
+                                    domOut = os.path.join(strainDir, str(i) + '_join_prot.domtblout')
+                                    appendTask = True
+                                elif considerNotJoined and (name == 'pair1_prot.fna.gz' or name == 'pair2_prot.fna.gz'):
+                                    assert protReadsInGzip.endswith('prot.fna.gz')
+                                    if name.startswith('pair1'):
+                                        domOut = os.path.join(strainDir, str(i) + '_pair1_prot.domtblout')
+                                    else:
+                                        domOut = os.path.join(strainDir, str(i) + '_pair2_prot.domtblout')
+                                    appendTask = True
+                                if appendTask:
+                                    cmd = 'zcat %s > %s;%s/hmmsearch -o /dev/null --noali --domtblout %s -E 0.01 ' \
+                                          '--cpu 5 %s %s;rm %s;gzip -f %s' \
+                                          % (protReadsInGzip, protReadsIn, comh.HMMER_BINARY, domOut,
+                                             os.path.join(comh.HMM_PROFILE_DIR, comh.HMM_PROFILE_FILE),
+                                             protReadsIn, protReadsIn, domOut)
+                                    cwd = os.path.dirname(protReadsIn)
+                                    taskList.append(parallel.TaskCmd(cmd, cwd))
 
     # search reads again the Pfam database in parallel
     parallel.runCmdParallel(taskList, comh.MAX_PROC)

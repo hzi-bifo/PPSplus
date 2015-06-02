@@ -105,8 +105,7 @@ def searchForGeneFam(specDir):
                str(basePath + '.domtblout'),
                0.01,
                1,
-               os.path.join(comh.PFAM, 'Pfam-A_and_Amphora2.hmm'),
-               filePath)
+               os.path.join(comh.HMM_PROFILE_DIR, comh.HMM_PROFILE_FILE), filePath)
         taskList.append(parallel.TaskCmd(cmd, cwd=srcProtGeneDir))
 
     # run commands in parallel

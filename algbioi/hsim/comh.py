@@ -59,17 +59,17 @@ if sys.platform == 'darwin':
     # REFERENCE_DIR_ROOT = '/Volumes/VerbatimSSD/work/hsim01'  # external storage !!!
     REFERENCE_DIR_ROOT = '/Users/ivan/Documents/nobackup/hsim01'  # local disk !!!
     NCBI_TAXONOMY_FILE = '/Users/ivan/Documents/work/binning/taxonomy/20140916/ncbitax_sqlite.db'
-    PFAM = '/Volumes/VerbatimSSD/work/pfam'
+    HMM_PROFILE_DIR = '/Volumes/VerbatimSSD/work/pfam'
 else:
     if platform.dist()[0] == 'Ubuntu':
         REFERENCE_DIR_ROOT = '/home/igregor/Documents/work/hsim'
         NCBI_TAXONOMY_FILE = '/home/igregor/Documents/work/taxonomy/20140916/ncbitax_sqlite.db'
-        PFAM = '/home/igregor/Documents/work/db/pfamV27'
+        HMM_PROFILE_DIR = '/home/igregor/Documents/work/db/pfamV27'
     else:
         assert sys.platform == 'linux2'
         REFERENCE_DIR_ROOT = '/net/metagenomics/projects/PPSmg/hsim/hsim01'
         NCBI_TAXONOMY_FILE = '/net/metagenomics/projects/PPSmg/taxonomy/20140916/ncbitax_sqlite.db'
-        PFAM = '/net/metagenomics/projects/PPSmg/database/pfamV27/nobackup/pub/databases/Pfam/releases/Pfam27.0'
+        HMM_PROFILE_DIR = '/net/metagenomics/projects/PPSmg/database/pfamV27/nobackup/pub/databases/Pfam/releases/Pfam27.0'
 
 # Directory names
 FASTA_GENOMES_DIR_NAME = 'fasta_genomes'
@@ -121,6 +121,7 @@ SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY = 0.9
 
 SAMPLES_PFAM_EVAN_MIN_SCORE = 40
 SAMPLES_PFAM_EVAN_MIN_ACCURACY = 0.6
+HMM_PROFILE_FILE = 'Pfam-A_and_Amphora2.hmm'
 
 # Assembly parameters
 ASSEMBLY_MAX_MISMATCH_QS_ALLOWED = 9

@@ -32,6 +32,7 @@ from algbioi.hsim import comh
 from algbioi.haplo import hmain
 from algbioi.haplo import hio
 from algbioi.haplo import join_rec
+from algbioi.com import qs
 
 
 def assemblyStat(recSet):
@@ -193,6 +194,7 @@ def getRefContig(refSeq, startPos, seqLen):
 def getError(dnaSeq, refSeq, covArray, maxCov, annotStart, annotLen, tripletMap):
     """
         Compute substitution errors between two DNA sequences.
+        A comparison to a non-DNA character in the reference sequence is considered to be "correct".
 
         @param dnaSeq: first sequence
         @param refSeq: second sequence
@@ -220,7 +222,8 @@ def getError(dnaSeq, refSeq, covArray, maxCov, annotStart, annotLen, tripletMap)
     for i in range(len(dnaSeq)):
         cov = min(covArray[i], maxCov)
         totalErrorA[0][cov] += 1
-        if dnaSeq[i] == refSeq[i]:
+        # count non-DNA in the reference as true
+        if dnaSeq[i] == refSeq[i] or (not qs.isDNAChar(refSeq[i])):  # TODO: consider all the ambiguous characters ?
             correct += 1
         else:
             totalErrorA[1][cov] += 1

@@ -44,6 +44,7 @@ from algbioi.hsim import gene_map
 from algbioi.hsim import pfam
 from algbioi.haplo import hmain
 from algbioi.haplo import heval
+from algbioi.haplo import align
 
 
 def _main():
@@ -102,7 +103,7 @@ def _main():
         if False:
             getGeneMapping(specDir)
 
-        if True:
+        if False:
             translateReadsToProt(specDir, translateJoined=False, translateNotJoined=True)
 
         # Get HMM annotation
@@ -115,7 +116,10 @@ def _main():
 
         # Partition reads into Pfam-domains
         if False:
-            partitionReadsToPfamDom(specDir)
+            partitionReadsToPfamDom(specDir, considerJoined=True, considerNotJoined=True)
+
+        if False:
+            alignHmmPartitionedReads(specDir)
 
         # Get Stat for partitioned reads into Pfam-domains
         if False:
@@ -852,7 +856,7 @@ def getAnnotationAccuracy(specDir):
                                            comh.SAMPLES_PFAM_EVAN_MIN_SCORE, comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY)
 
 
-def partitionReadsToPfamDom(specDir):
+def partitionReadsToPfamDom(specDir, considerJoined=False, considerNotJoined=False):
     """
         Partition reads into Pfam-domains.
     """
@@ -865,10 +869,34 @@ def partitionReadsToPfamDom(specDir):
         if sample.isdigit():
             sampleDir = os.path.join(samplesDir, sample)
             if os.path.isdir(sampleDir):
-                taskList.append(parallel.TaskThread(pfam.partitionReads, (sampleDir, comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
-                                    comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY, comh.SAMPLES_SHUFFLE_RAND_SEED,
-                                    comh.SAMPLES_PFAM_PARTITIONED_DIR)))
+                if considerJoined:
+                    taskList.append(parallel.TaskThread(pfam.partitionReads, (sampleDir, comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
+                                        comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY, comh.SAMPLES_SHUFFLE_RAND_SEED,
+                                        comh.SAMPLES_PFAM_PARTITIONED_DIR, True)))
+                if considerNotJoined:
+                    taskList.append(parallel.TaskThread(pfam.partitionReads, (sampleDir, comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
+                                        comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY, comh.SAMPLES_SHUFFLE_RAND_SEED,
+                                        comh.SAMPLES_PFAM_PARTITIONED_DIR, False)))
+
     parallel.runThreadParallel(taskList, comh.MAX_PROC)
+
+
+def alignHmmPartitionedReads(specDir):
+    """
+        Align partitioned reads.
+    """
+    print('Aligning partitioned reads.')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            sampleDir = os.path.join(samplesDir, sample)
+            partDir = os.path.join(os.path.join(sampleDir, comh.SAMPLES_PFAM_PARTITIONED_DIR))
+            if os.path.isdir(sampleDir) and os.path.isdir(partDir):
+                align.alignAllPartitioned(partDir,
+                                          os.path.join(comh.HMM_PROFILE_DIR, comh.HMM_PROFILE_FILES_PARTITIONED_DIR),
+                                          comh.HMMER_BINARY, comh.MAX_PROC)
 
 
 def getStatPartitionedReadsPfamDom(specDir):

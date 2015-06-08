@@ -104,6 +104,8 @@ def buildSuperReads(inFq, inDomtblout, pairEndReadLen, inProtFna=None, outFile=N
         # 1. read in read records
         recList = hio.parse(inFq, inDomtblout, inProtFna, pairEndReadLen)
 
+        # return None  # TODO: tmp !!!
+
         # 2. sort read record list according to the HMM start positions
         recList.sort(key=lambda x: x.hmmCoordStart)
 

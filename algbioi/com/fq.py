@@ -19,7 +19,9 @@
     Contains basic functionality to work with FASTAQ files.
 """
 
+import os
 import gzip
+import zlib
 import parallel
 import multiprocessing as mp
 import numpy as np
@@ -85,8 +87,8 @@ class WriteFq():
         self._outFq.write(''.join(self._blocks))
         self._blocks = []
 
-    def writeFqEntry(self, name, dna, qs):
-        self.write(name + '\n' + dna + '\n+\n' + qs + '\n')
+    def writeFqEntry(self, name, dna, qs, comment=''):
+        self.write(name + '\n' + dna + '\n+' + comment + '\n' + qs + '\n')
 
     def write(self, text):
         self._blocks.append(text)
@@ -96,6 +98,34 @@ class WriteFq():
     def close(self):
         self._writeBlocks()
         self._outFq.close()
+
+
+def getFqToDict(inFq1, inFq2, compressLevel=0):
+    """
+        Store pair-end reads into a dictionary.
+
+        @param compressLevel: if set to 1-9, the dictionary values are compressed (see zlib.decompress())
+        @type inFq1: str
+        @type inFq2: str
+        @type compressLevel: int
+        @rtype: dict[str,str]
+        @return: map: readName -> TAB dna1 TAB qs1 TAB dna2 TAB qs2
+    """
+    assert os.path.isfile(inFq1) and os.path.isfile(inFq2)
+    rDict = {}
+    for r1, r2 in zip(ReadFqGen(inFq1), ReadFqGen(inFq2)):
+        name1, dna1, p1, qs1 = r1
+        name2, dna2, p2, qs2 = r2
+        name = name1[1:-2]
+        assert name == name2[1:-2]
+        assert name not in rDict
+        entry = '\t%s\t%s\t%s\t%s' % (dna1, qs1, dna2, qs2)
+        if compressLevel == 0:
+            rDict[name] = entry
+        else:
+            rDict[name] = zlib.compress(entry, compressLevel)
+
+    return rDict
 
 
 def joinPairEnd(fileTupleList, minOverlap=0.05, minOverlapIdentity=0.9, maxCpu=mp.cpu_count()):
@@ -576,10 +606,33 @@ def _fqReadWriteTest():
 #     q = QsMultMatrix(62)
     # print q._qsMismatchMatrix
 
-if __name__ == "__main__":
-    pass
+
+def testGetFqToDict():
+    d = getFqToDict('/home/igregor/Documents/work/hsim/562/samples/0/NZ_AKLX00000000/0_pair1.fq.gz',
+                '/home/igregor/Documents/work/hsim/562/samples/0/NZ_AKLX00000000/0_pair2.fq.gz')
+    i=0
+    for k, v in d.iteritems():
+        print k, v
+        if i > 10:
+            break
+        i += 1
     # _fqReadWriteTest()
     # _testFilter()
     # _testJoin()
     # _testReadsToProt()
     # _testQSMismatch()
+
+
+def testConsecutiveRead():
+    fq1 ='/home/igregor/Documents/work/hsim/562/samples/0/NZ_AKLX00000000/0_pair1.fq.gz'
+    fq2 = '/home/igregor/Documents/work/hsim/562/samples/0/NZ_AKLX00000000/0_pair2.fq.gz'
+    i = 0  # 464658 464658
+    for a,b,c,d in list(ReadFqGen(fq1)) + list(ReadFqGen(fq2)):
+        if i % 100000 == 0:
+            print a,b,c,d
+        i += 1
+    print i
+
+
+if __name__ == "__main__":
+    pass

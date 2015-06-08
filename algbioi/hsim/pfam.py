@@ -62,6 +62,11 @@ def _main():
         if False:
             getAmbiguousDomains(specDir)
 
+    # partition the file containing Hmm profiles into individual files, one profile per file
+    if False:
+        getPartitionHmmProfiles(os.path.join(comh.HMM_PROFILE_DIR, comh.HMM_PROFILE_FILE),
+                                os.path.join(comh.HMM_PROFILE_DIR, comh.HMM_PROFILE_FILES_PARTITIONED_DIR))
+
 
 def dnaToProt(specDir):
     """
@@ -308,6 +313,37 @@ def getAmbiguousDomains(specDir):
         totalDomains += 1
     print('Total: %s, Ambiguous: %s' % (totalDomains, domainAmbiguous))
     out.close()
+
+
+def getPartitionHmmProfiles(srcHmmProfileFile, dstDir):
+    """
+        Partition a file containing hmm profiles into individual files, each containing one hmm profile.
+
+        @param srcHmmProfileFile: file containing hmm profiles in the stockholm format
+        @param dstDir: directory containing individual files
+        @type srcHmmProfileFile: str
+        @type dstDir: str
+    """
+    assert os.path.isfile(srcHmmProfileFile)
+    assert os.path.isdir(os.path.dirname(dstDir))
+    if not os.path.isdir(dstDir):
+        os.mkdir(dstDir)
+    buff = []
+    name = None
+    for line in open(srcHmmProfileFile):
+        if line.startswith('//'):
+            buff.append(line)
+            assert name is not None
+            out = csv.OutFileBuffer(os.path.join(dstDir, comh.getGeneNameToFileName(name)[:-4]) + '.hmm')
+            out.writeText(''.join(buff))
+            out.close()
+            buff = []
+            name = None
+        else:
+            if line.startswith('NAME'):
+                assert name is None
+                name = line.strip().split()[1]
+            buff.append(line)
 
 
 class FamInfoHolder():
@@ -730,7 +766,7 @@ def dnaHitInfo(hit, dnaSeq, protSeq=None, translTable=11):
     return startOnRead, overlapLen, strain, score, acc
 
 
-def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed, pfamPartitionedDir):
+def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed, pfamPartitionedDir, joinedReads=True):
     """
         Partitioning reads into the individual Pfam-domains.
     """
@@ -748,39 +784,94 @@ def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed
 
     for strainDir in strainDirList:
         strainAcc = os.path.basename(strainDir)
+        if strainAcc == 'sample_partitioned':  # skip the directory containing the partitioned data
+            continue
         if os.path.isdir(strainDir):
-            # find the dom file! do it for each dom file you find!
+            # find the dom file! do it for each dom file you find
             for f in os.listdir(strainDir):
-                # print f, type(f), f.endswith('domtblout.gz')
-                if f.endswith('domtblout.gz'):  # a domtblout file found
-                    i = f.split('_')[0]
+
+                if (joinedReads and f.endswith('join_prot.domtblout.gz')) \
+                        or (not joinedReads and f.endswith('pair1_prot.domtblout.gz')):  # a domtblout file found
+                    i = f.split('_', 1)[0]
                     if i.isdigit():
-                        domPath = os.path.join(strainDir, f)
-                        fqPath = os.path.join(strainDir, '%s_join.fq.gz' % (i,))
-                        fqProtPath = os.path.join(strainDir, '%s_join_prot.fna.gz' % (i,))
-                        samPath = os.path.join(strainDir, '%s_join_gmap.sam.gz' % (i,))
-                        assert os.path.isfile(domPath) and os.path.isfile(fqPath) and os.path.isfile(fqProtPath) \
-                            and os.path.isfile(samPath)
+                        if joinedReads:
+                            domPath = os.path.join(strainDir, f)
+                            domPath2 = None
+                            fqPath = os.path.join(strainDir, '%s_join.fq.gz' % (i,))
+                            fqPair1Path = os.path.join(strainDir, '%s_pair1.fq.gz' % (i,))
+                            fqPair2Path = os.path.join(strainDir, '%s_pair2.fq.gz' % (i,))
+                            fqProtPath = os.path.join(strainDir, '%s_join_prot.fna.gz' % (i,))
+                            fqProtPath2 = None
+                            samPath = os.path.join(strainDir, '%s_join_gmap.sam.gz' % (i,))
+                            assert os.path.isfile(fqPath)
+                        else:
+                            domPath = os.path.join(strainDir, f)
+                            domPath2 = os.path.join(strainDir, '%s_pair2_prot.domtblout.gz' % (i,))
+                            fqPath = None
+                            fqPair1Path = os.path.join(strainDir, '%s_pair1.fq.gz' % (i,))
+                            fqPair2Path = os.path.join(strainDir, '%s_pair2.fq.gz' % (i,))
+                            fqProtPath = os.path.join(strainDir, '%s_pair1_prot.fna.gz' % (i,))
+                            fqProtPath2 = os.path.join(strainDir, '%s_pair2_prot.fna.gz' % (i,))
+                            samPath = os.path.join(strainDir, '%s_pair.sam.gz' % (i,))
+                            assert os.path.isfile(domPath2) and os.path.isfile(fqProtPath2)
+                        assert os.path.isfile(domPath) and os.path.isfile(samPath) and os.path.isfile(fqPair1Path) \
+                               and os.path.isfile(fqPair2Path) and os.path.isfile(fqProtPath)
 
                         # map: read-name -> list of hits (lists sorted according to the scores)
                         nameToHitList = getReadNameToHitList(domPath)
+                        if not joinedReads:
+                            nameToHitList2 = getReadNameToHitList(domPath2)
+                            len1 = len(nameToHitList)
+                            len2 = len(nameToHitList2)
+                            nameToHitList.update(nameToHitList2)
+                            assert len(nameToHitList) == len1 + len2
 
                         # map: read-name-prot -> seq-prot
                         protNameToSeq = fas.fastaFileToDictWholeNames(fqProtPath)
+                        if not joinedReads:
+                            protNameToSeq.update(fas.fastaFileToDictWholeNames(fqProtPath2))
 
                         # map: read-name -> sam-line-entry
                         readNameToSam = {}
-                        for line in gzip.open(samPath):
-                            line = line.strip()
-                            if line.startswith('#'):
-                                continue
-                            readName = line.split('\t', 1)[0]
-                            if len(line.split('\t')) == 11:  # lines with only 11 entries will be padded with * to 12
-                                line += '\t*'
-                            readNameToSam[readName] = line
+                        if joinedReads:
+                            for line in gzip.open(samPath):
+                                line = line.strip()
+                                if line.startswith('#'):
+                                    continue
+                                readName = line.split('\t', 1)[0]
+                                if len(line.split('\t')) == 11:  # lines with only 11 entries will be padded with * to 12
+                                    line += '\t*'
+                                readNameToSam[readName] = line + '\t' + strainAcc
+                        else:
+                            entry = []
+                            for line in gzip.open(samPath):
+                                line = line.strip()
+                                if line.startswith('#') or line.startswith('@'):
+                                    continue
+                                if len(entry) < 2:
+                                    entry.append(line)
+                                if len(entry) == 2:
+                                    readName = entry[0].split('\t', 1)[0]
+                                    assert readName == entry[1].split('\t', 1)[0]
+                                    readNameToSam[readName] = entry[0] + '\t*\t' + strainAcc + '\n' \
+                                                              + entry[1] + '\t*\t' + strainAcc
+                                    entry = []
+
+                        # map read-name -> "pair1-dna tab pair1-qs tab pair2-dna tab pair2-qs"
+                        if joinedReads:
+                            readNameToPairReads = fq.getFqToDict(fqPair1Path, fqPair2Path)
+                        else:
+                            readNameToPairReads = None
+
+                        if joinedReads:
+                            g1 = fq.ReadFqGen(fqPath)
+                            g2 = []
+                        else:
+                            g1 = fq.ReadFqGen(fqPair1Path)
+                            g2 = fq.ReadFqGen(fqPair2Path)
 
                         # go over all reads !!!
-                        for readName, dna, p, qs in fq.ReadFqGen(fqPath):
+                        for readName, dna, p, qs in list(g1) + list(g2):
                             readName = readName[1:]  # strip starting '@'
 
                             # take the hit with the highest score
@@ -799,18 +890,29 @@ def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed
                                     fqSamOutDict[famName] = []
                                     fqDomOutDict[famName] = []
 
-                                fqOutDict[famName].append((readName, dna, qs))
+                                if joinedReads:
+                                    comment = readNameToPairReads[readName]
+                                else:
+                                    comment = ''
+                                fqOutDict[famName].append((readName, dna, qs, comment))
 
                                 protSeqName = topHit[0]
                                 protSeq = protNameToSeq[protSeqName]
                                 fqProtOutDict[famName].append((readName, protSeq))
 
-                                fqSamOutDict[famName].append(readNameToSam[readName] + '\t' + strainAcc)
-
+                                if joinedReads:
+                                    fqSamOutDict[famName].append(readNameToSam[readName])
+                                else:
+                                    fqSamOutDict[famName].append(readNameToSam[readName[:-2]])
                                 # top hit coordinates within the read
                                 startOnRead, overlapLen, strain = dnaHitInfo(topHit, dna, protSeq)[:3]
 
                                 fqDomOutDict[famName].append('\t'.join(topHit) + '\t%s\t%s\t%s' % (startOnRead, overlapLen, strain))
+
+    if joinedReads:
+        ident = 'join'
+    else:
+        ident = 'pair'
 
     # for each pfam-dom, store into a file
     for famName, fqContentList in fqOutDict.iteritems():
@@ -819,22 +921,22 @@ def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed
         pf = comh.getGeneNameToFileName(famName)[:-4]
 
         # define output files
-        fqOutO = os.path.join(samplePartDir, 'o_%s_join.fq.gz' % pf)  # 'o_' ~ ordered entries
-        fqOutR = os.path.join(samplePartDir, 'r_%s_join.fq.gz' % pf)  # 'r_' ~ random shuffled entries
+        fqOutO = os.path.join(samplePartDir, 'o_%s_%s.fq.gz' % (pf, ident))  # 'o_' ~ ordered entries
+        fqOutR = os.path.join(samplePartDir, 'r_%s_%s.fq.gz' % (pf, ident))  # 'r_' ~ random shuffled entries
 
-        fqProtOutO = os.path.join(samplePartDir, 'o_%s_join_prot.fna.gz' % pf)
-        fqProtOutR = os.path.join(samplePartDir, 'r_%s_join_prot.fna.gz' % pf)
+        fqProtOutO = os.path.join(samplePartDir, 'o_%s_%s_prot.fna.gz' % (pf, ident))
+        fqProtOutR = os.path.join(samplePartDir, 'r_%s_%s_prot.fna.gz' % (pf, ident))
 
-        fqSamOutO = os.path.join(samplePartDir, 'o_%s_join_gmap.sam.gz' % pf)
-        fqSamOutR = os.path.join(samplePartDir, 'r_%s_join_gmap.sam.gz' % pf)
+        fqSamOutO = os.path.join(samplePartDir, 'o_%s_%s_gmap.sam.gz' % (pf, ident))
+        fqSamOutR = os.path.join(samplePartDir, 'r_%s_%s_gmap.sam.gz' % (pf, ident))
 
-        fqDomOutO = os.path.join(samplePartDir, 'o_%s_join_prot.domtblout.gz' % pf)
-        fqDomOutR = os.path.join(samplePartDir, 'r_%s_join_prot.domtblout.gz' % pf)
+        fqDomOutO = os.path.join(samplePartDir, 'o_%s_%s_prot.domtblout.gz' % (pf, ident))
+        fqDomOutR = os.path.join(samplePartDir, 'r_%s_%s_prot.domtblout.gz' % (pf, ident))
 
         # write fq
         fqOut = fq.WriteFq(fqOutO)
         for e in fqContentList:
-            fqOut.writeFqEntry(e[0], e[1], e[2])
+            fqOut.writeFqEntry('@' + e[0], e[1], e[2], e[3])
         fqOut.close()
 
         # write prot
@@ -855,8 +957,12 @@ def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed
         # shuffle file entries
         rand.shuffleLines(fqOutO, fqOutR, 4, shuffleRandSeed)
         rand.shuffleLines(fqProtOutO, fqProtOutR, 2, shuffleRandSeed)
-        rand.shuffleLines(fqSamOutO, fqSamOutR, 1, shuffleRandSeed)
         rand.shuffleLines(fqDomOutO, fqDomOutR, 1, shuffleRandSeed)
+
+        if joinedReads:
+            rand.shuffleLines(fqSamOutO, fqSamOutR, 1, shuffleRandSeed)
+        else:
+            rand.shuffleLines(fqSamOutO, fqSamOutR, 2, shuffleRandSeed)
 
         # delete ordered files (keep only the shuffled ones)
         os.remove(fqOutO)
@@ -993,6 +1099,7 @@ def testAnnotationAccuracy():
     # print 'rest', r1, r2
 
 if __name__ == "__main__":
+    _main()
     # testAnnotationAccuracy()
     # testPartition()
-    testPartitionStat()
+    # testPartitionStat()

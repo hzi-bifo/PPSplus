@@ -426,8 +426,8 @@ def getAssemblyReport(errorAList, maxCov=20):
 
 def _test():
 
-    gf = 'pfl_3'
-    # gf1 = 'aminotran_3_1'
+    # gf = 'pfl_3'
+    gf = 'aminotran_3_1'
 
     # gf = 'acr_tran_3'
     # gf = 'abc_tran_3'
@@ -442,6 +442,30 @@ def _test():
     # gf = 'bpd_transp_1_3'
     # gf = 'feccd_3'
     # gf = 'terminase_gpa_3'
+
+    baseDir = os.path.join(comh.REFERENCE_DIR_ROOT, '562/samples/0/sample_partitioned')
+    recSet = hmain.buildSuperReads(inFq=os.path.join(baseDir, 'r_%s_join.fq.gz' % gf),
+                    inDomtblout=os.path.join(baseDir, 'r_%s_join_prot.domtblout.gz' % gf),
+                    inProtFna=os.path.join(baseDir, 'r_%s_join_prot.fna.gz' % gf),
+                    pairEndReadLen=150)
+
+    # refGmap = os.path.join(baseDir, 'r_%s_join_gmap.sam.gz' % gf)
+
+    # refSeqBuff = fas.getSequenceBuffer([os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DIR_NAME),
+    #                            os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
+
+    # errA = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=10)
+
+    # print getAssemblyReport([errA], maxCov=10)
+
+    # assemblyStat(recSet)
+    # assemblyPurity(recSet, refGmap)
+
+
+if __name__ == "__main__":
+    _test()
+
+
     # gf = 'pfl_3'
     # gf = 'okr_dc_1_5'
     # gf = 'mfs_1_3'
@@ -528,24 +552,3 @@ def _test():
     # gf = 'ribosomal_l16_2'
     # gf = 'ribosomal_l19_2'
     # gf = 'ribosomal_l20_2'
-
-    baseDir = os.path.join(comh.REFERENCE_DIR_ROOT, '562/samples/0/sample_partitioned')
-    recSet = hmain.buildSuperReads(inFq=os.path.join(baseDir, 'r_%s_join.fq.gz' % gf),
-                    inDomtblout=os.path.join(baseDir, 'r_%s_join_prot.domtblout.gz' % gf),
-                    inProtFna=os.path.join(baseDir, 'r_%s_join_prot.fna.gz' % gf),
-                    pairEndReadLen=150)
-    refGmap = os.path.join(baseDir, 'r_%s_join_gmap.sam.gz' % gf)
-
-    refSeqBuff = fas.getSequenceBuffer([os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DIR_NAME),
-                               os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
-
-    errA = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=10)
-
-    print getAssemblyReport([errA], maxCov=10)
-
-    # assemblyStat(recSet)
-    # assemblyPurity(recSet, refGmap)
-
-
-if __name__ == "__main__":
-    _test()

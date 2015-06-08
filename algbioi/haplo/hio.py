@@ -54,13 +54,13 @@ def readDomblout(inDomblout):
     return nameToHit
 
 
-def parse(inFq, inDomtblout, inProtFna, pairEndReadLen):
+def parse(inFq, inDomtblout, inProtFna, pairEndReadLen):  # TODO: remove pair-end read length, inProtFna=None
     """
         Read in joined pair-end reads and its HMM annotation from the FASTQ, prot FASTA, and DOMTBLOUT files.
 
         @param inFq: FASTQ file containing joined pair-end reads
         @param inDomtblout: HMM annotation file
-        @param inProtFna: corresponding prot sequence
+        @param inProtFna: corresponding prot sequence (can be None)
         @param pairEndReadLen: length of one pair-end read (i.e. its length, not the insert size)
 
         @return: a list of read records
@@ -69,7 +69,7 @@ def parse(inFq, inDomtblout, inProtFna, pairEndReadLen):
     recList = []
 
     # read in prot sequences
-    nameToProtSeq = fas.fastaFileToDictWholeNames(inProtFna)
+    nameToProtSeq = fas.fastaFileToDictWholeNames(inProtFna)  # TODO: inProtFna can be None
 
     # read in dom file
     nameToDom = readDomblout(inDomtblout)
@@ -79,7 +79,9 @@ def parse(inFq, inDomtblout, inProtFna, pairEndReadLen):
     # read in pair end reads, create ReadRec
     for readName, dna, p, qs in fq.ReadFqGen(inFq):
 
-        protSeq = nameToProtSeq[readName]
+        readName = readName[1:]
+
+        protSeq = nameToProtSeq[readName]  # TODO: con be None
 
         hit, frameTag = nameToDom[readName]
 
@@ -97,6 +99,8 @@ def parse(inFq, inDomtblout, inProtFna, pairEndReadLen):
 
         assert annotLen == 3 * protLen
 
+
+        # TODO: correct the coordinate start !!!
         hmmCoordStart = int(hit[15]) - 1
         hmmCoordLen = int(hit[16]) - hmmCoordStart
 
@@ -109,6 +113,8 @@ def parse(inFq, inDomtblout, inProtFna, pairEndReadLen):
                 posCovArray[i] = 2
             else:
                 posCovArray[i] = 1
+
+        # TODO: replace qs and posCovArray !!!
 
         recList.append(read_rec.ReadRec(readName, dna, qs, protSeq, frameTag, annotStart, annotLen, protStart, protLen,
                                         hmmCoordStart, hmmCoordLen, posCovArray))

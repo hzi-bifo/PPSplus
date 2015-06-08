@@ -449,17 +449,17 @@ def _test():
                     inProtFna=os.path.join(baseDir, 'r_%s_join_prot.fna.gz' % gf),
                     pairEndReadLen=150)
 
-    # refGmap = os.path.join(baseDir, 'r_%s_join_gmap.sam.gz' % gf)
+    refGmap = os.path.join(baseDir, 'r_%s_join_gmap.sam.gz' % gf)
 
-    # refSeqBuff = fas.getSequenceBuffer([os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DIR_NAME),
-    #                            os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
+    refSeqBuff = fas.getSequenceBuffer([os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DIR_NAME),
+                               os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
 
-    # errA = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=10)
+    errA = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=10)
 
-    # print getAssemblyReport([errA], maxCov=10)
+    print getAssemblyReport([errA], maxCov=10)
 
-    # assemblyStat(recSet)
-    # assemblyPurity(recSet, refGmap)
+    assemblyStat(recSet)
+    assemblyPurity(recSet, refGmap)
 
 
 if __name__ == "__main__":

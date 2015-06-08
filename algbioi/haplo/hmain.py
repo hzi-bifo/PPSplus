@@ -102,7 +102,7 @@ def buildSuperReads(inFq, inDomtblout, pairEndReadLen, inProtFna=None, outFile=N
 
     try:
         # 1. read in read records
-        recList = hio.parse(inFq, inDomtblout, inProtFna, pairEndReadLen)
+        recList = hio.parse(inFq, inDomtblout, inProtFna, pairEndReadLen)  # TODO: remove pairEndReadLen
 
         # return None  # TODO: tmp !!!
 

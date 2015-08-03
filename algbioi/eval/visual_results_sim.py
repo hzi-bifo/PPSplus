@@ -347,7 +347,7 @@ class SimPlotSettings():
             @param outFile: output file to store the chart
             @param showFigure: show the figure if true
         """
-        simSetPlot(self.__dataModel, outFile, showFigure)
+        simSetPlot(self.__dataModel, outFile, showFigure=showFigure)
 
 
 def melanieSimsetGenerateCharts():
@@ -358,8 +358,47 @@ def melanieSimsetGenerateCharts():
 
     """
     # in/out directories
-    fileDir = '/Users/ivan/Documents/work/Doc/PPSplus/evaluation_simset'
-    outFig = '/Users/ivan/Documents/work/Doc/PPSplus/figures_simset'
+    # fileDir = '/Users/ivan/Documents/work/Doc/PPSplus/evaluation_simset'
+    fileDir = '/Users/ivan/Documents/work/Doc/PPSplus/revision/evaluation_simset'
+    # outFig = '/Users/ivan/Documents/work/Doc/PPSplus/figures_simset'
+    outFig = '/Users/ivan/Documents/work/Doc/PPSplus/revision/figures_simset'
+
+    # For Clark and Kraken
+    for fileKeywords, simsetType, method, rank in zip(
+            [['UNIFORM', 'kraken'], ['UNIFORM', 'clark'],
+                ['LOG-NORM', 'kraken'], ['LOG-NORM', 'clark']],
+            (2 * ['uniform'] + 2 * ['log-norm']),
+            ['Kraken', 'CLARK', 'Kraken', 'CLARK'],
+            ['species', 'species', 'species', 'species']):
+
+        SimPlotSettings(fileDir, fileKeywords=fileKeywords,
+                        scenarioList=[
+                        ['no exclude', 'nc'],
+                        ['new strain', 'nc'],
+                        ['new species', 'nc'],
+                        ['new genus', 'nc']
+                        ],
+                        title='%s (%s dataset)' % (method, simsetType),
+                        legend=['known strain', 'new strain', 'new species', 'new genus'],
+                        legendTitle='precision (P), recall (R)').\
+            generateChart(os.path.join(outFig, '%s_simset_%s_%s_rs_nc.png' % \
+                                               (str.lower(method), simsetType, rank)))
+
+        SimPlotSettings(fileDir, fileKeywords=fileKeywords,
+                        scenarioList=[
+                        ['no exclude', 'correction'],
+                        ['new strain', 'correction'],
+                        ['new species', 'correction'],
+                        ['new genus', 'correction']
+                        ],
+                        title='%s (%s dataset, correction)' % (method, simsetType),
+                        legend=['known strain', 'new strain', 'new species', 'new genus'],
+                        legendTitle='precision (P), recall (R)').\
+            generateChart(os.path.join(outFig, '%s_simset_%s_%s_rs_correction.png' % \
+                                               (str.lower(method), simsetType, rank)))
+
+    # return  # TODO: !!! run only for Clark and kraken
+
 
     # For PPSP (modeled down to species)
     for fileKeywords, simsetType in zip([['UNIFORM', 'ppsp-species'], ['LOG-NORM', 'ppsp-species']],
@@ -505,10 +544,11 @@ def _test():
         legend(['known strain', 'new strain (rs)', 'new species (rs)', 'new genus (rs)']).\
         legendTitle('New species (mg), precision (P), recall (R)')
 
-    simSetPlot(dataModel, outFile='/Users/ivan/Documents/work/Doc/PPSplus/figures/test.png')
+    simSetPlot(dataModel, outFile='/Users/ivan/Documents/work/Doc/PPSplus/revision/figures_simset/test.png')
 
 def _main():
     melanieSimsetGenerateCharts()
 
 if __name__ == "__main__":
     _main()
+    # _test()

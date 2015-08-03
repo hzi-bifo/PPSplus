@@ -64,6 +64,7 @@ from algbioi.com import common
 from algbioi.com import parallel
 from algbioi.com import taxonomy_ncbi
 
+
 def printStatDbk():
     """
         Print statistics of a DBK file.
@@ -200,7 +201,6 @@ def mergeSequences(mapFilePathList, fastaFilePathList, outputDir):
         totalSeqCount += seqCount
         totalStoredSeqCount += storedSeqCount
 
-
     print 'totalSeqCount, totalStoredSeqCount, totalIdenticalSeqCount', totalSeqCount, totalStoredSeqCount, totalIdenticalSeqCount
 
     print 'sequences merged'
@@ -329,8 +329,8 @@ def filterOutSequencesBatch(taxonIdSet, srcDir, dstDir, notAllowedSeqIdSet):
         For each fasta file that is in directory srcDir filters out sequences that are not defined in the allowedSeqIdSet.
     """
     for taxonId in taxonIdSet:
-        srcFilePath = os.path.join(srcDir,str(str(taxonId) + '.1.fna'))
-        dstFilePath = os.path.join(dstDir,str(str(taxonId) + '.1.fna'))
+        srcFilePath = os.path.join(srcDir, str(str(taxonId) + '.fna'))
+        dstFilePath = os.path.join(dstDir, str(str(taxonId) + '.1.fna'))
 
         seqIdDict = fasta.getSequenceToBpDict(srcFilePath)
         allowedNamesSet = set()
@@ -400,9 +400,9 @@ def _main():
                          '/local/igregor/ref_cami_1/complete.fna']
 
     # output dirs
-    mergedDir = '/local/igregor/ref_cami_1/merged' # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/merged'  # '/local/igregor/ref_20121122/nobackup/merged'
-    sortedDir = '/local/igregor/ref_cami_1/sorted' # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/sorted'  # '/local/igregor/ref_20121122/nobackup/sorted'
-    centroidsDir = '/local/igregor/ref_cami_1/centroids' # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/centroids'  # '/local/igregor/ref_20121122/nobackup/centroids_1_0'
+    mergedDir = '/local/igregor/ref_cami_1/merged'  # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/merged'  # '/local/igregor/ref_20121122/nobackup/merged'
+    sortedDir = '/local/igregor/ref_cami_1/sorted'  # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/sorted'  # '/local/igregor/ref_20121122/nobackup/sorted'
+    centroidsDir = '/local/igregor/ref_cami_1/centroids'  # '/net/refdata/static/nonredundant-microbial_20140513/nobackup/centroids'  # '/local/igregor/ref_20121122/nobackup/centroids_1_0'
     # clustersDir = '/net/refdata/static/nonredundant-microbial_20140513/nobackup/clusters'  # '/local/igregor/ref_20121122/nobackup/clusters_1_0'
 
     # tools

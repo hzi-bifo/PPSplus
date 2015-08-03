@@ -45,6 +45,8 @@ from algbioi.hsim import pfam
 from algbioi.haplo import hmain
 from algbioi.haplo import heval
 from algbioi.haplo import align
+from algbioi.haplo import scaff
+from algbioi.haplo import stat
 
 
 def _main():
@@ -129,18 +131,27 @@ def _main():
             assembleContigs(specDir)
 
         if False:
-            computePerBaseAssemblyError(specDir)
+            computePerBaseAssemblyError(specDir, storeAllLabels=True)
+
+        if True:
+            computeAssemblyStat(specDir)
+
+        # calculate overlaps between reads and contigs for scaffolding
+        if False:
+            calculatePairOverlapsScaff(specDir)
+
+        if False:
+            readUniqueMapScaff(specDir)
+
+            # filter reads given QS cutoffs
+            # if False:
+            #     filterReadsQS(specDir)
 
 
-        # filter reads given QS cutoffs
-        # if False:
-        #     filterReadsQS(specDir)
+            # getGenesStat(specDir)  # check, put to a new module,
 
 
-        # getGenesStat(specDir)  # check, put to a new module,
-
-
-        ###
+            ###
     taxonomy.close()
 
 
@@ -878,7 +889,7 @@ def partitionReadsToPfamDom(specDir, considerJoined=False, considerNotJoined=Fal
                                         comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY, comh.SAMPLES_SHUFFLE_RAND_SEED,
                                         comh.SAMPLES_PFAM_PARTITIONED_DIR, False)))
 
-    parallel.runThreadParallel(taskList, comh.MAX_PROC)
+    parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=False)
 
 
 def alignHmmPartitionedReads(specDir):
@@ -913,11 +924,10 @@ def getStatPartitionedReadsPfamDom(specDir):
             sampleDir = os.path.join(samplesDir, sample)
             if os.path.isdir(sampleDir):
                 taskList.append(parallel.TaskThread(pfam.getStatPartitionedReads,
-                                                    (sampleDir,
-                                                     comh.SAMPLES_PFAM_PARTITIONED_DIR,
+                                                    (sampleDir, comh.SAMPLES_PFAM_PARTITIONED_DIR,
                                                      comh.SAMPLES_PFAM_PARTITIONED_STAT_FILE)))
 
-    parallel.runThreadParallel(taskList, comh.MAX_PROC)
+    parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=False)
 
 
 def assembleContigs(specDir):
@@ -935,22 +945,27 @@ def assembleContigs(specDir):
             if os.path.isdir(partitionedDir):
                 for f in os.listdir(partitionedDir):
                     fPath = os.path.join(partitionedDir, f)
-                    if f.endswith('fq.gz') and os.path.isfile(fPath):
+                    if f.endswith('join.fq.gz') and os.path.isfile(fPath):
                         base = fPath[:-6]
                         inFq = fPath
                         inDomtblout = '%s_prot.domtblout.gz' % base
                         inProtFna = '%s_prot.fna.gz' % base
                         outPath = '%s_read_rec.pkl.gz' % base
-                        taskList.append(parallel.TaskThread(hmain.buildSuperReads, (inFq, inDomtblout,
-                            comh.ART_READ_LEN[0], inProtFna, outPath, comh.TRANSLATION_TABLE,
-                            comh.ASSEMBLY_MAX_MISMATCH_QS_ALLOWED, comh.ASSEMBLY_MIN_SCORE_REQIURED,
-                            comh.ASSEMBLY_MIN_ANNOT_OVERLAP_SCORE, comh.ASSEMBLY_SCORE_STOP_SEARCH,
-                            comh.ASSEMBLY_MAX_QS)))
+                        taskList.append(parallel.TaskThread(hmain.buildSuperReads,
+                                                            (inFq, inDomtblout, inProtFna, outPath,
+                                                             comh.ASSEMBLY_CONSIDER_PROT_COMP,
+                                                             comh.ASSEMBLY_ONLY_POVERLAP,
+                                                             comh.ASSEMBLY_POVERLAP,
+                                                             comh.ASSEMBLY_OVERLAP_LEN,
+                                                             comh.ASSEMBLY_OVERLAP_ANNOT_LEN,
+                                                             comh.ASSEMBLY_STOP_OVERLAP_MISMATCH,
+                                                             comh.ASSEMBLY_MAX_LOOPS,
+                                                             comh.TRANSLATION_TABLE)))
 
-    parallel.runThreadParallel(taskList, comh.MAX_PROC)
+    parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=False)
 
 
-def computePerBaseAssemblyError(specDir):
+def computePerBaseAssemblyError(specDir, storeAllLabels=False):
     """
         Compute the per base assembly error.
     """
@@ -965,6 +980,8 @@ def computePerBaseAssemblyError(specDir):
     # rList = []
     for sample in os.listdir(samplesDir):
         if sample.isdigit():
+            # if int(sample) != 5:  # TODO: remove !!!
+            #     continue
             partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
             if os.path.isdir(partitionedDir):
                 for f in os.listdir(partitionedDir):
@@ -977,7 +994,7 @@ def computePerBaseAssemblyError(specDir):
 
                         taskList.append(parallel.TaskThread(heval.getPerBaseErrorPkl,
                                                             (readRecPkl, gmapSam, refSeqBuff, 30,
-                                                             comh.TRANSLATION_TABLE)))
+                                                             comh.TRANSLATION_TABLE, storeAllLabels)))
 
                         # a = heval.getPerBaseErrorPkl(readRecPkl, gmapSam, refGenomesDraftGDirList, 30, comh.TRANSLATION_TABLE)
                         # rList.append(a)
@@ -988,6 +1005,118 @@ def computePerBaseAssemblyError(specDir):
     out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_INIT))
     out.writeText(report)
     out.close()
+
+
+def computeAssemblyStat(specDir):
+    """
+        Compute assembly statistics.
+    """
+    print('Computing assembly statistics.')
+    sampleDef = comh.SampleDef(os.path.join(specDir, comh.SAMPLES_DIR, comh.SAMPLES_DEF_FILE))
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    rListAll = []
+    outList = []
+    strainNumMax = 0
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            strainNum = sampleDef.sIdToStrainListLen(int(sample))
+            strainNumMax = max(strainNumMax, strainNum)
+            # if int(sample) != 3:  # TODO: remove !!!
+            #     continue
+            taskList = []
+            partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
+            if os.path.isdir(partitionedDir):
+                for f in os.listdir(partitionedDir):
+                    fPath = os.path.join(partitionedDir, f)
+                    if f.endswith('join_read_rec.pkl.gz') and os.path.isfile(fPath):
+                        taskList.append(parallel.TaskThread(stat.getStat, (fPath, strainNum)))
+
+            rList = parallel.runThreadParallel(taskList, comh.MAX_PROC)
+            rListAll += rList
+
+            outList.append((int(sample), stat.sumUpStatInfo(rList, strainNum)))
+
+    outList.sort(key=lambda x: x[0])
+    outList.append(('all', stat.sumUpStatInfo(rListAll, strainNumMax)))
+    buff = '\n'.join(map(lambda x: str(x[0]) + '\n' + str(x[1]), outList))
+    print buff
+    out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_STAT_INIT))
+    out.writeText(buff)
+    out.close()
+
+
+def calculatePairOverlapsScaff(specDir):
+    """
+        Calculate overlaps between reads and contigs for scaffolding.
+    """
+    print('Calculating reads-contigs overlaps')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            # if int(sample) != 5:  # TODO: remove !!!
+            #     continue
+            partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
+            if os.path.isdir(partitionedDir):
+                for f in os.listdir(partitionedDir):
+                    fPath = os.path.join(partitionedDir, f)
+                    if f.endswith('_pair.fq.gz') and os.path.isfile(fPath):
+                        base = fPath[:-11]
+                        readFq = fPath
+                        contigRecFile = '%s_join_read_rec.pkl.gz' % base
+                        if os.path.isfile(contigRecFile):
+
+                            readDomtblout = '%s_pair_prot.domtblout.gz' % base
+                            outFile = '%s_scaff_overlap.pkl.gz' % base
+                            readProtFna = '%s_pair_prot.fna.gz' % base
+                            readSam = '%s_pair_gmap.sam.gz' % base
+
+                            assert os.path.isdir(os.path.dirname(base))
+                            assert os.path.isfile(readFq)
+                            assert os.path.isfile(readDomtblout)
+                            assert os.path.isdir(os.path.dirname(outFile))
+                            assert os.path.isfile(readProtFna)
+                            assert os.path.isfile(readSam)
+
+                            # scaff.calculatePairOverlaps(readFq, readDomtblout, contigRecFile, outFile,
+                            #                       minPOverlap=0.8, minScoreFraction=0.8, minAnnotFraction=0.5,
+                            #                       readProtFna=readProtFna, readSam=readSam,
+                            #                       tTable=comh.TRANSLATION_TABLE)
+                            #
+                            taskList.append(parallel.TaskThread(scaff.calculatePairOverlaps,
+                                                                (readFq, readDomtblout, contigRecFile, outFile,
+                                                                 0.8, 0.8, 0.5, readProtFna, readSam,
+                                                                 comh.TRANSLATION_TABLE)))
+
+    parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=False)
+
+
+def readUniqueMapScaff(specDir):
+    """
+        Calculate overlaps between reads and contigs for scaffolding.
+    """
+    print('Calculate read unique mapping.')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
+    # collect tasks
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
+            partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
+            if os.path.isdir(partitionedDir):
+                for f in os.listdir(partitionedDir):
+                    fPath = os.path.join(partitionedDir, f)
+                    if f.endswith('_scaff_overlap.pkl.gz') and os.path.isfile(fPath):
+
+                        # (scaffOverlapFile, pFrom=0.8, pTo=0.99, step=0.01)
+                        taskList.append(parallel.TaskThread(scaff.readUniqueMap, (fPath,)))
+                # break  # TODO: remove !!!
+
+    rList = parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=True)
+    print scaff.readUniqueMapReport(rList)
 
 
 def filterReadsQS(specDir):

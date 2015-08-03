@@ -32,10 +32,12 @@ from algbioi.eval import accuracy
 from algbioi.eval import confusion_matrix
 from algbioi.core.taxonomy import Taxonomy
 from algbioi.core import ref_seq
+from algbioi.core import pps_wrap
 
 
 def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrainDataDir, outputDir, ppsInstallDir,
-                            ppsScripts, ppsConfigFilePath, predictLogFileName, modelTaxonIdFilePath, databaseFile):
+                            ppsScripts, ppsConfigFilePath, predictLogFileName, modelTaxonIdFilePath, databaseFile,
+                            config, ppsConfigFilePathPy):
     """
         Computes the training accuracy for the PPS training data.
         This function doesn't consider training data used to train intermediate (misc?) nodes!
@@ -57,7 +59,7 @@ def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrai
     for d in [workingDir, taWorkingDir, sampleSpecificDir,
               ppsTrainDataDir, outputDir, ppsInstallDir, ppsScripts, os.path.dirname(predictLogFileName)]:
         assert os.path.isdir(d), "Directory '%s' doesn't exist!" % d
-    for f in [ppsConfigFilePath, databaseFile, modelTaxonIdFilePath]:
+    for f in [ppsConfigFilePath, ppsConfigFilePathPy, databaseFile, modelTaxonIdFilePath]:
         assert os.path.isfile(f), "File '%s' doesn't exist!" % f
 
     # all directories that contain PPS training data
@@ -71,38 +73,63 @@ def computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrai
     seqIdToTruePred = {}
 
     # merge all training fasta files to one fasta file
-    for d in trainDirList:
-        dName = os.path.basename(d)
-        for f in os.listdir(d):
-            taxonId = int(os.path.basename(f).rsplit('.', 2)[0])
-            for seqId, seq in fasta.fastaFileToDict(os.path.join(d, f)).iteritems():
-                if d == sampleSpecificDir:
-                    #label = int(str(str(seqId).rsplit('|', 1)[1]).split(':', 1)[1])
-                    id = str(taxonId) + '|' + dName + '|' + seqId + '|label:' + str(taxonId)
-                else:
-                    id = str(taxonId) + '|' + dName + '|' + seqId
-                out.writeText('>' + id + '\n' + seq + '\n')
-                seqIdToTruePred[id] = taxonId
+    if config.get('ruby') is not None and eval(config.get('ruby')):
+        for d in trainDirList:
+            dName = os.path.basename(d)
+            for f in os.listdir(d):
+                taxonId = int(os.path.basename(f).rsplit('.', 2)[0])
+                for seqId, seq in fasta.fastaFileToDict(os.path.join(d, f)).iteritems():
+                    if d == sampleSpecificDir:
+                        #label = int(str(str(seqId).rsplit('|', 1)[1]).split(':', 1)[1])
+                        id = str(taxonId) + '|' + dName + '|' + seqId + '|label:' + str(taxonId)
+                    else:
+                        id = str(taxonId) + '|' + dName + '|' + seqId
+                    out.writeText('>' + id + '\n' + seq + '\n')
+                    seqIdToTruePred[id] = taxonId
+    else:
+        for d in trainDirList:
+            dName = os.path.basename(d)
+            for f in os.listdir(d):
+                baseName = os.path.basename(f)
+                for seqId, seq in fasta.fastaFileToDict(os.path.join(d, f)).iteritems():
+                    if d == sampleSpecificDir:
+                        taxonId = int(baseName.split('.', 1)[0])
+                        id = str(taxonId) + '|' + dName + '|' + seqId + '|label:' + str(taxonId)
+                    else:
+                        taxonId = int(seqId.rsplit('|', 1)[-1].split(':')[1])  # >NZ_BACV01000705.1|at2109000|label:976
+                        id = str(taxonId) + '|' + dName + '|' + seqId
+                    out.writeText('>' + id + '\n' + seq + '\n')
+                    seqIdToTruePred[id] = taxonId
+
     out.close()
 
     # predict the merged file using the generated model
     if os.name == 'posix':
-        predictCmd = str(os.path.join(ppsScripts, 'predict.rb') + ' ' + allTrainFastaFile + ' ' + ppsConfigFilePath)
-        #print(predictCmd)
-        logOut = open(predictLogFileName, 'w')
-        predictProc = subprocess.Popen(predictCmd, shell=True, bufsize=-1, cwd=ppsInstallDir, stdout=logOut,
-                                       stderr=subprocess.STDOUT)  # stdout=subprocess.STDOUT
-        predictProc.wait()
-        logOut.close()
-        if predictProc.returncode != 0:
-            raise Exception("PPS 'predict' training data returned with non-zero status: %s, cmd: %s" %
-                            (predictProc.returncode, predictCmd))
+
+        if config.get('ruby') is not None and eval(config.get('ruby')):
+
+            predictCmd = str(os.path.join(ppsScripts, 'predict.rb') + ' ' + allTrainFastaFile + ' ' + ppsConfigFilePath)
+            #print(predictCmd)
+            logOut = open(predictLogFileName, 'w')
+            predictProc = subprocess.Popen(predictCmd, shell=True, bufsize=-1, cwd=ppsInstallDir, stdout=logOut,
+                                           stderr=subprocess.STDOUT)  # stdout=subprocess.STDOUT
+            predictProc.wait()
+            logOut.close()
+            if predictProc.returncode != 0:
+                raise Exception("PPS 'predict' training data returned with non-zero status: %s, cmd: %s" %
+                                (predictProc.returncode, predictCmd))
+        else:
+            pps_wrap.runPredict(config.get('ppsInstallDir'), ppsConfigFilePathPy, allTrainFastaFile)
+
     else:
         print("Can't run PPS on a non-posix system!")
         return
 
     # read in predicted train data
-    seqIdToPred = csv.predToDict(allTrainFastaFile + '.nox.fna.out')
+    if config.get('ruby') is not None and eval(config.get('ruby')):
+        seqIdToPred = csv.predToDict(allTrainFastaFile + '.nox.fna.out')
+    else:
+        seqIdToPred = csv.predToDict(allTrainFastaFile + '.out')
 
     # read fasta file
     seqIdToBp = fasta.getSequenceToBpDict(allTrainFastaFile)
@@ -212,7 +239,7 @@ def _trainAccuracyDataTest():
     databaseFile = '/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db'
     modelTaxonIdFilePath = '/Users/ivan/Documents/nobackup/trainAccuracyTest/workingDir/ncbids.txt'
     computeTrainingAccuracy(workingDir, taWorkingDir, sampleSpecificDir, ppsTrainDataDir, outputDir, ppsInstallDir,
-                            ppsScripts, ppsConfigFilePath, predictLogFileName, modelTaxonIdFilePath, databaseFile)
+                            ppsScripts, ppsConfigFilePath, predictLogFileName, modelTaxonIdFilePath, databaseFile)  # TODO: add arguments
 
 
 def refToClades(refDir, taxonomyFile, rank='species', outFile=None):

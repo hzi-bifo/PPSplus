@@ -325,9 +325,11 @@ def _main():
 def _test():
     pass
     # getChecksumForDir('/Volumes/VerbatimSSD/work/vm_rel_1_3/reference_NCBI20121122')
-    getChecksumForDir('/Volumes/VerbatimSSD/work/vm_1_4/tools')
+    # getChecksumForDir('/Volumes/VerbatimSSD/work/vm_1_4/tools')
     # getChecksumForDir('/Volumes/VerbatimSSD/work/vm_1_4/sys')
     # getChecksumForDir('/net/metagenomics/projects/PPSmg/release/1_4/nobackup/reference_NCBI20140513')
+    # getChecksumForDir('/media/igregor/verbatim/work/ppsp_vm/reference_NCBI201502')
+    # getChecksumForDir('/home/igregor/Documents/work/ippsp/tools')
 
 if __name__ == "__main__":
     _main()

@@ -50,6 +50,7 @@ from algbioi.eval import accuracy
 from algbioi.eval import confusion_matrix
 from algbioi.misc import out_proc
 from algbioi.ref import mask_db
+from algbioi.core import pps_wrap
 
 
 # paths on hera/gaia:
@@ -176,11 +177,13 @@ def _main():
     summaryTrainFile = os.path.join(outputDir, 'summary_train.txt')
     if config.get('configPPS') is None:
         ppsConfigFilePath = os.path.join(workingDir, 'PPS_config_generated.txt')  # config will be generated
+        ppsConfigFilePathPy = os.path.join(workingDir, 'PPS_config_generated_py.txt')  # config will be generated
     else:
         if not os.path.isfile(config.get('configPPS')):
             print("The PPS configuration file (configPPS) '%s' doesn't exist." % config.get('configPPS'))
             return
         ppsConfigFilePath = os.path.normpath(config.get('configPPS'))  # use custom config file
+        ppsConfigFilePathPy = ppsConfigFilePath
 
     taxonomicRanks = taxonomy_ncbi.TAXONOMIC_RANKS[1:]  # without root
     try:
@@ -482,28 +485,37 @@ def _main():
         if not os.path.isdir(sampleSpecDir) or len(os.listdir(sampleSpecDir)) == 0:
             sampleSpecDir = ''
 
+        if config.get('processors') is not None:
+            processors = config.get('processors')
+        else:
+            processors = '1'
         keyDict = {'NCBI_PROCESSED_DIR': str(refSeq),
                    'NCBI_TAX_DIR': os.path.dirname(databaseFile),
                    'PROJECT_DIR': os.path.join(workingDir, 'projectDir'),
                    'TREE_FILE': os.path.join(workingDir, 'ncbids.txt'),
                    'SAMPLE_SPECIFIC_DIR': sampleSpecDir,
                    'PARALLEL_MODELS': pm,  # optional
-                   'GENOMES_EXCLUDE': ''}  # optional
-        createPPSConfig(ppsConfigFilePath, keyDict)
+                   'GENOMES_EXCLUDE': '',
+                   'PROCESSORS': processors}  # optional
+        createPPSConfig(ppsConfigFilePath, keyDict)  # TODO: !!!
+        pps_wrap.createPPSConfigPython(ppsConfigFilePathPy, keyDict)
 
     # run PhyloPythiaS train (optionally compute training accuracy)
     ppsScripts = os.path.normpath(os.path.join(config.get('ppsInstallDir'), 'scripts'))
     if args.t:
-
-        trainCmd = str(os.path.join(ppsScripts, 'train.rb') + ' ' + ppsConfigFilePath)
-        logOut = open(getLogFileName(logDir, 'PPS_train'), 'w')
-        trainProc = subprocess.Popen(trainCmd, shell=True, bufsize=-1, cwd=config.get('ppsInstallDir'),
-                                     stdout=logOut, stderr=subprocess.STDOUT)
-        trainProc.wait()
-        logOut.close()
-        print('PPS "train" return code: %s' % trainProc.returncode)
-        if trainProc.returncode != 0:
-            raise Exception("PPS train returned with non-zero %s status: %s" % (trainProc.returncode, trainCmd))
+        if config.get('ruby') is not None and eval(config.get('ruby')):
+            trainCmd = str(os.path.join(ppsScripts, 'train.rb') + ' ' + ppsConfigFilePath)
+            logOut = open(getLogFileName(logDir, 'PPS_train'), 'w')
+            trainProc = subprocess.Popen(trainCmd, shell=True, bufsize=-1, cwd=config.get('ppsInstallDir'),
+                                         stdout=logOut, stderr=subprocess.STDOUT)
+            trainProc.wait()
+            logOut.close()
+            print('PPS "train" return code: %s' % trainProc.returncode)
+            if trainProc.returncode != 0:
+                raise Exception("PPS train returned with non-zero %s status: %s" % (trainProc.returncode, trainCmd))
+        else:
+            # run python PPS
+            pps_wrap.runTrain(config.get('ppsInstallDir'), ppsConfigFilePathPy)
 
         # compute training accuracy (precision and recall) and confusion matrices
     if args.a:
@@ -527,30 +539,38 @@ def _main():
                     except IOError:
                         print("Train accuracy: Can't create directory: " + taDir)
                     else:
-                        computeTrainingAccuracy(workingDir, taDir, os.path.join(workingDir, 'sampleSpecificDir'),
+                        computeTrainingAccuracy(workingDir, taDir, os.path.join(workingDir, 'sampleSpecificDir'),  # TODO: replace!!!
                                                 os.path.join(workingDir, 'projectDir', 'sampled_fasta'), taOutDir,
                                                 config.get('ppsInstallDir'), ppsScripts, ppsConfigFilePath,
                                                 getLogFileName(logDir, 'PPS_predict_train_data'),
-                                                os.path.join(workingDir, 'ncbids.txt'), databaseFile)
-                        print("Train accuracy: done")
+                                                os.path.join(workingDir, 'ncbids.txt'), databaseFile,
+                                                config, ppsConfigFilePathPy)
+                        print("\nTrain accuracy: done")
         except Exception as e:
             print("Training data accuracy won't be computed due to an error: %s" % e.message)
 
     # run PhyloPythiaS predict
     if args.p:
         if 'c' in args.p:  # predict contigs
-            predictCmd = str(os.path.join(ppsScripts, 'predict.rb') + ' ' + fastaFileIds + ' ' + ppsConfigFilePath)
-            logOut = open(getLogFileName(logDir, 'PPS_predict_c'), 'w')
-            predictProc = subprocess.Popen(predictCmd, shell=True, bufsize=-1, cwd=config.get('ppsInstallDir'),
-                                           stdout=logOut, stderr=subprocess.STDOUT)  # stdout=subprocess.STDOUT
-            predictProc.wait()
-            logOut.close()
-            shutil.move(str(fastaFileIds + '.nox.fna.out'), str(fastaFileIds + '.out'))
-            shutil.move(str(fastaFileIds + '.nox.fna.PP.out'), str(fastaFileIds + '.PP.out'))
-            print('PPS "predict" contigs return code: %s' % predictProc.returncode)
-            if predictProc.returncode != 0:
-                raise Exception("PPS predict contigs returned with non-zero %s status: %s" %
-                                (predictProc.returncode, predictCmd))
+            if config.get('ruby') is not None and eval(config.get('ruby')):
+                predictCmd = str(os.path.join(ppsScripts, 'predict.rb') + ' ' + fastaFileIds + ' ' + ppsConfigFilePath)
+                logOut = open(getLogFileName(logDir, 'PPS_predict_c'), 'w')
+                predictProc = subprocess.Popen(predictCmd, shell=True, bufsize=-1, cwd=config.get('ppsInstallDir'),
+                                               stdout=logOut, stderr=subprocess.STDOUT)  # stdout=subprocess.STDOUT
+                predictProc.wait()
+                logOut.close()
+
+                shutil.move(str(fastaFileIds + '.nox.fna.out'), str(fastaFileIds + '.out'))
+                shutil.move(str(fastaFileIds + '.nox.fna.PP.out'), str(fastaFileIds + '.PP.out'))
+                print('PPS "predict" contigs return code: %s' % predictProc.returncode)
+                if predictProc.returncode != 0:
+                    raise Exception("PPS predict contigs returned with non-zero %s status: %s" %
+                                    (predictProc.returncode, predictCmd))
+            else:
+                # python PPS
+                pps_wrap.runPredict(config.get('ppsInstallDir'), ppsConfigFilePathPy, fastaFileIds)
+                print('Done: assign contigs')
+
 
         if inputFastaScaffoldsFile is not None:
             scaffoldsIdsNewPath = os.path.join(workingDir, 'crossVal', os.path.basename(fastaFileScaffoldsIds))
@@ -568,20 +588,27 @@ def _main():
                         print("Can't create directory:", crossValDir)
                         return
                 shutil.copy2(fastaFileScaffoldsIds, os.path.join(crossValDir, os.path.basename(fastaFileScaffoldsIds)))
-                predictCmd = str(os.path.join(ppsScripts, 'predict.rb') + ' ' + scaffoldsIdsNewPath + ' ' +
-                                 ppsConfigFilePath)
 
-                logOut = open(getLogFileName(logDir, 'PPS_predict_s'), 'w')
-                predictProc = subprocess.Popen(predictCmd, shell=True, bufsize=-1, cwd=config.get('ppsInstallDir'),
-                                               stdout=logOut, stderr=subprocess.STDOUT)  # stdout=subprocess.STDOUT
-                predictProc.wait()
-                logOut.close()
-                shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.out'), str(scaffoldsIdsNewPath + '.out'))
-                shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.PP.out'), str(scaffoldsIdsNewPath + '.PP.out'))
-                print('PPS "predict" scaffolds return code: %s' % predictProc.returncode)
-                if predictProc.returncode != 0:
-                    raise Exception("PPS predict scaffolds returned with non-zero %s status: %s"
-                                    % (predictProc.returncode, predictCmd))
+                if config.get('ruby') is not None and eval(config.get('ruby')):
+                    predictCmd = str(os.path.join(ppsScripts, 'predict.rb') + ' ' + scaffoldsIdsNewPath + ' ' +
+                                     ppsConfigFilePath)
+
+                    logOut = open(getLogFileName(logDir, 'PPS_predict_s'), 'w')
+                    predictProc = subprocess.Popen(predictCmd, shell=True, bufsize=-1, cwd=config.get('ppsInstallDir'),
+                                                   stdout=logOut, stderr=subprocess.STDOUT)  # stdout=subprocess.STDOUT
+                    predictProc.wait()
+                    logOut.close()
+                    shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.out'), str(scaffoldsIdsNewPath + '.out'))
+                    shutil.move(str(scaffoldsIdsNewPath + '.nox.fna.PP.out'), str(scaffoldsIdsNewPath + '.PP.out'))
+                    print('PPS "predict" scaffolds return code: %s' % predictProc.returncode)
+                    if predictProc.returncode != 0:
+                        raise Exception("PPS predict scaffolds returned with non-zero %s status: %s"
+                                        % (predictProc.returncode, predictCmd))
+                else:
+                    # python PPS
+                    pps_wrap.runPredict(config.get('ppsInstallDir'), ppsConfigFilePathPy, scaffoldsIdsNewPath)
+                    print('Done: assign scaffolds')
+
 
         # compare prediction of scaffolds and contigs
         if 'v' in args.p:

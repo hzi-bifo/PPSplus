@@ -27,7 +27,7 @@ import subprocess
 from Bio import SeqIO
 
 from algbioi.com import common, csv
-
+from algbioi.com import parallel
 
 class RRNA16S():
     """
@@ -43,24 +43,38 @@ class RRNA16S():
         """
             Run the hidden markov model to get regions in the input sequences where the 16S and 23S genes are located.
         """
+
+        processors = self._config.get('processors')
+        if processors is not None:
+            processors = ' -p %s ' % processors
+        else:
+            processors = ''
+
         hmmInstallDir = os.path.normpath(self._config.get('rnaHmmInstallDir'))
         hmmerBinDir = os.path.normpath(self._config.get('hmmerBinDir'))
         regionsFile = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.gff'))
-        cmd = str('export PATH=' + hmmerBinDir + ':$PATH; time ' + os.path.join(hmmInstallDir,'rna_hmm3.py') +
-                  ' -i ' + inputFastaFile + ' -o ' + regionsFile)
+        cmd = str('export PATH=' + hmmerBinDir + ':$PATH;' + os.path.join(hmmInstallDir, 'rna_hmm3.py') +
+                  ' -i ' + inputFastaFile + ' -o ' + regionsFile + processors)  # + processors
         if os.name == 'posix':
-            if outLog is not None:
-                stdoutLog = open(outLog,'w')
-            else:
-                stdoutLog = subprocess.STDOUT  # stdout=subprocess.STDOUT
-            hmmProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self._config.get('rnaHmmInstallDir'), stdout=stdoutLog)
-            print 'run cmd:', cmd
-            hmmProc.wait()
-            if outLog is not None:
-                stdoutLog.close()
-            print 'HMM return code:', hmmProc.returncode
-            if hmmProc.returncode != 0:
-                raise Exception("Command returned with non-zero %s status: %s" % (hmmProc.returncode, cmd))
+
+            cwd = self._config.get('rnaHmmInstallDir')
+
+            if parallel.reportFailedCmd(parallel.runCmdSerial([parallel.TaskCmd(cmd, cwd)])) is not None:
+                sys.exit(-1)
+
+            # if outLog is not None:
+            #     stdoutLog = open(outLog, 'w')
+            # else:
+            #     stdoutLog = subprocess.STDOUT  # stdout=subprocess.STDOUT
+            # hmmProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self._config.get('rnaHmmInstallDir'), stdout=stdoutLog)
+            # print 'run cmd:', cmd
+            # hmmProc.wait()
+            # if outLog is not None:
+            #     stdoutLog.close()
+            # print 'HMM return code:', hmmProc.returncode
+            # if hmmProc.returncode != 0:
+            #     raise Exception("Command returned with non-zero %s status: %s" % (hmmProc.returncode, cmd))
+
         else:
             print 'Cannot run HMM since your system is not "posix" but', str('"' + os.name + '"'), '\n', cmd
 
@@ -154,8 +168,8 @@ class RRNA16S():
         elif mode == 5:
             #extractedRegionsFasta = str(inputFastaFile + '.5S_rRNA.fna')
             extractedRegionsFasta = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.5S_rRNA.fna'))
-            taxonomyFile = os.path.join(self._refDir, os.path.normpath(self._refDict[('5S_rRNA','taxonomyDNA')][0]))
-            templateFile = os.path.join(self._refDir, os.path.normpath(self._refDict[('5S_rRNA','templateDNA')][0]))
+            taxonomyFile = os.path.join(self._refDir, os.path.normpath(self._refDict[('5S_rRNA', 'taxonomyDNA')][0]))
+            templateFile = os.path.join(self._refDir, os.path.normpath(self._refDict[('5S_rRNA', 'templateDNA')][0]))
             mothurPredFileName = common.getMothurOutputFilePath(extractedRegionsFasta, taxonomyFile)
             predFileName = os.path.join(self._workingDir, str(os.path.basename(inputFastaFile) + '.5P'))
 
@@ -173,22 +187,35 @@ class RRNA16S():
 
         param = self._config.get('mothurClassifyParamOther')
 
-        cmd = str('time ' + mothur + ' "#classify.seqs(fasta=' + extractedRegionsFasta + ', template=' + templateFile
+        cmd = str(mothur + ' "#classify.seqs(fasta=' + extractedRegionsFasta + ', template=' + templateFile
                 + ', taxonomy=' + taxonomyFile + ', ' + param + ')"')
 
         if os.name == 'posix':
+
+            print('Mothur processing: %s' % os.path.basename(templateFile).split('_', 1)[0])
+
+            cwd = self._workingDir
+
             if outLog is not None:
                 stdoutLog = open(outLog, 'w')
             else:
                 stdoutLog = subprocess.STDOUT
-            mothurProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self._workingDir, stdout=stdoutLog)
-            print 'run cmd:', cmd
-            mothurProc.wait()
+
+            if parallel.reportFailedCmd(parallel.runCmdSerial([parallel.TaskCmd(cmd, cwd, stdout=stdoutLog)])) is not None:
+                sys.exit(-1)
+
             if outLog is not None:
                 stdoutLog.close()
-            print 'mothur return code:', mothurProc.returncode
-            if mothurProc.returncode != 0:
-                raise Exception("Command returned with non-zero %s status: %s" % (mothurProc.returncode, cmd))
+
+            # mothurProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self._workingDir, stdout=stdoutLog)
+            # print 'run cmd:', cmd
+            # mothurProc.wait()
+            # if outLog is not None:
+            #     stdoutLog.close()
+            # print 'mothur return code:', mothurProc.returncode
+            # if mothurProc.returncode != 0:
+            #     raise Exception("Command returned with non-zero %s status: %s" % (mothurProc.returncode, cmd))
+
         else:
             print 'Cannot run mothur since your system is not "posix" but', str('"' + os.name + '"'), '\n', cmd
 

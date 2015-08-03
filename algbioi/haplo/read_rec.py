@@ -19,88 +19,86 @@
     Represents a (super-)read record.
 """
 import copy
-import numpy as np
+# import numpy as np
 
-from Bio.Alphabet import generic_dna
-from Bio.Seq import Seq
+# from Bio.Seq import Seq
+# from Bio.Alphabet import generic_dna
+
+from algbioi.com import qs as qs_man
 
 
 class ReadRec(object):
-    def __init__(self, recordId, dnaSeq, qsArray, protSeq, readingFrameTag, annotStart, annotLen, protStart, protLen,
-                 hmmCoordStart, hmmCoordLen, posCovArray, translTable=11):
+    def __init__(self, recordId, qsArray, readingFrameTag, annotStart, annotLen, hmmCoordStart, hmmCoordLen=None,
+                 protSeq=None, protStart=None, protLen=None):
         """
             A record representing one read (also a super-read or a joined pair-end read).
             The constructor is used to create an initial record, the function "merge records" of this module
             is then used to create super-read-records by merging of read-records.
 
             @param recordId: record identifier
-            @param dnaSeq: dna sequence of the (super-)read (oriented as +strain)
-            @param qsArray: QS array
-            @param protSeq: protein sequence (may drop this?)
+            @param qsArray: QS array representing a DNA sequence of the (super-)read (oriented as +strain)
             @param readingFrameTag: reading frame indicator (1..6), (for super-reads: 1..3)
 
             @param annotStart: start of the HMM annotation within the read (0 based)
             @param annotLen: length of the HMM annotation
-            @param protStart: start of the HMM annotation on the prot sequence (0 based) (or None)
-            @param protLen: length of the HMM annotation on the prot sequence (or None)
-
             @param hmmCoordStart: start of the HMM annotation within the Gene family (0 based)
             @param hmmCoordLen: length of the annotation withing the Gene family (or None)
 
-            @param posCovArray: position coverage array (i.e. for each position, how many pair-end reads cover it,
-                                                        e.g. 111222111 for a joined pair-end read)
-            @param translTable: a translation table used to translate dna to prot sequences
+            @param protSeq: protein sequence (or None)
+            @param protStart: start of the HMM annotation on the PROT sequence (0 based, or None)
+            @param protLen: length of the HMM annotation on the PROT sequence (or None)
 
             @type recordId: str
-            @type dnaSeq: str
-            @type qsArray: str
-            @type protSeq: str
+            @type qsArray: qs_man.QSArray
             @type readingFrameTag: int
             @type annotStart: int
             @type annotLen: int
-            @type protStart: int
-            @type protLen: int
             @type hmmCoordStart: int
-            @type hmmCoordLen: int
-            @type posCovArray: ndarray
-            @type translTable: int
+            @type hmmCoordLen: int | None
+            @type protSeq: str | None
+            @type protStart: int | None
+            @type protLen: int | None
         """
-        assert len(dnaSeq) == len(qsArray)
         assert annotLen == 3 * protLen
 
         # the gene family annotation is on the reverse strain, orient it as if it was on the positive strain
         if 4 <= readingFrameTag <= 6:
-            dnaSeq = str(Seq(dnaSeq, generic_dna).reverse_complement())  # dna reverse complement
-            qsArray = qsArray[::-1]  # reverse the QS array
-            annotStart = len(dnaSeq) - annotStart - annotLen  # reverse the start annotation position
+            # dna reverse complement
+            qsArray.revCompl()
+            # reverse the start annotation position
+            annotStart = qsArray.getLen() - annotStart - annotLen
 
-        self.qsArray = qsArray
-        # QS array as a numpy array if needed.. uncomment
-        # self.qsArray = np.zeros(len(qsArray), dtype=np.uint8)
-        # for i in range(len(qsArray)):
-        #     self.qsArray[i] = ord(qsArray[i]) - 33
+            # dnaSeq = str(Seq(self.dnaSeq, generic_dna).reverse_complement())
+            # qsArray = qsArray[::-1]  # reverse the QS array
+
+        # init values from parameters
         self.recordId = recordId
-        self.dnaSeq = dnaSeq
-        self.protSeq = protSeq
+        self.qsArray = qsArray
         self.readingFrameTag = readingFrameTag
         self.annotStart = annotStart
         self.annotLen = annotLen
-        self.protStart = protStart
-        self.protLen = protLen
         self.hmmCoordStart = hmmCoordStart
         self.hmmCoordLen = hmmCoordLen
-        self.posCovArray = posCovArray
+        self.protSeq = protSeq
+        self.protStart = protStart
+        self.protLen = protLen
+
+        # DNA sequence of the record
+        self.dnaSeq = qsArray.getConsDna()
 
         # a list of ReadRec merging of which this read-record originated
-        # None - if this read-record did not originate by the composition of other read-records
+        # None - if this read-record did not originate by merging of other read-records
         # (may remove in the future)
         self.readRecList = None
 
         # a list of (overlapIdx, score) used to merge the read-records (list of (idx, score), i.e. list[(int, int)]
-        self.overlapIdxList = None
+        # self.overlapIdxList = None  # TODO: drop this
 
-        # the position of this (super-)read within a bigger contig
+        # the position of this (super-)read within a bigger contig (super-read)
         self.posWithinContig = 0
+
+        # label for the evaluation purposes
+        self.labelEval = None
 
         # TODO: remove this checking
         # p = self.protSeq[self.protStart:self.protStart + self.protLen]
@@ -114,6 +112,49 @@ class ReadRec(object):
         #             self.protSeq[self.protStart: self.protStart + self.protLen], \
         #             str(self.qsArray[i:i+3])
 
+    def getPosCovArray(self):
+        """
+            @rtype: ndarray
+            @return: position coverage array, entries as floats! (i.e. for each position,
+            how many pair-end reads cover it, e.g. 111222111 for a joined pair-end read)
+        """
+        return self.qsArray.getPosCovArray()
+
+    def getLen(self):
+        """
+            @return: length of the (super-)read
+            @rtype: int
+        """
+        return self.qsArray.getLen()
+
+    def isSuperRead(self):
+        """
+            @rtype: bool
+            @return: is this a super-read
+        """
+        return self.readRecList is not None
+
+    def getConstituentReadCount(self):
+        if self.readRecList is None:
+            return 1
+        else:
+            return len(self.readRecList)
+
+    def getAvgCov(self):
+        """
+            @return: (super-)read coverage
+        """
+        return self.qsArray.getAvgCov()
+
+    def getLabels(self):
+        """
+            @rtype: list[algbioi.haplo.heval.LabelR] | None
+        """
+        try:
+            return self.labelEval
+        except AttributeError:
+            return None
+
     def getMostCoveredRec(self):
         """
             Get read-records (of which this read-record consist of) sorted according to how they are covered
@@ -122,136 +163,155 @@ class ReadRec(object):
             @return: list of the read-records, most covered first (or None if this read-record consists only of itself)
             @rtype: list[ReadRec]
         """
+        # TODO: do I need this method?
         if self.readRecList is None:
             return None
         else:
+            posCovArray = self.getPosCovArray()
             recCovList = []
             for rec in self.readRecList:
-                covSum = 0
+                covSum = 0.
                 offset = rec.posWithinContig
                 for i in range(len(rec.dnaSeq)):
-                    covSum += self.posCovArray[offset + i]
+                    # covSum += self.posCovArray[offset + i]
+                    covSum += posCovArray[offset + i]
                 recCovList.append((rec, covSum))
             recCovList.sort(key=lambda x: x[1], reverse=True)
         return map(lambda x: x[0], recCovList)
 
 
-def mergeRecords(rec1, rec2, overlapIdx, consSeqGen, score=None):
+def mergeRecords(rec1, rec2, overlapIdx):
     """
         Merges record-1 into record-2, returns a merged object.
 
         @param rec1: (super-)read-record
         @param rec2: read-record (that hasn't been joined with any other so far)
         @param overlapIdx: position within rec2, start pos of rec1 mapped onto rec2 (it can be a negative value)
-        @param consSeqGen: generator of consensus sequences and consensus QS arrays
         @param score: score used for this overlap
 
         @type rec1: ReadRec
         @type rec2: ReadRec
         @type overlapIdx: int
-        @type consSeqGen: algbioi.com.fq.QsMultMatrix
         @type score: int
         @rtype: ReadRec
 
         @return: a merged read record
     """
     # make a shallow copy of the object
-    mRec = copy.copy(rec1)
+    if rec2.readRecList is None:
+        mRec = copy.copy(rec1)
+    else:
+        mRec = copy.copy(rec2)
+
+    if overlapIdx < 0:
+        tmp = rec1
+        rec1 = rec2
+        rec2 = tmp
+        overlapIdx = -overlapIdx
 
     # concatenate record ids
-    mRec.recordId = rec1.recordId + '|' + rec2.recordId
+    mRec.recordId = rec1.recordId + '|' + rec2.recordId  # TODO: simplify the ids
 
     # lengths of the sequences
-    dnaLen1 = len(rec1.dnaSeq)
-    dnaLen2 = len(rec2.dnaSeq)
+    # dnaLen1 = rec1.getLen()
+    # dnaLen2 = rec2.getLen()
 
     # get start positions withing the dna sequences and corresponding lengths
-    if overlapIdx <= 0:
+    # if overlapIdx <= 0:
 
         # part before overlap rec1
-        boPos1 = 0
-        boLen1 = - overlapIdx
+        # boPos1 = 0
+        # boLen1 = - overlapIdx
 
         # part before overlap rec2
-        boPos2 = 0
-        boLen2 = 0
+        # boPos2 = 0
+        # boLen2 = 0
 
         # overlap start pos within rec1, rec2
-        oPos1 = - overlapIdx
-        oPos2 = 0
+        # oPos1 = - overlapIdx
+        # oPos2 = 0
 
-    else:
-
+    # else:
         # part before overlap rec1
-        boPos1 = 0
-        boLen1 = 0
+        # boPos1 = 0
+    boLen1 = 0
 
         # part before overlap rec2
-        boPos2 = 0
-        boLen2 = overlapIdx
+        # boPos2 = 0
+    boLen2 = overlapIdx
 
         # overlap start pos within rec1, rec2
-        oPos1 = 0
-        oPos2 = overlapIdx
+        # oPos1 = 0
+        # oPos2 = overlapIdx
 
     # length of the dna overlap
-    oLen = min(dnaLen1 - oPos1, dnaLen2 - oPos2)
+    # oLen = min(dnaLen1 - oPos1, dnaLen2 - oPos2)
 
     # after overlap rec1
-    aPos1 = oPos1 + oLen
-    aLen1 = dnaLen1 - aPos1
+    # aPos1 = oPos1 + oLen
+    # aLen1 = dnaLen1 - aPos1
 
     # after overlap rec2
-    aPos2 = oPos2 + oLen
-    aLen2 = dnaLen2 - aPos2
+    # aPos2 = oPos2 + oLen
+    # aLen2 = dnaLen2 - aPos2
 
-    dnaCons, qsCons = consSeqGen.getConsensus(rec1.dnaSeq[oPos1:oPos1+oLen],
-                                              rec2.dnaSeq[oPos2:oPos2+oLen],
-                                              rec1.qsArray[oPos1:oPos1+oLen],
-                                              rec2.qsArray[oPos2:oPos2+oLen])
+    # @type consSeqGen: algbioi.com.fq.QsMultMatrix
+    # dnaCons, qsCons = consSeqGen.getConsensus(rec1.dnaSeq[oPos1:oPos1+oLen],
+    #                                           rec2.dnaSeq[oPos2:oPos2+oLen],
+    #                                           rec1.qsArray[oPos1:oPos1+oLen],
+    #                                           rec2.qsArray[oPos2:oPos2+oLen])
 
-    mRec.dnaSeq = rec1.dnaSeq[boPos1:boPos1+boLen1] + rec2.dnaSeq[boPos2:boPos2+boLen2] + dnaCons \
-                  + rec1.dnaSeq[aPos1:aPos1+aLen1] + rec2.dnaSeq[aPos2:aPos2+aLen2]
+    # get the consensus QS Array
+    mRec.qsArray = qs_man.QSArray(qsA1=rec1.qsArray, qsA2=rec2.qsArray, pos1Within2=overlapIdx)
 
-    mRec.qsArray = rec1.qsArray[boPos1:boPos1+boLen1] + rec2.qsArray[boPos2:boPos2+boLen2] + qsCons \
-                   + rec1.qsArray[aPos1:aPos1+aLen1] + rec2.qsArray[aPos2:aPos2+aLen2]
+    # consensus DNA
+    mRec.dnaSeq = mRec.qsArray.getConsDna()
 
-    assert len(mRec.dnaSeq) == len(mRec.qsArray)
+    mRec.posWithinContig = 0
+
+    # mRec.dnaSeq = rec1.dnaSeq[boPos1:boPos1+boLen1] + rec2.dnaSeq[boPos2:boPos2+boLen2] + dnaCons \
+    #               + rec1.dnaSeq[aPos1:aPos1+aLen1] + rec2.dnaSeq[aPos2:aPos2+aLen2]
+
+    # mRec.qsArray = rec1.qsArray[boPos1:boPos1+boLen1] + rec2.qsArray[boPos2:boPos2+boLen2] + qsCons \
+    #                + rec1.qsArray[aPos1:aPos1+aLen1] + rec2.qsArray[aPos2:aPos2+aLen2]
+
+    # assert len(mRec.dnaSeq) == len(mRec.qsArray)
 
     # position coverage array
-    mRec.posCovArray = np.zeros(len(mRec.dnaSeq), dtype=np.uint32)
+    # mRec.posCovArray = np.zeros(len(mRec.dnaSeq), dtype=np.uint32)
 
     # copy before overlap coverage
-    if boLen1 > 0:
-        assert boLen2 == 0
-        for i in range(boLen1):
-            mRec.posCovArray[i] = rec1.posCovArray[i]
-    else:
-        assert boLen1 == 0
-        for i in range(boLen2):
-            mRec.posCovArray[i] = rec2.posCovArray[i]
+    # if boLen1 > 0:
+    #     assert boLen2 == 0
+    #     for i in range(boLen1):
+    #         mRec.posCovArray[i] = rec1.posCovArray[i]
+    # else:
+    #     assert boLen1 == 0
+    #     for i in range(boLen2):
+    #         mRec.posCovArray[i] = rec2.posCovArray[i]
 
     # sum up overlap coverage
-    offset = max(boLen1, boLen2)
-    assert min(boLen1, boLen2) == 0
-    for i in range(oLen):
-        mRec.posCovArray[offset + i] = rec1.posCovArray[oPos1 + i] + rec2.posCovArray[oPos2 + i]
+    # offset = max(boLen1, boLen2)
+    # assert min(boLen1, boLen2) == 0
+    # for i in range(oLen):
+    #     mRec.posCovArray[offset + i] = rec1.posCovArray[oPos1 + i] + rec2.posCovArray[oPos2 + i]
 
     # copy after overlap coverage
-    offset += oLen
-    if aLen1 > 0:
-        assert aLen2 == 0
-        for i in range(aLen1):
-            mRec.posCovArray[offset + i] = rec1.posCovArray[aPos1 + i]
-    else:
-        assert aLen1 == 0
-        for i in range(aLen2):
-            mRec.posCovArray[offset + i] = rec2.posCovArray[aPos2 + i]
+    # offset += oLen
+    # if aLen1 > 0:
+    #     assert aLen2 == 0
+    #     for i in range(aLen1):
+    #         mRec.posCovArray[offset + i] = rec1.posCovArray[aPos1 + i]
+    # else:
+    #     assert aLen1 == 0
+    #     for i in range(aLen2):
+    #         mRec.posCovArray[offset + i] = rec2.posCovArray[aPos2 + i]
 
-    if overlapIdx > 0:
-        mRec.readingFrameTag = rec2.readingFrameTag
-    else:
-        mRec.readingFrameTag = rec1.readingFrameTag
+    # set the reading frame tag
+    # if overlapIdx > 0:
+    mRec.readingFrameTag = rec2.readingFrameTag
+    # else:
+    #     mRec.readingFrameTag = rec1.readingFrameTag
     if mRec.readingFrameTag > 3:
         mRec.readingFrameTag -= 3
 
@@ -281,22 +341,41 @@ def mergeRecords(rec1, rec2, overlapIdx, consSeqGen, score=None):
         mRec.hmmCoordStart = rec2.hmmCoordStart
 
     # a list of all read-records this merged read-record consist of, also the overlap index and score
-    assert rec2.readRecList is None and rec2.overlapIdxList is None
-    if rec1.readRecList is None:
-        assert rec1.overlapIdxList is None
-        mRec.readRecList = [rec1, rec2]
-        mRec.overlapIdxList = [(overlapIdx, score)]
-        # set the positions of the read-records within the merged record
-        rec1.posWithinContig = boLen2
-    else:
-        mRec.readRecList = rec1.readRecList + [rec2]
-        mRec.overlapIdxList = rec1.overlapIdxList + [(overlapIdx, score)]
-        # set the positions of the read-records within the merged record
-        if boLen2 > 0:
+    if rec2.readRecList is None:
+        # assert rec2.overlapIdxList is None
+        if rec1.readRecList is None:
+            # assert rec1.overlapIdxList is None
+            # read - read
+            mRec.readRecList = [rec1, rec2]
+            # mRec.overlapIdxList = [(overlapIdx, score)]
+            # set the positions of the read-records within the merged record
+            rec1.posWithinContig = boLen2
+        else:
+            # super-read - read
+            mRec.readRecList = rec1.readRecList + [rec2]
+            # mRec.overlapIdxList = rec1.overlapIdxList + [(overlapIdx, score)]
+            # set the positions of the read-records within the merged record
+            # if boLen2 > 0:
             for r in rec1.readRecList:
                 r.posWithinContig += boLen2
 
-    rec2.posWithinContig = boLen1
+        rec2.posWithinContig = 0
+
+    else:
+        # assert rec2.overlapIdxList is not None
+
+        if rec1.readRecList is None:
+            # assert rec1.overlapIdxList is None
+            # read - super-read
+            mRec.readRecList = rec2.readRecList + [rec1]
+            # mRec.overlapIdxList = rec2.overlapIdxList + [(overlapIdx, score)]
+            rec1.posWithinContig = boLen2
+        else:
+            # super-read - super-read
+            # assert rec2.overlapIdxList is not None
+            mRec.readRecList = rec1.readRecList + rec2.readRecList
+            for r in rec1.readRecList:
+                r.posWithinContig += boLen2
 
     # TODO: may drop these !!!
     mRec.protSeq = None

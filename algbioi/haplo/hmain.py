@@ -20,6 +20,7 @@
 """
 
 # import os
+# import sys
 # import gzip
 import numpy as np
 
@@ -33,7 +34,7 @@ def getHmmCovArray(recList):
 
         @type recList list[algbioi.haplo.read_rec.ReadRec]
 
-        @rtype: list[int]
+        @rtype: ndarray
     """
     # find out the alignment length considering all read-records
     aliLen = 0
@@ -41,16 +42,17 @@ def getHmmCovArray(recList):
         aliLen = max(aliLen, 3 * rec.hmmCoordStart + rec.annotLen)
 
     # alignment coverage array
-    aliCovArray = np.zeros(aliLen, np.uint32)
+    aliCovArray = np.zeros(aliLen, np.float64)
 
     # go over all records
     for rec in recList:
         hmmCoordStart = rec.hmmCoordStart * 3
+        posCovArray = rec.getPosCovArray()
 
         # go over all alignment positions, count the coverage
         j = 0
         for i in range(rec.annotStart, rec.annotStart + rec.annotLen):
-            aliCovArray[hmmCoordStart + j] += rec.posCovArray[i]
+            aliCovArray[hmmCoordStart + j] += posCovArray[i]
             j += 1
 
     return aliCovArray
@@ -64,7 +66,7 @@ def findSeed(recList, aliCovArray):
         Returns a list sorted according this sum (the biggest first).
 
         @type recList: list[algbioi.haplo.read_rec.ReadRec]
-        @type aliCovArray: list[int]
+        @type aliCovArray: ndarray
 
         @return: seed list, seeds with the highest support first
         @rtype: list[algbioi.haplo.read_rec.ReadRec]
@@ -73,12 +75,13 @@ def findSeed(recList, aliCovArray):
     # compute the overlap sum of each read-record
     for rec in recList:
         hmmCoordStart = rec.hmmCoordStart * 3
-        covSum = 0
+        covSum = 0.
         j = 0
         for i in range(rec.annotStart, rec.annotStart + rec.annotLen):
             covSum += aliCovArray[hmmCoordStart + j]
             j += 1
 
+        assert covSum > 0.
         recSumList.append((rec, covSum))
 
     # sort according to the longest annotation
@@ -94,17 +97,21 @@ def findSeed(recList, aliCovArray):
     return retList
 
 
-def buildSuperReads(inFq, inDomtblout, pairEndReadLen, inProtFna=None, outFile=None, translTable=11,
-                    maxMismatchQSAllowed=9, minScoreReqiured=75, minAnnotOverlapScore=40, scoreStopSearch=100,
-                    maxQS=94):
-
-    # TODO: make prot sequence voluntary
-
+def buildSuperReads(inFq, inDomtblout, inProtFna=None, outFile=None,
+                    considerProtSeqCmp=(False, False), considerOnlyPOverlap=(False, True),
+                    pOverlapMin=(0.8, 0.8), scoreOverlapLenMin=(0.5, 0.4),
+                    scoreOverlapAnnotLenMin=(0.2, 0.2), stopOverlapMaxMismatch=(0.1, 0.05), maxLoops=1, translTable=11):
+    """
+        Recommendation:
+            pOverlap: 0.7 - 0.8
+            score: 0.25 - 0.8
+    """
     try:
-        # 1. read in read records
-        recList = hio.parse(inFq, inDomtblout, inProtFna, pairEndReadLen)  # TODO: remove pairEndReadLen
+        assert len(considerProtSeqCmp) == len(considerOnlyPOverlap) == len(pOverlapMin) == len(scoreOverlapLenMin) \
+               == len(scoreOverlapAnnotLenMin) == len(stopOverlapMaxMismatch) >= maxLoops
 
-        # return None  # TODO: tmp !!!
+        # 1. read in read records
+        recList = hio.parse(inFq, inDomtblout, inProtFna)
 
         # 2. sort read record list according to the HMM start positions
         recList.sort(key=lambda x: x.hmmCoordStart)
@@ -117,9 +124,33 @@ def buildSuperReads(inFq, inDomtblout, pairEndReadLen, inProtFna=None, outFile=N
 
         # print("Record list input length: %s" % len(recList))
 
-        # 5. run the snowball alg.
-        recSet = runSnowball(recList, seedList, translTable, maxMismatchQSAllowed, minScoreReqiured,
-                             minAnnotOverlapScore, scoreStopSearch, maxQS)
+        # 5. run the snowball alg. overlap~0.75, score~0.3  # 0.3 0.25,  # 0.35
+        recSet = runSnowball(recList, seedList, considerProtSeqCmp[0], considerOnlyPOverlap[0], pOverlapMin[0],
+                             scoreOverlapLenMin[0], scoreOverlapAnnotLenMin[0], stopOverlapMaxMismatch[0], translTable)
+
+        i = 1
+        inLen = len(recSet)
+        while i < maxLoops:
+            # print('loop')
+            # get the record list again
+            recList = list(recSet)
+
+            # sort: longest seq first
+            recList.sort(key=lambda x: len(x.dnaSeq), reverse=True)
+            seedList = recList[:]
+
+            # sort according to the HMM start positions
+            recList.sort(key=lambda x: x.hmmCoordStart)
+
+            # run again
+            recSet = runSnowball(recList, seedList, considerProtSeqCmp[i], considerOnlyPOverlap[i], pOverlapMin[i],
+                                 scoreOverlapLenMin[i], scoreOverlapAnnotLenMin[i], stopOverlapMaxMismatch[i],
+                                 translTable)
+            outLen = len(recSet)
+            if inLen == outLen:
+                break
+            inLen = outLen
+            i += 1
 
         if outFile is not None:
             hio.storeReadRec(list(recSet), outFile)
@@ -128,7 +159,7 @@ def buildSuperReads(inFq, inDomtblout, pairEndReadLen, inProtFna=None, outFile=N
             return recSet
     except Exception as e:
         print('Exception in buildSuperReads:')
-        print inFq, inDomtblout, pairEndReadLen, inProtFna, outFile, translTable, maxMismatchQSAllowed, minScoreReqiured, minAnnotOverlapScore, scoreStopSearch, maxQS
+        print inFq, inDomtblout, inProtFna, outFile
         print e.message
         print type(e)
         print e.args
@@ -136,7 +167,6 @@ def buildSuperReads(inFq, inDomtblout, pairEndReadLen, inProtFna=None, outFile=N
 
 # TODO: 6. clean up discart low support contigs, output results
 
-# TODO: 7. evaluate results !!!
 
 if __name__ == "__main__":
     pass

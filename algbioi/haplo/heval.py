@@ -83,8 +83,33 @@ def getReadTrueMap(refGmap):
         seqId = tokens[2]
         seqPos = int(tokens[3])
         geneAnnot = tokens[11]
-        assert readId not in mapping
+        assert readId not in mapping, readId
         mapping[readId] = (strainId, seqId, seqPos, geneAnnot)
+    return mapping
+
+
+def getReadTrueMapSimple(refGmap):
+    """
+        Read the true read-mapping.
+        @param refGmap: sam mapping file
+        @type refGmap: str
+        @return: map: readId -> (strainId, seqId)
+        @rtype: dict[str,(str,str)]
+    """
+    mapping = {}
+    for line in gzip.open(refGmap):
+        line = line.strip()
+        if line.startswith('#'):
+            continue
+        tokens = line.split('\t')
+        readId = tokens[0]
+        seqId = tokens[2]
+        strainId = tokens[12]
+
+        if readId not in mapping:
+            mapping[readId] = (strainId, seqId)
+        else:
+            assert mapping[readId] == (strainId, seqId)
     return mapping
 
 
@@ -120,12 +145,18 @@ def assemblyPurity(recSet, refGmap):
                 t.append((k, v))
             t.sort(key=lambda x: x[1], reverse=True)
 
-            resultList.append((len(rec.readRecList), len(strainSet), str(t)))
+            resultList.append((len(rec.readRecList), len(strainSet), str(t),
+                               ' | '.join((map(lambda x: ', '.join(x.getContent().split(',')[:4]), rec.labelEval)))))
 
     resultList.sort(key=lambda x: x[0], reverse=True)
 
-    for i in resultList:
-        print('%s\t%s\t%s' % i)
+    for e1, e2, e3, e4 in resultList:
+        print('%s\t%s\t%s' % (e1, e2, e3))
+
+    print('#reads, #strains, seq, strain, error, codonError, startPos, strain')
+    resultList.sort(key=lambda x: x[0], reverse=True)
+    for e1, e2, e3, e4 in resultList:
+        print('%s\t%s\t%s' % (e1, e2, e4))
 
 
 # def getContigLabel(rec, gmap):
@@ -157,13 +188,39 @@ def assemblyPurity(recSet, refGmap):
     #     return tList[0][0]
 #
 
+
+class LabelR(object):
+    def __init__(self, error, codonError, strainId, seqId, startPos, refContig=None, strand=None, totalErrorA=None):
+        self.error = error
+        self.codonError = codonError
+        self.strainId = strainId
+        self.seqId = seqId
+        self.startPos = startPos
+        self.refContig = refContig
+        self.strand = strand
+        self.totalErrorA = totalErrorA
+
+    def getRefDna(self):
+        if self.strand is None:
+            return None
+        if self.strand == 1:
+            return self.refContig
+        else:
+            assert self.strand == -1
+            return str(Seq(self.refContig, generic_dna).reverse_complement())
+
+    def getContent(self):
+        return '(%s, %s, %s, %s, %s, %s, %s)' \
+               % (self.seqId, self.strainId, self.error, self.codonError, self.startPos, self.strand, self.refContig)
+
+
 def getRefContig(refSeq, startPos, seqLen):
     """
         Gets a substring of the reference sequence corresponding to the start position and length.
-        If the start position is negative or the sequence is shorter than seqLen, it's padded by non-DNA characters (X).
+        If the start position is negative or the sequence is shorter than seqLen, it's padded by non-DNA characters (?).
 
         @param refSeq: reference dna sequence
-        @param startPos: a start position within the sequence
+        @param startPos: a start position within the sequence (can be negative)
         @param seqLen: the length of the substring sequence
         @type refSeq: str
         @type startPos: int
@@ -178,12 +235,12 @@ def getRefContig(refSeq, startPos, seqLen):
         padLeft = ''
         padRight = ''
         if startPos + seqLen > len(refSeq):
-            padRight = 'X' * (startPos + seqLen - len(refSeq))
+            padRight = '?' * (startPos + seqLen - len(refSeq))
             endPos = len(refSeq)
         else:
             endPos = startPos + seqLen
         if startPos < 0:
-            padLeft = 'X' * (-startPos)
+            padLeft = '?' * (-startPos)
             startPos = 0
         refContig = padLeft + refSeq[startPos:endPos] + padRight
 
@@ -194,10 +251,10 @@ def getRefContig(refSeq, startPos, seqLen):
 def getError(dnaSeq, refSeq, covArray, maxCov, annotStart, annotLen, tripletMap):
     """
         Compute substitution errors between two DNA sequences.
-        A comparison to a non-DNA character in the reference sequence is considered to be "correct".
+        A comparison to a non-DNA character in the reference sequence is considered to be "correct" (except for '?').
 
-        @param dnaSeq: first sequence
-        @param refSeq: second sequence
+        @param dnaSeq: a sequence
+        @param refSeq: a reference sequence
         @param covArray: represents a coverage value for each position
         @param maxCov: maximum coverage considered (higher values will be mapped to this one
         @param annotStart: position within the dnaSeq at which the Hmm annotation starts
@@ -210,8 +267,8 @@ def getError(dnaSeq, refSeq, covArray, maxCov, annotStart, annotLen, tripletMap)
         @type annotStart: int
         @type tripletMap: dict[str,str]
         @rtype: (ndarray, int, int, int)
-        @return: the result error array (1 row ~ total count, 2 row error count, 3 row codon error, length ~ coverage),
-            error, correct, codonError
+        @return: the result error array (1 row ~ total count, 2 row error count, 3 row codon-error, length ~ coverage),
+            error, correct, codon-error
     """
     assert len(dnaSeq) == len(refSeq) == len(covArray)
     totalErrorA = np.zeros((3, maxCov + 1), dtype=np.uint64)
@@ -220,10 +277,10 @@ def getError(dnaSeq, refSeq, covArray, maxCov, annotStart, annotLen, tripletMap)
     correct = 0
     codonError = 0
     for i in range(len(dnaSeq)):
-        cov = min(covArray[i], maxCov)
+        cov = min(int(round(covArray[i])), maxCov)
         totalErrorA[0][cov] += 1
         # count non-DNA in the reference as true
-        if dnaSeq[i] == refSeq[i] or (not qs.isDNAChar(refSeq[i])):  # TODO: consider all the ambiguous characters ?
+        if dnaSeq[i] == refSeq[i] or (refSeq[i] != '?' and (not qs.isDNAChar(refSeq[i]))):  # TODO: consider all the ambiguous characters ?
             correct += 1
         else:
             totalErrorA[1][cov] += 1
@@ -243,10 +300,14 @@ def getError(dnaSeq, refSeq, covArray, maxCov, annotStart, annotLen, tripletMap)
     return totalErrorA, error, correct, codonError
 
 
-def getPerBaseErrorPkl(recListFile, refGmap, refSeqBuff, maxCov, translTable):
+def getPerBaseErrorPkl(recListFile, refGmap, refSeqBuff, maxCov, translTable, storeLabels=True):
     try:
         recSet = set(hio.loadReadRec(recListFile))
-        return getPerBaseError(recSet, refGmap, refSeqBuff, maxCov, translTable)
+        error = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov, translTable, allLabels=storeLabels)
+        if storeLabels:
+            hio.storeReadRec(list(recSet), recListFile)
+        return error
+
     except Exception as e:
         print "Exception in heval.getPerBaseErrorPkl"
         print recListFile, refGmap, 'buffer here', maxCov, translTable
@@ -255,7 +316,7 @@ def getPerBaseErrorPkl(recListFile, refGmap, refSeqBuff, maxCov, translTable):
         return None
 
 
-def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11):
+def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allLabels=False):
     """
         Get the per position, per coverage error.
 
@@ -265,10 +326,13 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11):
         @param refGmap: reference file containing the true mapping for each read
         @param refSeqBuff: mapping for reference sequenceing map: (strainId, seqId) -> sequence
         @param maxCov: higher coverages will be mapped to this one
+        @param allLabels: compute the error for all labels and set the labels (incl. errors) to the read-record
+
         @type recSet: set[read_rec.ReadRec]
         @type refGmap: str
-        @type refDirList: list[str]
+        @type refSeqBuff: map[(str,str),str]
         @type maxCov: int
+        @type allLabels: bool
 
         @return: a two dimensional array, first row ~ total counts, second row ~ error counts (array length ~ coverage)
         @rtype: ndarray
@@ -315,11 +379,12 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11):
                 refContig = getRefContig(refSeq, startPos, len(rec.dnaSeq))
 
                 # compute error
-                totalErrorA, error, correct, codonError = getError(rec.dnaSeq, refContig, rec.posCovArray, maxCov,
+                totalErrorA, error, correct, codonError = getError(rec.dnaSeq, refContig, rec.getPosCovArray(), maxCov,
                                                                    rec.annotStart, rec.annotLen, tripletMap)
                 # store error
-                errList.append((totalErrorA, error, codonError, correct, refContig, refSeq, seqId))
-                if error == 0:
+                errList.append((totalErrorA, error, codonError, correct, refContig, refSeq, seqId, strainId, startPos, 1))
+                if error == 0 and not allLabels:
+                    assert codonError == 0
                     break
                 examinedSet.add((strainId, seqId, startPos, 1))
             else:
@@ -338,18 +403,46 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11):
 
                 refContig = getRefContig(refSeq, startPos, len(rec.dnaSeq))
 
-                totalErrorA, error, correct, codonError = getError(str(Seq(rec.dnaSeq, generic_dna).reverse_complement()),
-                                                                   refContig, rec.posCovArray, maxCov, rec.annotStart,
+                totalErrorA, error, correct, codonError = getError(rec.dnaSeq,
+                                                                   str(Seq(refContig, generic_dna).reverse_complement()),
+                                                                   rec.getPosCovArray(), maxCov, rec.annotStart,
                                                                    rec.annotLen, tripletMap)
 
-                errList.append((totalErrorA, error, codonError, correct, refContig, refSeq, seqId))
-                if error == 0:
+                errList.append((totalErrorA, error, codonError, correct, refContig, refSeq, seqId, strainId, startPos, -1))
+                if error == 0 and not allLabels:
+                    assert codonError == 0
                     break
                 examinedSet.add((strainId, seqId, startPos, -1))
 
-        # get the results from the smallest error
-        errList.sort(key=lambda x: x[2])
-        errorA += errList[0][0]
+        # get the results from the smallest error (first sort according to the error, then codon-error)
+        errList.sort(key=lambda x: (x[1], x[2]))
+
+        totalErrorA, error, codonError, correct, refContig, refSeq, seqId, strainId, startPos, s = errList[0]
+
+        # if the start position is outside of the reference sequence, try a different reference seq. with the same error
+        if startPos < 0:  # TODO: is it necessary?
+            for err in errList[1:]:
+                totalErrorA2, error2, codonError2, correct2, refContig2, refSeq2, seqId2, strainId2, startPos2, s2 = err
+                if error2 > error or codonError2 > codonError:
+                    break
+                elif startPos2 >= 0:
+                    totalErrorA = totalErrorA2
+                    break
+
+        errorA += totalErrorA
+
+        # store all the possible labels with corresponding errors
+        if allLabels:
+            examinedSet2 = set()  # (strainId, seqId)  # TODO: consider also the straind?
+            labelList = []
+            for err in errList:
+                totalErrorA2, error2, codonError2, correct2, refContig2, refSeq2, seqId2, strainId2, startPos2, s2 = err
+                if (strainId2, seqId2) not in examinedSet2:
+                    labelList.append(LabelR(error2, codonError2, strainId2, seqId2, startPos2, refContig2, s2, totalErrorA2))
+                    examinedSet2.add((strainId2, seqId2))
+
+            # all possible labels of the read-record
+            rec.labelEval = labelList
 
         # if errList[0][1] > 0 and len(rec.readRecList) > 30:
         #     print 'Error "%s" at contig len: "%s" reads: "%s" matrix: %s' % (errList[0][1], len(rec.dnaSeq), len(rec.readRecList), errList[0][0][1])
@@ -427,12 +520,12 @@ def getAssemblyReport(errorAList, maxCov=20):
 def _test():
 
     # gf = 'pfl_3'
-    gf = 'aminotran_3_1'
+    # gf = 'aminotran_3_1'
 
     # gf = 'acr_tran_3'
-    # gf = 'abc_tran_3'
+    # gf = 'abc_tran_3'  # too many pieces..
     # gf = 'usher_1'
-    # gf = 'aldedh_1'
+    gf = 'aldedh_1'  # TODO: explore two long contigs belonging to one reference !!!
     # gf = 'molybdopterin_1'
     # gf = 'aa_permease_2'
     # gf = 'hth_1_3'
@@ -445,16 +538,16 @@ def _test():
 
     baseDir = os.path.join(comh.REFERENCE_DIR_ROOT, '562/samples/0/sample_partitioned')
     recSet = hmain.buildSuperReads(inFq=os.path.join(baseDir, 'r_%s_join.fq.gz' % gf),
-                    inDomtblout=os.path.join(baseDir, 'r_%s_join_prot.domtblout.gz' % gf),
-                    inProtFna=os.path.join(baseDir, 'r_%s_join_prot.fna.gz' % gf),
-                    pairEndReadLen=150)
+                                   inDomtblout=os.path.join(baseDir, 'r_%s_join_prot.domtblout.gz' % gf),
+                                   inProtFna=os.path.join(baseDir, 'r_%s_join_prot.fna.gz' % gf))
 
     refGmap = os.path.join(baseDir, 'r_%s_join_gmap.sam.gz' % gf)
 
     refSeqBuff = fas.getSequenceBuffer([os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DIR_NAME),
-                               os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
+                                        os.path.join(comh.REFERENCE_DIR_ROOT, '562', comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
 
-    errA = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=10)
+    print 'assembly finished'
+    errA = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=10, allLabels=True)
 
     print getAssemblyReport([errA], maxCov=10)
 
@@ -465,13 +558,11 @@ def _test():
 if __name__ == "__main__":
     _test()
 
-
-    # gf = 'pfl_3'
-    # gf = 'okr_dc_1_5'
+# gf = 'okr_dc_1_5'
     # gf = 'mfs_1_3'
     # gf = 'eal_3'
     # gf = 'sigma54_activat_1'
-    # gf = 'pfkb_2'
+    #### gf = 'pfkb_2'
     # gf = 'sbp_bac_5_3'
     # gf = 'aminotran_3_1'
     # gf = 'phage_integrase_1'
@@ -498,6 +589,37 @@ if __name__ == "__main__":
     # gf = 'pep_utilizers_c_5'  # three contigs same label
     #gf = 'sbp_bac_3_3'
     # gf = 'asma_2'
+
+    # gf = 'dnag_1'
+    # gf = 'infc_1'
+    # gf = 'pgk_0'
+    # gf = 'tsf_0'
+    # gf = 'frr_0'
+    # gf = 'nusa_1'
+    # gf = 'pyrg_1'
+    # gf = 'rpma_1'
+    # gf = 'smpb_1'
+    # gf = 'rpsc_1'
+    # gf = 'rpsi_1'
+    # gf = 'rpsk_1'
+    # gf = 'rpss_1'
+    # gf = 'rpsb_1'
+    # gf = 'rpse_1'
+    # gf = 'rpsj_1'
+    # gf = 'rpsm_1'
+    # gf = 'rpla_1'
+    # gf = 'rplb_1'
+    # gf = 'rplc_1'
+    # gf = 'rpld_1'
+    # gf = 'rple_1'
+    # gf = 'rplf_1'  # two variants !
+    # gf = 'rplk_1'
+    # gf = 'rpll_1'
+    # gf = 'rplm_1'
+    # gf = 'rpln_1'
+    # gf = 'rplp_1'
+    # gf = 'rpls_1'
+    # gf = 'rplt_1'
 
     # now skipping several records
 

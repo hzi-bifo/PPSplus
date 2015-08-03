@@ -21,7 +21,11 @@
 
 import numpy as np
 
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
+
 PROB_MATRIX_ROWS = 5  # A, C, T, G, cov
+
 
 def nuclToInt(nucl):
     """
@@ -178,7 +182,6 @@ class QSArray(object):
                     self._probMatrix[i][r2] = qs1._probMatrix[i][r1]
                 r2 += 1
 
-
     def _init2(self, dna, qsArray):
         """
             Init an instance given a FASTQ entry (DNA seq and QS as string).
@@ -237,7 +240,7 @@ class QSArray(object):
                     x[c][i] = x[t][i] = pc / 2.
                     x[g][i] = x[a][i] = pe / 2.
                 elif ch == 'S':
-                    x[c][i] = x[g][i]= pc / 2.
+                    x[c][i] = x[g][i] = pc / 2.
                     x[a][i] = x[t][i] = pe / 2.
                 elif ch == 'W':
                     x[a][i] = x[t][i] = pc / 2.
@@ -272,11 +275,11 @@ class QSArray(object):
         """
         dnaA = np.zeros(self._len, dtype=np.int8)
         for i in range(self._len):
-            max = 0
+            maxI = 0
             for j in range(1, PROB_MATRIX_ROWS - 1):
-                if self._probMatrix[j][i] > self._probMatrix[max][i]:
-                    max = j
-            dnaA[i] = max
+                if self._probMatrix[j][i] > self._probMatrix[maxI][i]:
+                    maxI = j
+            dnaA[i] = maxI
 
         return ''.join(map(lambda x: self._intToNucl.get(x), dnaA))
 
@@ -291,9 +294,44 @@ class QSArray(object):
         qsA = np.zeros(self._len, dtype=np.int8)
         for i, c in zip(range(self._len), list(dna)):
 
-            qsA[i] = int(round((-10.) * np.log10(1 - self._probMatrix[nuclToInt(c)][i])))
+            p = self._probMatrix[nuclToInt(c)][i] / self._probMatrix[PROB_MATRIX_ROWS - 1][i]
+            qsA[i] = int(round((-10.) * np.log10(1. - p)))
 
         return ''.join(map(lambda x: chr(x + 33), qsA))
+
+    def revCompl(self):
+        """
+            Make reverse complement of the QS array.
+        """
+        assert PROB_MATRIX_ROWS == 5
+
+        i = 0
+        j = self._len - 1
+
+        tmp = np.zeros(5, dtype=np.float128)
+        interval1 = [0, 1, 2, 3, 4]
+        interval2 = [2, 3, 0, 1, 4]
+
+        while i <= j:
+
+            for k in range(5):
+                tmp[k] = self._probMatrix[k][i]
+
+            if i < j:
+                for k, r in zip(interval1, interval2):
+                    self._probMatrix[k][i] = self._probMatrix[r][j]
+
+            for k, r in zip(interval1, interval2):
+                self._probMatrix[k][j] = tmp[r]
+
+            i += 1
+            j -= 1
+
+    def getPosCovArray(self):
+        return self._probMatrix[PROB_MATRIX_ROWS - 1]
+
+    def getAvgCov(self):
+        return self._probMatrix[PROB_MATRIX_ROWS - 1].sum() / float(len(self._probMatrix[PROB_MATRIX_ROWS - 1]))
 
     def getOverlapScore(self, selfPos, qsArray2, pos2, overlapLen):
         """
@@ -304,34 +342,35 @@ class QSArray(object):
             @type qsArray2: QSArray
             @type pos2: int
             @type overlapLen: int
+            @rtype: (float, float)
         """
         probMatrix2 = qsArray2._probMatrix
         assert 0 <= selfPos < self._len and selfPos + overlapLen <= self._len
         assert 0 <= pos2 < qsArray2._len and pos2 + overlapLen <= qsArray2._len
-        sum = np.zeros(3, dtype=np.float128)
+        sumA = np.zeros(3, dtype=np.float128)
         for i in range(overlapLen):
-            sum[0] = 0.
+            sumA[0] = 0.
             for j in range(PROB_MATRIX_ROWS - 1):
                 covProduct = (self._probMatrix[PROB_MATRIX_ROWS - 1][selfPos] * probMatrix2[PROB_MATRIX_ROWS - 1][pos2])
-                sum[0] += (self._probMatrix[j][selfPos] * probMatrix2[j][pos2]) / covProduct
+                sumA[0] += (self._probMatrix[j][selfPos] * probMatrix2[j][pos2]) / covProduct
 
-            sum[1] += np.log10(sum[0])
-            sum[2] += sum[0]
+            sumA[1] += np.log10(sumA[0])
+            sumA[2] += sumA[0]
             selfPos += 1
             pos2 += 1
-            # print sum[0]  # TODO:
 
-        return float(sum[1]), float(sum[1] / overlapLen), np.power(10, float(sum[1] / overlapLen)), sum[2], (sum[2] / overlapLen)
-
+        # return float(sum[1]), float(sum[1] / overlapLen), np.power(10, float(sum[1] / overlapLen)), sum[2], (sum[2] / overlapLen)
+        return (np.power(10, float(sumA[1] / overlapLen)), sumA[2])
 
     def getOverlapScoreProt(self, selfPos, qsArray2, pos2, overlapLen):
         """
             Get the overlap score of two QS arrays considering matching of PROT sequences.
             @attention: for the normalization, divide by the overlap-length.
             @type selfPos: int
-            @type probMatrix2: QSArray
+            @type qsArray2: QSArray
             @type pos2: int
             @type overlapLen: int
+            @rtype: (float, float)
         """
         assert overlapLen % 3 == 0
         assert PROB_MATRIX_ROWS >= 5
@@ -425,8 +464,8 @@ class QSArray(object):
             sum[1] += np.log10(entry)
             sum[2] += entry
 
-        return float(sum[1]), float(sum[1] / (overlapLen / 3)), np.power(10, float(sum[1] / (overlapLen / 3))), sum[2] * 3, (sum[2] / (overlapLen / 3))
-
+        # return float(sum[1]), float(sum[1] / (overlapLen / 3)), np.power(10, float(sum[1] / (overlapLen / 3))), sum[2] * 3, (sum[2] / (overlapLen / 3))
+        return (np.power(10, float(sum[1] / (overlapLen / 3))), sum[2] * 3)
 
     def update(self, startPos, qs):
         """
@@ -441,6 +480,7 @@ class QSArray(object):
 
 # TODO:  allowing different type of information to compute the overlap ?
 
+
 def getRandQS(length, rand=None):
     if rand is None:
         rand = np.random.RandomState(length)
@@ -449,9 +489,10 @@ def getRandQS(length, rand=None):
         l.append(chr(rand.randint(37) + 33 + 5))
     return ''.join(l)
 
+
 def test2():
     rand = np.random.RandomState(0)
-    dom  = 'GAAAGTTGACCAACTGATATTTGCCGGTCTGGCATCAAGTTATTCGGTATTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGTACAATGAATATCGCCGTTTATACCGGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
+    dom = 'GAAAGTTGACCAACTGATATTTGCCGGTCTGGCATCAAGTTATTCGGTATTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGTACAATGAATATCGCCGTTTATACCGGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
     # rare  = 'GAAAGTTGACCAACTGATATTTGCCGGTCTGGCATCAAGTTATTCGGTATTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGTACAATGAATATCGCCGTTTATACCGGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
     rare = 'GAAAGTTGACCAACTGATATcTGCCGGTCTGGCATCAAGTTATTCGGTAcTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGTACAATGAATATCGCCGTTTATACCtGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
     length = len(dom)
@@ -486,13 +527,11 @@ def test2():
     qs2 = QSArray(dna=rare[60:], qsArrayFq=getRandQS(57+66, rand))
     print qsAll.getOverlapScore(60, qs2, 0, 57+66)
 
-
-
 def test1():
     dna1 = 'ATGCACGAACACAGCAACCACTCTCTGGCCGTACTATCGCTTAAA'
     dna2 = 'ATGCACGAACACAGCAACCACTCTCTGGCCGTACTATCGCTTACT'
     # qsA1 = '+++++++++++++++++++++++++++++++++++++++++++++'
-    qsA2 = '0000000000000000000000000000000000000000000H+' # #-
+    qsA2 = '0000000000000000000000000000000000000000000H+'  # #-
     print len(dna1)
 
     for i in range(40):
@@ -500,10 +539,10 @@ def test1():
 
         qs1 = QSArray(dna=dna1, qsArrayFq=qsA1)
         qs2 = QSArray(dna=dna2, qsArrayFq=qsA2)
-    # qs3 = QSArray(qsA1=qs1, qsA2=qs2, pos1Within2=0)
-
+        # qs3 = QSArray(qsA1=qs1, qsA2=qs2, pos1Within2=15)
+        # print 'cov', qs3.getAvgCov()
     # print qs1._probMatrix
-        print i, ':', qs1.getOverlapScore(0, qs2, 0, len(dna1))
+    #     print i, ':', qs1.getOverlapScore(0, qs2, 0, len(dna1))
 
     # print qs3._probMatrix
 
@@ -517,9 +556,23 @@ def test1():
     # qs = QSArray(qs1=qs1, qs2=qs2)
 
 
+def test3():
 
+    dna = 'ATGCTACGAACACAGCAACCA'
+    qs = 'G(C#$1GC8GCG=GG=1CG=C'
+    qsA = QSArray(dna=dna, qsArrayFq=qs)
 
-    # print qs._qsArray
+    rc = str(Seq(dna, generic_dna).reverse_complement())
+    # print qsA._probMatrix
+    qsA.revCompl()
+    # print qsA._probMatrix
+
+    print dna
+    print rc
+    print qsA.getConsDna()
+    assert rc == qsA.getConsDna()
+
 if __name__ == "__main__":
-    # test1()
-    test2()
+    test1()
+    # test2()
+    # test3()

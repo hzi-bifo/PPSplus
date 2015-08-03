@@ -115,7 +115,7 @@ def isLocationContinuous(locationList):
     return True
 
 
-def readFromGbkFile(gbkFile, taxonomy, listOfKeywords=list(KEYWORDS)):
+def readFromGbkFile(gbkFile, taxonomy, listOfKeywords=list(KEYWORDS), considerDnaSeq=True):
     """
         For a list of input keywords, returns a list dictionaries (keyword -> value).
         One dictionary for one record (often, there is just one record in one gbk file)
@@ -182,8 +182,8 @@ def readFromGbkFile(gbkFile, taxonomy, listOfKeywords=list(KEYWORDS)):
             for feature in record.features:
                 if feature.type == 'source':
                     dbxref = feature.qualifiers['db_xref']
-                    assert len(dbxref) == 1, 'TaxonId: this list should be of length 1: "%s"' % dbxref
-                    taxon, taxonId = dbxref[0].split(':')
+                    assert len(dbxref) >= 1, 'TaxonId: this list should be of length 1: "%s"' % dbxref
+                    taxon, taxonId = dbxref[-1].split(':')
                     assert taxon == 'taxon', 'This string should be "taxon", not "%s"' % taxon
                     if taxonomy.exists(int(taxonId)):
                         recDict['taxonId'] = int(taxonId)
@@ -232,7 +232,7 @@ def readFromGbkFile(gbkFile, taxonomy, listOfKeywords=list(KEYWORDS)):
                         location = feature.location  # FeatureLocation: start, end, strand
 
                         # gene name
-                        assert len(feature.qualifiers['gene']) == 1, 'file: %s' % (gbkFile)
+                        assert len(feature.qualifiers['gene']) == 1, 'file: %s' % gbkFile
                         geneName = feature.qualifiers['gene'][0].strip()
                         try:
                             assert len(feature.qualifiers['translation']) == 1, 'geneName: %s; file: %s' \
@@ -243,7 +243,7 @@ def readFromGbkFile(gbkFile, taxonomy, listOfKeywords=list(KEYWORDS)):
 
                         # protein
                         protein = feature.qualifiers['translation'][0]
-                        assert len(feature.qualifiers['transl_table']) == 1, 'file: %s' % (gbkFile)
+                        assert len(feature.qualifiers['transl_table']) == 1, 'file: %s' % gbkFile
                         translTable = int(feature.qualifiers['transl_table'][0])
                         seq = str(record.seq)
 
@@ -252,18 +252,20 @@ def readFromGbkFile(gbkFile, taxonomy, listOfKeywords=list(KEYWORDS)):
                             # print location
                         else:
                             locationList = [location]
-                        seq = Seq(getRegions(seq, locationList), generic_dna)
 
-                        try:
-                            protein2 = seq.translate(table=translTable, stop_symbol='', cds=True)
-                        except Exception as e:
-                            print(e.message)
-                            protein2 = 'X'
+                        if considerDnaSeq:
+                            seq = Seq(getRegions(seq, locationList), generic_dna)
+
+                            try:
+                                protein2 = seq.translate(table=translTable, stop_symbol='', cds=True)
+                            except Exception as e:
+                                print(e.message)
+                                protein2 = 'X'
 
                         if not isLocationContinuous(locationList):
                             print('The location "%s" is not continuous for gene "%s" in file "%s"'
                                   % (location, geneName, gbkFile))
-                        elif str(protein) != str(protein2):
+                        elif considerDnaSeq and str(protein) != str(protein2):
                             print("Problem! translated proteins doesn't match: \n%s\n%s\n%s: %s\n"
                                   % (protein, protein2, geneName, gbkFile))
                         else:
@@ -285,5 +287,4 @@ def readFromGbkFile(gbkFile, taxonomy, listOfKeywords=list(KEYWORDS)):
 
         # append the record dictionary
         retList.append(recDict)
-
     return retList

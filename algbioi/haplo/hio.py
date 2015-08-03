@@ -20,13 +20,17 @@
 """
 
 import os
+# import sys
 import gzip
 import cPickle
+# import numpy as np
 
-import numpy as np
+# from Bio.Seq import Seq
+# from Bio.Alphabet import generic_dna
 
 from algbioi.com import fq
 from algbioi.com import fasta as fas
+from algbioi.com import qs as qs_man
 from algbioi.haplo import read_rec
 from algbioi.hsim import pfam
 
@@ -54,34 +58,40 @@ def readDomblout(inDomblout):
     return nameToHit
 
 
-def parse(inFq, inDomtblout, inProtFna, pairEndReadLen):  # TODO: remove pair-end read length, inProtFna=None
+def parse(inFq, inDomtblout, inProtFna=None):
     """
-        Read in joined pair-end reads and its HMM annotation from the FASTQ, prot FASTA, and DOMTBLOUT files.
+        Read in joined pair-end reads and its HMM annotation from the FASTQ, DOMTBLOUT, (and optionally PROT FASTA file)
 
         @param inFq: FASTQ file containing joined pair-end reads
         @param inDomtblout: HMM annotation file
         @param inProtFna: corresponding prot sequence (can be None)
-        @param pairEndReadLen: length of one pair-end read (i.e. its length, not the insert size)
 
-        @return: a list of read records
+        @type inFq: str
+        @type inDomtblout: str
+        @type inProtFna: str | None
         @rtype: list[read_rec.ReadRec]
+
+        @return: a list of read-records
     """
     recList = []
 
     # read in prot sequences
-    nameToProtSeq = fas.fastaFileToDictWholeNames(inProtFna)  # TODO: inProtFna can be None
+    if inProtFna is None:
+        nameToProtSeq = {}
+    else:
+        nameToProtSeq = fas.fastaFileToDictWholeNames(inProtFna)
 
     # read in dom file
     nameToDom = readDomblout(inDomtblout)
 
-    assert len(nameToProtSeq) == len(nameToDom)
+    assert inProtFna is None or len(nameToProtSeq) == len(nameToDom)
 
-    # read in pair end reads, create ReadRec
-    for readName, dna, p, qs in fq.ReadFqGen(inFq):
+    # read in pair-end reads, create ReadRec
+    for readName, dna, comment, qs in fq.ReadFqGen(inFq):
 
-        readName = readName[1:]
+        readName = readName[1:]  # strip starting @
 
-        protSeq = nameToProtSeq[readName]  # TODO: con be None
+        protSeq = nameToProtSeq.get(readName, None)
 
         hit, frameTag = nameToDom[readName]
 
@@ -94,30 +104,74 @@ def parse(inFq, inDomtblout, inProtFna, pairEndReadLen):  # TODO: remove pair-en
 
         # TODO: consider also strain, score, acc ?
 
+        # alignment env coord
         protStart = int(hit[19]) - 1
         protLen = int(hit[20]) - protStart
 
         assert annotLen == 3 * protLen
 
+        # alignment coord
+        protStartAli = int(hit[17]) - 1
+        protLenAli = int(hit[18]) - protStartAli
 
-        # TODO: correct the coordinate start !!!
+        # hmm coordinates
         hmmCoordStart = int(hit[15]) - 1
         hmmCoordLen = int(hit[16]) - hmmCoordStart
 
-        # create the coverage array
-        posCovArray = np.zeros(len(dna), dtype=np.uint8)
-        start = len(dna) - pairEndReadLen  # incl.
-        end = pairEndReadLen - 1  # incl.
-        for i in range(len(posCovArray)):
-            if start <= i <= end:
-                posCovArray[i] = 2
-            else:
-                posCovArray[i] = 1
+        # the env coordinates start (and end) often before the alignment coordinates and end after, get the offsets
+        offsetEnv = protStartAli - protStart
+        offsetEnvE = protLen - offsetEnv - protLenAli
 
-        # TODO: replace qs and posCovArray !!!
+        assert offsetEnv >= 0
+        assert offsetEnvE >= 0
 
-        recList.append(read_rec.ReadRec(readName, dna, qs, protSeq, frameTag, annotStart, annotLen, protStart, protLen,
-                                        hmmCoordStart, hmmCoordLen, posCovArray))
+        hmmCoordStart -= offsetEnv
+        hmmCoordLen += offsetEnv + offsetEnvE
+
+        # create the coverage array (NO NEED)
+        # posCovArray = np.zeros(len(dna), dtype=np.uint8)
+        # start = len(dna) - pairEndReadLen  # incl.
+        # end = pairEndReadLen - 1  # incl.
+        # for i in range(len(posCovArray)):
+        #     if start <= i <= end:
+        #         posCovArray[i] = 2
+        #     else:
+        #         posCovArray[i] = 1
+
+        tokens = comment.split('\t')
+
+        if len(tokens) == 5:
+            # get the ends of the pair-end read and corresponding quality-scores
+            p, dna1, qs1, dna2, qs2 = tokens
+            # get the QSArray representation
+            qsA1 = qs_man.QSArray(dna=dna1, qsArrayFq=qs1)
+
+            # get the reverse complement of the second end of pair-end read
+            qsA2 = qs_man.QSArray(dna=dna2, qsArrayFq=qs2)
+            qsA2.revCompl()
+
+            # dna2 = str(Seq(dna2, generic_dna).reverse_complement())
+            # qs2 = qs2[::-1]
+            # qsA2 = qs_man.QSArray(dna=dna2, qsArrayFq=qs2)
+
+            # get the consensus QS Array representing of the joined read
+            qsA = qs_man.QSArray(qsA1=qsA1, qsA2=qsA2, pos1Within2=len(dna2) - len(dna))
+        else:
+            # there is just a simple dna sequence (i.e. not joined reads)
+            qsA = qs_man.QSArray(dna=dna, qsArrayFq=qs)
+
+        # cDna = qsA.getConsDna()
+        # the consensus sequences can differ in the case both read-ends have different char with the same quality-score
+        # if cDna != dna:
+        #     print dna
+        #     print cDna
+        #     print qs1
+        #     print (' ' * (len(dna) - len(dna2))) + qs2[::-1]
+        #     print qsA.getQSStr(cDna)
+        #     print('')
+        #     sys.exit(0)
+        recList.append(read_rec.ReadRec(readName, qsA, frameTag, annotStart, annotLen, hmmCoordStart, hmmCoordLen,
+                                        protSeq, protStart, protLen))
 
     return recList
 
@@ -131,10 +185,24 @@ def storeReadRec(recList, outFilePath, compressLevel=1):
         @type recList: list[read_rec.ReadRec]
         @type outFilePath: str
     """
+    storeObj(recList, outFilePath, compressLevel)
+    # open file for writing
+    # out = gzip.open(outFilePath, 'wb', compressLevel)
+    # write the list to the file
+    # cPickle.dump(recList, out, cPickle.HIGHEST_PROTOCOL)
+    # out.close()
+
+
+def storeObj(obj, outFilePath, compressLevel=1):
+    """
+        Store an object to a file.
+        @type obj: object
+        @type outFilePath: str
+    """
     # open file for writing
     out = gzip.open(outFilePath, 'wb', compressLevel)
-    # write the list to the file
-    cPickle.dump(recList, out, cPickle.HIGHEST_PROTOCOL)
+    # write the object to the file
+    cPickle.dump(obj, out, cPickle.HIGHEST_PROTOCOL)
 
     out.close()
 
@@ -147,6 +215,22 @@ def loadReadRec(srcFilePath):
         @type srcFilePath: str
         @return: list of read-records or None
         @rtype: list[read_rec.ReadRec]
+    """
+    return loadObj(srcFilePath)
+    # out = gzip.open(srcFilePath, 'rb')
+    # try:
+    #     return cPickle.load(out)
+    # except EOFError:
+    #     return None
+
+
+def loadObj(srcFilePath):
+    """
+        Load an object from a file.
+
+        @type srcFilePath: str
+        @return: an object or None
+        @rtype: object | None
     """
     out = gzip.open(srcFilePath, 'rb')
     try:
@@ -162,8 +246,8 @@ def _test():
     baseName = 'aminotran_3_1'
     recList = parse(inFq=os.path.join(baseDir, 'r_' + baseName + '_join.fq.gz'),
                     inDomtblout=os.path.join(baseDir, 'r_' + baseName + '_join_prot.domtblout.gz'),
-                    inProtFna=os.path.join(baseDir, 'r_' + baseName + '_join_prot.fna.gz'),
-                    pairEndReadLen=150)
+                    inProtFna=os.path.join(baseDir, 'r_' + baseName + '_join_prot.fna.gz'))
+
     f = '/home/igregor/Documents/work/hsim/562/samples/0/tmp_test.gz'
     storeReadRec(recList, f)
 

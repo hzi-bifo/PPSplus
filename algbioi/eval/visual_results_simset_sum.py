@@ -28,6 +28,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 
+from algbioi.com import fasta as fas
+from algbioi.com import csv
+from algbioi.com import taxonomy_ncbi
+
 
 def getData():
     """
@@ -39,6 +43,7 @@ def getData():
     UNIFORM_SIZE = 142570.869
 
     data = {}
+    predFile = None
     for rank in ranks:
 
         for f in os.listdir(srcDir):
@@ -63,14 +68,25 @@ def getData():
             for line in open(os.path.join(srcDir, f)):
                 if line.startswith('@'):
                     coef = float(line.split(',')[1])
+                elif line.startswith('$'):
+                    predFile = line.strip().split(':')[1]
                 elif line.startswith(rank):
                     pr = float(line.split(',')[-6]) / 100.0
                     re = float(line.split(',')[-5]) / 100.0
                     tp = re * t
-                    if pr > 0.0:
-                        p = tp / pr
+                    #
+                    # p = predBp / 1000.
+                    if pr > 1.1 and re > 1.1:
+                        p = tp / pr  # TODO: !!!
                     else:
-                        p = 0.0
+                        print predFile,
+                        predBp = assignedAtRank(rank, predFile, simset)
+                        p = predBp / 1000.
+                        print ' ..ok'
+                        if re < 0.05 or pr < 0.05:
+                            print rank, p, re, pr
+
+
                     w = p - tp
                     u = t - p
                     #print tp, w, u
@@ -92,13 +108,13 @@ def createChart():
     """
         Creates a summary figure for simulated datasets divided into 4 subplots.
     """
-    outFile = '/Users/ivan/Documents/work/Doc/PPSplus/figures/Fig_1_simset_summary.png'
+    outFile = '/Users/ivan/Documents/work/Doc/PPSplus/revision/figures_simset/Fig_1_simset_summary_Kraken.png'
     dpi = 300
 
     N = 3  # N ranks
     ind = np.arange(N)    # the x locations for the groups
-    width = 0.2
-    width2 = 0.22
+    width = 0.16 # 0.2
+    width2 = 0.18 # 0.22
     data = getData()  # (method, rank, correction, simset) # ((cTp/cT), (cW/cT), (cU/cT)) true, wrong, unassigned
 
     # create subplots
@@ -109,7 +125,7 @@ def createChart():
     fig.set_figheight(8)
 
     # padding/margins
-    plt.subplots_adjust(left=0.1, bottom=0.22, right=0.9, top=0.9, wspace=0.3, hspace=0.75)
+    plt.subplots_adjust(left=0.1, bottom=0.22, right=0.9, top=0.9, wspace=0.3, hspace=0.75)  # left=0.1, bottom=0.22, right=0.9, top=0.9, wspace=0.3, hspace=0.75
 
     # create 4 subplots
     for simset, correction, ax, title, letter in [('uniform', 'nc', ax1, 'Uniform dataset', 'A)'),
@@ -153,10 +169,18 @@ def createChart():
         tp_taxator = (data[('taxator', 'species', correction, simset)][0], data[('taxator', 'genus', correction, simset)][0],
                       data[('taxator', 'family', correction, simset)][0])
 
-        # PPS+
-        p1 = ax.bar(ind, u_ppsp, width, color='y')
-        p2 = ax.bar(ind, w_ppsp, width, color='r')
-        p3 = ax.bar(ind, tp_ppsp, width, color='b')
+        # Kraken (species, genus, family)
+        u_kraken = (100.0, 100.0, 100.0)
+        w_kraken = (data[('kraken', 'species', correction, simset)][1] + data[('kraken', 'species', correction, simset)][0],
+                    data[('kraken', 'genus', correction, simset)][1] + data[('kraken', 'genus', correction, simset)][0],
+                    data[('kraken', 'family', correction, simset)][1] + data[('kraken', 'family', correction, simset)][0])  # false
+        tp_kraken = (data[('kraken', 'species', correction, simset)][0], data[('kraken', 'genus', correction, simset)][0],
+                      data[('kraken', 'family', correction, simset)][0])
+
+        # Taxator
+        p1 = ax.bar(ind, u_taxator, width, color='y')
+        p2 = ax.bar(ind, w_taxator, width, color='r')
+        p3 = ax.bar(ind, tp_taxator, width, color='b')
 
         # PPS
         p1 = ax.bar(ind + width2, u_pps, width, color='y')
@@ -168,20 +192,26 @@ def createChart():
         p2 = ax.bar(ind + 2 * width2, w_megan, width, color='r')
         p3 = ax.bar(ind + 2 * width2, tp_megan,   width, color='b')
 
-        # Taxator
-        p1 = ax.bar(ind + 3 * width2, u_taxator, width, color='y')
-        p2 = ax.bar(ind + 3 * width2, w_taxator, width, color='r')
-        p3 = ax.bar(ind + 3 * width2, tp_taxator, width, color='b')
+        # Kraken
+        p1 = ax.bar(ind + 3 * width2, u_kraken, width, color='y')
+        p2 = ax.bar(ind + 3 * width2, w_kraken, width, color='r')
+        p3 = ax.bar(ind + 3 * width2, tp_kraken, width, color='b')
+
+        # PPS+
+        p1 = ax.bar(ind + 4 * width2, u_ppsp, width, color='y')
+        p2 = ax.bar(ind + 4 * width2, w_ppsp, width, color='r')
+        p3 = ax.bar(ind + 4 * width2, tp_ppsp, width, color='b')
 
         ax.set_ylabel('Percentage')
         ax.set_yticks(np.arange(0, 110, 10))
 
-        ax.set_title(title +'\n')
+        ax.set_title(title + '\n')
 
-        ticks = (width/2, width2 + width/2, width2*2 + width/2, width2*3 + width/2)
+        ticks = (width/2, width2 + width/2, width2*2 + width/2, width2*3 + width/2, width2*4 + width/2)
         ax.set_xticks(ticks + tuple(map(lambda x: x + 1, ticks)) + tuple(map(lambda x: x + 2, ticks)))
-        ax.set_xticklabels(('PPS+', 'PPS', 'Megan', 'taxator-tk', 'PPS+', 'PPS', 'Megan', 'taxator-tk',
-                            'PPS+', 'PPS', 'Megan', 'taxator-tk'), rotation='vertical')
+        ax.set_xticklabels(('taxator-tk', 'PPS', 'MEGAN', 'Kraken', 'PPS+',
+                            'taxator-tk', 'PPS', 'MEGAN', 'Kraken', 'PPS+',
+                            'taxator-tk', 'PPS', 'MEGAN', 'Kraken', 'PPS+'), rotation='vertical')
 
         ax.annotate(letter, xy=(1, 2), xytext=(-0.3, 115.))
 
@@ -264,10 +294,60 @@ def createDemo():
 
     plt.show()
 
+def assignedAtRank(rankR, mapFile, fasType):
+    if mapFile is None or not os.path.isfile(mapFile):
+        print('Nothing %s%s%s' % (rankR, mapFile, fasType))
+        return 0
+
+    # mapFile = '/Users/ivan/Documents/work/Doc/PPSplus/revision/kraken/results/kraken_lognorm_genus_lab.csv'
+    if fasType == 'lognorm':
+        fasFile = '/Users/ivan/Documents/work/Doc/PPSplus/revision/nobackup/VelvetNoscafMinimus2_ma_merge_lognorm_min_1000bp.fna'
+    else:
+        assert fasType == 'uniform'
+        fasFile = '/Users/ivan/Documents/work/Doc/PPSplus/revision/nobackup/VelvetNoscafMinimus2_ma_merge_uniform_min_1000bp.fna'
+
+    taxFile = '/Users/ivan/Documents/work/Doc/PPSplus/revision/nobackup/ncbitax_sqlite.db'
+
+    predDict = csv.predToDict(mapFile)
+    bpDict = fas.getSequenceToBpDict(fasFile)
+    tax = taxonomy_ncbi.TaxonomyNcbi(taxFile)
+
+    rankList = taxonomy_ncbi.TAXONOMIC_RANKS[1:]
+    rankSet = set(rankList)
+    rankMap = {}
+    for i in range(len(rankList)):
+        rankMap[rankList[i]] = i
+
+    counts = np.zeros(len(rankList), np.int64)
+
+    for seqId, taxonId in predDict.iteritems():
+        bp = bpDict[seqId]
+
+        rank = tax.getRank(taxonId)
+        while rank not in rankSet and taxonId != 1 and taxonId is not None:
+            taxonId = tax.getParentNcbid(taxonId)
+            rank = tax.getRank(taxonId)
+            # print taxonId
+
+        if rank in rankSet:
+            counts[rankMap[rank]] += bp
+
+    # print counts
+
+    for i in range(len(rankList) -1, 0, -1):
+        counts[i-1] += counts[i]
+
+    # print counts
+
+    # print ','.join(map(lambda x: '%s:%s' % (x[0], x[1]), zip(rankList, counts)))
+    d = dict(map(lambda x: (x[0], x[1]), zip(rankList, counts)))
+
+    tax.close()
+
+    return d[rankR]
 
 if __name__ == "__main__":
-
-    print('DO NOT remove all nodes of degree 2, only if the record is redundant!!!')
-    #createChart()
+    # print('DO NOT remove all nodes of degree 2, only if the record is redundant!!!')
+    createChart()
     #createDemo()
 

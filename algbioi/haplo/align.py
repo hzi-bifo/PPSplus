@@ -243,6 +243,6 @@ def test1():
     print outAliFilePath
 
 if __name__ == "__main__":
-    pass
-    # test1()
+    # pass
+    test1()
 

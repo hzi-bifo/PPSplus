@@ -24,8 +24,15 @@ import os
 import sys
 import signal
 import string
+import shutil
 from Bio import SeqIO
 from algbioi.com import csv
+from algbioi.com import gbk
+from algbioi.com import parallel
+# from algbioi.com import taxonomy_ncbi
+import multiprocessing as mp
+
+from algbioi.com import fasta as fas
 
 
 #from FastaFileFunctions import fastaFileToDict
@@ -33,7 +40,6 @@ from algbioi.com import csv
 #from TabSepFileFunctions import getMapping
 #from TabSepFileFunctions import getColumnAsList
 #from Common import noNewLine
-
 
 
 def scanForPlasmids():
@@ -162,7 +168,6 @@ def scan():
                 #        taxonId = int(val)
                 #        break
 
-
         if recordCount == breakCount:
             break
 
@@ -213,7 +218,7 @@ def scan():
 def extractPlasmidAccessions(gbDir, outFile):
     """
 
-        @param dbkDir: directory containing gbk files, where the taxon id is encoded in the same way as PPS reference
+        @param gbDir: directory containing gbk files, where the taxon id is encoded in the same way as PPS reference
         @param outFile: output file containing (taxonId, tab, accession) of records whose description contain 'plasmid'
     """
     start = 1
@@ -221,14 +226,19 @@ def extractPlasmidAccessions(gbDir, outFile):
     i = 0
     out = csv.OutFileBuffer(outFile)
     for f in os.listdir(gbDir):
+        if not os.path.isfile(os.path.join(gbDir, f)):
+            continue
         i += 1
         if i < start:
             continue
-        if f in ['911244.1.gb','933263.1.gb', '1151366.1.gb']:
-            continue
+        # if f in ['911244.1.gb','933263.1.gb', '1151366.1.gb']:
+        #     continue
 
-        taxonId = int(f.split('.')[0])
+        # taxonId = int(f.split('.')[0])
+
         try:
+            taxonId = int(f.split('_')[1].split('.')[0])
+
             for record in SeqIO.parse(os.path.join(gbDir, f), "genbank"):
                 if "plasmid" in str(record.description).lower():
                     out.writeText(str(taxonId) + '\t' + record.id + '\n')
@@ -274,8 +284,8 @@ def extractPlasmidAccessions(gbDir, outFile):
 
     # print dnaXml
 
-# MAIN
-if __name__ == "__main__":
+
+def test1():
     # handle broken pipes
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
@@ -285,3 +295,137 @@ if __name__ == "__main__":
 
     # scanForPlasmids()
     #scan()
+
+
+def extractPlasmidAccession2Part(gbkFile, taxFile, outDir, taxonId=None):  # new !
+
+    try:
+        # tax = taxonomy_ncbi.TaxonomyNcbi(taxFile)
+        last = ''  # TODO: add this as a function to algbioi.com.gbk
+        for line in open(gbkFile):
+            line = line.strip()
+            if len(line) > 0:
+                last = line
+        if '//' != last:
+            print('Unusual end of file: |%s| In file: |%s|, file skipped!' % (last, gbkFile))
+            return
+        # print('Proc: %s' % os.path.basename(gbkFile))
+        tax = None
+        recList = gbk.readFromGbkFile(gbkFile, tax, ('description', 'acc_version'))
+        lineList = []
+        for rec in recList:
+            if "plasmid" in rec['description'].lower():
+                accVersion = rec.get('acc_version')
+                # taxonId2 = rec.get('taxonId')
+                # if taxonId is None:
+                #     taxonId = taxonId2
+
+                # if taxonId is not None and taxonId2 is not None and int(taxonId) != int(taxonId2):
+                #     print('%s %s %s' % (taxonId, taxonId2, accVersion))
+
+                if accVersion is not None and taxonId is not None:
+
+                    line = '%s\t%s\n' % (taxonId, accVersion)
+                    lineList.append(line)
+                else:
+                    print('%s %s' % (taxonId, accVersion))
+
+        if len(lineList) > 0:
+            out = csv.OutFileBuffer(os.path.join(outDir, 'plasmids_' + os.path.basename(gbkFile)))
+            out.writeText(''.join(lineList))
+            out.close()
+
+        # tax.close()
+    except Exception as e:
+        print 'Exception', type(e), e.message, gbkFile, taxFile, taxonId
+
+
+def extractPlasmidAccession2(gbkDir, taxFile, outDir):  # new !
+
+    assert os.path.isdir(gbkDir)
+    assert os.path.isfile(taxFile)
+    assert os.path.isdir(outDir)
+
+    taskList = []
+    for f in os.listdir(gbkDir):
+        fPath = os.path.join(gbkDir, f)
+        if os.path.isfile(fPath):
+            try:
+                taxonId = int(f.split('_')[1].split('.')[0])
+            except Exception:
+                taxonId = None
+
+            taskList.append(parallel.TaskThread(extractPlasmidAccession2Part, (fPath, taxFile, outDir, taxonId)))
+            # rList.append(extractPlasmidAccession2Part(fPath, taxFile, taxonId))
+
+    parallel.runThreadParallel(taskList, min(15, mp.cpu_count()), keepRetValues=False)
+
+
+def filterOutPlasmids(inDir, outDir, plasmidFile):  # new !
+    assert os.path.isdir(inDir)
+    assert os.path.isdir(outDir)
+    assert os.path.isfile(plasmidFile)
+
+    # map: taxonId -> set-of-acc
+    taxonIdToAccSet = {}
+
+    for line in open(plasmidFile):
+        line = line.strip()
+        tokens = line.split('\t')
+        if len(tokens) >= 2:
+            taxonId = int(tokens[0])
+            acc = tokens[1]
+
+            if taxonId not in taxonIdToAccSet:
+                taxonIdToAccSet[taxonId] = set([acc])
+            else:
+                taxonIdToAccSet[taxonId].add(acc)
+    filtered = 0
+    for inFile in os.listdir(inDir):
+        inFilePath = os.path.join(inDir, inFile)
+        if os.path.isfile(inFilePath):
+            taxonId = int(inFile.split('.', 1)[0])
+            outFilePath = os.path.join(outDir, '%s.1.fna' % taxonId)
+            if taxonId in taxonIdToAccSet:
+                notAllowedSet = taxonIdToAccSet[taxonId]
+                out = csv.OutFileBuffer(outFilePath)
+                for seqId, seq in fas.fastaFileToDictWholeNames(inFilePath).iteritems():
+                    if seqId not in notAllowedSet:
+                        out.writeText('>%s\n%s\n' % (seqId, seq))
+                    else:
+                        filtered += 1
+                out.close()
+            else:
+                shutil.copy2(inFilePath, outFilePath)
+    print('Filtered seq: %s' % filtered)
+
+
+def _extractPlasmids():
+    # gbkDir = '/home/igregor/Documents/work/ppsp/bac_arch/gbk2'
+    gbkDir = '/media/igregor/verbatim/work/ppsp_ref/ref_cami1/bac_arch/gbk2'
+    taxFile = '/home/igregor/Documents/work/taxonomy/NCBI201502/ncbitax_sqlite.db'
+    outDir = '/home/igregor/Documents/work/ppsp/bac_arch/plasmids'
+
+    # taxFile = '/net/metagenomics/projects/PPSmg/database/NCBI201502/nobackup/mg5/taxonomy/ncbitax_sqlite.db'
+    # gbkDir = '/local/igregor/ref_cami_1/bac_arch/gbk2'
+    # outDir = '/local/igregor/ref_cami_1/bac_arch/plasmids'
+    # outFile = '////local/igregor/ref_cami_1/bac_arch/plasmids2.csv' TODO: don't use
+
+    # gbkDir = '/net/metagenomics/projects/PPSmg/database/NCBI201502/nobackup/gbk2'
+    # outDir = '/net/metagenomics/projects/PPSmg/database/NCBI201502/nobackup/plasmids'
+
+    extractPlasmidAccession2(gbkDir, taxFile, outDir)
+
+
+def _filterOutPlasmids():
+
+    inDir = '/local/igregor/ref_cami_1/bac_arch_centroids'
+    outDir = '/local/igregor/ref_cami_1/bac_arch/bac_arch_no_plas'
+    plasmidFile = '/local/igregor/ref_cami_1/bac_arch/plasmids.txt'
+    filterOutPlasmids(inDir, outDir, plasmidFile)
+
+# MAIN
+if __name__ == "__main__":
+    # test1()
+    # _extractPlasmids()
+    _filterOutPlasmids()

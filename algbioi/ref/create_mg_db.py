@@ -31,17 +31,17 @@ import os
 import glob
 import argparse
 
-from Bio import Entrez
-from Bio import SeqIO
+# from Bio import Entrez
+# from Bio import SeqIO
 
 from algbioi.com import csv
 from algbioi.com import fasta as fas
 from algbioi.com import taxonomy_ncbi as tax
 
 
-class _TaxonomyWrap():
+class TaxonomyWrap():
     def __init__(self, taxonomyFile,
-                 allowedRanks=['root','superkingdom','phylum','class','order','family','genus','species']):
+                 allowedRanks=['root', 'superkingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']):
         """
             Represents the ncbi taxonomy, buffers entries to efficiently compute the path to the root.
             @param taxonomyFile: database in sqlite3 format
@@ -119,7 +119,7 @@ def _main():
         metavar='out_dir',
         dest='outDir')
 
-    parser.add_argument('-s', '--source-type', required=True, nargs=1, choices=["s","a"],
+    parser.add_argument('-s', '--source-type', required=True, nargs=1, choices=["s", "a"],
         help='To determine the source, use "s" for the Silva database and "a" for the Amphora database.',
         dest='srcType')
 
@@ -148,7 +148,7 @@ def _main():
         print('Taxon ids that are to be filtered out are in a wrong format! Comma separated integers are needed!')
         raise
 
-    taxonomy = _TaxonomyWrap(args.taxonomy[0].name)
+    taxonomy = TaxonomyWrap(args.taxonomy[0].name)
     for dir in [inDir, outDir]:
         assert os.path.isdir(dir), 'Path: "' + dir + '" does not exists!'
 
@@ -230,7 +230,7 @@ def _main():
         print('Stored entries: %s filtered out: %s leaf, %s top level, not mapped: %s' %
               (count, filteredLeaf, filteredSup, notMapped))
         if noBacArch > 0:
-            print('WARN: stored %s of non Bacterial and non Archaeal sequences: ' % (noBacArch))
+            print('WARN: stored %s of non Bacterial and non Archaeal sequences: ' % noBacArch)
 
         # Silva:
         #-i /Users/ivan/Documents/work/binning/database/silva111/arbGenerated -s s -t /Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db
@@ -243,8 +243,9 @@ def _main():
     taxonomy.close()
     print 'done'
 
+
 def _testTaxonomyWrap():
-    taxonomy = _TaxonomyWrap('/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db')
+    taxonomy = TaxonomyWrap('/Users/ivan/Documents/work/binning/taxonomy/20121122/ncbitax_sqlite.db')
     print(str(taxonomy.getPathToRoot(870603)))
 
 if __name__ == "__main__":

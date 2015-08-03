@@ -25,6 +25,7 @@ from algbioi.com.common import noNewLine
 from algbioi.com.common import removeNonDna
 
 #---------------------------------------------------
+
 class Sequence():
     """Represents one aminoacid or protein sequence/contig
 
@@ -42,7 +43,7 @@ class Sequence():
         self.name = noNewLine(name)
         seq = noNewLine(seq)
         self.seqBp = len(removeNonDna(seq))
-        self._seqCompressed = zlib.compress(seq)
+        self._seqCompressed = zlib.compress(seq, 1)
         self._taxPathDict = None
         self._placementWeight = None
         self._hash = hash(seq.upper())

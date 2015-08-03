@@ -30,6 +30,7 @@ from algbioi.com.csv import forEachLine
 from algbioi.com.csv import isComment
 from algbioi.com.csv import OutFileBuffer
 from algbioi.com import common
+from algbioi.com import parallel
 from algbioi.core.dna_to_prot import dnaToProt
 
 
@@ -148,6 +149,11 @@ class MarkerGeneAnalysis():
         self.workingDir = workingDir
         self.hmmerBinDir = os.path.normpath(config.get('hmmerBinDir'))
         self.mothur = os.path.join(os.path.normpath(config.get('mothurInstallDir')), 'mothur')
+        p = config.get('processors')  # --cpu <n>
+        if p is not None:
+            self.processorsHmm = ' --cpu %s ' % p
+        else:
+            self.processorsHmm = ''
 
 
     def runMarkerGeneAnalysis(self, fastaFileDNA, outLog=None):
@@ -179,52 +185,61 @@ class MarkerGeneAnalysis():
         mgList = mgFiles.getGeneNameList()
 
         if outLog is not None:
-            stdoutLog = open(outLog,'w')
+            stdoutLog = open(outLog, 'w')
         else:
             stdoutLog = subprocess.STDOUT
 
         #for each gene perform the analysis separately
         for geneName in mgList:
 
-            domFileArray = [os.path.join(self.markerGeneWorkingDir, str(geneName + '_1.dom')),
-                            os.path.join(self.markerGeneWorkingDir, str(geneName + '_2.dom'))]
-            outFileArray = [os.path.join(self.markerGeneWorkingDir, str(geneName + '_1.out')),
-                            os.path.join(self.markerGeneWorkingDir, str(geneName + '_2.out'))]
-            hmmFileArray = [mgFiles.getFilePath(geneName, 'hmmPROTPrim'),
-                            mgFiles.getFilePath(geneName, 'hmmPROTSec')]
+            domFileArray = [os.path.join(self.markerGeneWorkingDir, str(geneName + '_1.dom'))]  #,
+                            # os.path.join(self.markerGeneWorkingDir, str(geneName + '_2.dom'))]
+            outFileArray = [os.path.join(self.markerGeneWorkingDir, str(geneName + '_1.out'))]  #,
+                            # os.path.join(self.markerGeneWorkingDir, str(geneName + '_2.out'))]
+            hmmFileArray = [mgFiles.getFilePath(geneName, 'hmmPROTPrim')]  #,
+                            # mgFiles.getFilePath(geneName, 'hmmPROTSec')]
             cmdArray = list([])
 
             #define cmd
-            for i in range(2):
+            for i in range(1):
                 if hmmFileArray[i] is not None:
-                    cmdArray.append(str(os.path.join(self.hmmerBinDir, 'hmmsearch') + ' --domtblout ' + domFileArray[i] + ' -E 0.01'
-                               + ' -o ' + outFileArray[i] + ' ' + hmmFileArray[i] + ' ' + fastaFileProt))
+                    cmdArray.append(str(os.path.join(self.hmmerBinDir, 'hmmsearch') + ' --domtblout ' + domFileArray[i]
+                                        + ' -E 0.01' + self.processorsHmm
+                                        + ' -o ' + outFileArray[i] + ' ' + hmmFileArray[i] + ' ' + fastaFileProt))
                 else:
                     cmdArray.append(None)
 
             #run cmd
             for cmd in cmdArray:
                 if cmd is not None and os.name == 'posix':
-                    hmmProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self.hmmInstallDir, stdout=stdoutLog)
-                    print 'run cmd:', cmd
-                    hmmProc.wait()
-                    print 'HMM  return code:', hmmProc.returncode
-                    if hmmProc.returncode != 0:
-                        raise Exception("Command returned with non-zero %s status: %s" % (hmmProc.returncode, cmd))
+
+                    cwd = self.hmmInstallDir
+
+                    if parallel.reportFailedCmd(parallel.runCmdSerial([parallel.TaskCmd(cmd, cwd)])) is not None:
+                        sys.exit(-1)
+
+                    # hmmProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self.hmmInstallDir, stdout=stdoutLog)
+                    # print 'run cmd:', cmd
+                    # hmmProc.wait()
+                    # print 'HMM  return code:', hmmProc.returncode
+                    # if hmmProc.returncode != 0:
+                    #     raise Exception("Command returned with non-zero %s status: %s" % (hmmProc.returncode, cmd))
+
+
                 else:
                     print 'Marker genes analysis, doesn`t run (no posix): ', cmd
 
 
             #get regions that match to the HMM profile ()
             entryDictList = []
-            for i in range(2):
+            for i in range(1):
                 if cmdArray[i] is not None:
                     entryDictList.append(forEachLine(domFileArray[i], _MgRegions()).getEntryDict())
                 else:
                     entryDictList.append(None)
 
             entryDict1 = entryDictList[0]
-            entryDict2 = entryDictList[1]
+            # entryDict2 = entryDictList[1]
 
             #extract regions found in the protein sequences that were found by the HMM and generate corresponding DNA sequences
             regionDnaFasta = os.path.join(self.markerGeneWorkingDir, str(geneName + '_dna.gff'))
@@ -238,10 +253,10 @@ class MarkerGeneAnalysis():
                     to1 = entryDict1[seqName][i][1]
                     assert ((from1 != None) and (to1 != None))
                     #compare the results found by the primary and secondary HMM profiles
-                    if (entryDict2 != None) and (seqName in entryDict2):
-                        if len(entryDict2[seqName]) >= (i+1):
-                            from2 = entryDict2[seqName][i][0]
-                            to2 = entryDict2[seqName][i][1]
+                    # if (entryDict2 != None) and (seqName in entryDict2):
+                    #     if len(entryDict2[seqName]) >= (i+1):
+                    #         from2 = entryDict2[seqName][i][0]
+                    #         to2 = entryDict2[seqName][i][1]
                             #if from1 != from2 or to1 != to2:
                             #    print str('Different positions in' + seqName + ' from1:' + str(from1) + ' from2:' + str(from2)
                             #                + ' to1:' + str(to1) + ' to2:' + str(to2))
@@ -298,15 +313,24 @@ class MarkerGeneAnalysis():
             templateFile = mgFiles.getFilePath(geneName, 'templateDNA')
             taxonomyFile = mgFiles.getFilePath(geneName, 'taxonomyDNA')
             assert ((templateFile is not None) and (taxonomyFile is not None))
-            cmd = str('time ' + self.mothur + ' "#classify.seqs(fasta=' + regionDnaFasta + ', template=' + templateFile
-                + ', taxonomy=' +  taxonomyFile + ', ' + self.mothurParam + ')"')
+            cmd = str('' + self.mothur + ' "#classify.seqs(fasta=' + regionDnaFasta + ', template=' + templateFile
+                      + ', taxonomy=' +  taxonomyFile + ', ' + self.mothurParam + ')"')
             if os.name == 'posix':
-                mothurProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self.markerGeneWorkingDir, stdout=stdoutLog)
-                print 'run cmd:', cmd
-                mothurProc.wait()
-                print 'mothur return code:', mothurProc.returncode
-                if mothurProc.returncode != 0:
-                    raise Exception("Command returned with non-zero %s status: %s" % (mothurProc.returncode, cmd))
+
+                print('Mothur processing: %s' % os.path.basename(templateFile).split('_', 1)[0])
+
+                cwd = self.markerGeneWorkingDir
+
+                if parallel.reportFailedCmd(parallel.runCmdSerial([parallel.TaskCmd(cmd, cwd, stdout=stdoutLog)])) is not None:
+                    sys.exit(-1)
+
+                # mothurProc = subprocess.Popen(cmd, shell=True, bufsize=-1, cwd=self.markerGeneWorkingDir, stdout=stdoutLog)
+                # print 'run cmd:', cmd
+                # mothurProc.wait()
+                # print 'mothur return code:', mothurProc.returncode
+                # if mothurProc.returncode != 0:
+                #     raise Exception("Command returned with non-zero %s status: %s" % (mothurProc.returncode, cmd))
+
             else:
                 print 'Cannot run mothur since your system is not "posix" but', str('"' + os.name + '"'), '\n', cmd
 

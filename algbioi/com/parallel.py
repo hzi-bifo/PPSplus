@@ -59,13 +59,16 @@ class TaskCmd():
         self.stderr = stderr
 
 
-def runThreadParallel(threadTaskList, maxThreads=mp.cpu_count()):
+def runThreadParallel(threadTaskList, maxThreads=mp.cpu_count(), keepRetValues=True):
     """
         Execute several functions (threads, processes) in parallel.
 
-        @type threadTaskList: list of TaskThread
+        @type threadTaskList: list[TaskThread]
         @param maxThreads: maximum number of tasks that will be run in parallel at the same time
-        @return: a list of respective return values
+        @param keepRetValues: keep the return values and return them at the end (else return None)
+        @type keepRetValues: bool
+        @return: a list of respective return values (or None)
+        @rtype: list | None
     """
     assert isinstance(threadTaskList, list)
     assert isinstance(maxThreads, int)
@@ -82,11 +85,16 @@ def runThreadParallel(threadTaskList, maxThreads=mp.cpu_count()):
     pool.join()
 
     # retrieve the return values
-    retValList = []
+    if keepRetValues:
+        retValList = []
+    else:
+        retValList = None
+
     for taskHandler in taskHandlerList:
         taskHandler.wait()
         assert taskHandler.successful()
-        retValList.append(taskHandler.get())
+        if keepRetValues:
+            retValList.append(taskHandler.get())
 
     return retValList
 
@@ -174,6 +182,7 @@ def runCmdParallel(cmdTaskList, maxProc=mp.cpu_count(), stdInErrLock=mp.Manager(
     returnValueList = runThreadParallel(threadTaskList, maxProc)
 
     failList = []
+    assert returnValueList is not None
     for process, task in returnValueList:
         if process.returncode != 0:
             failList.append(dict(process=process, task=task))

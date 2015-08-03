@@ -231,6 +231,26 @@ class TaxonomyNcbi():
             return None
         return str(result[0][0])
 
+    def parentAtRank(self, ncbid, rank):
+        """
+           searches the taxonomy for the parent NCBI ID of a taxon on a specific rank
+           @return: taxon ID of parent at rank or None
+           @rtype: int
+           @author: jessika fiedler
+        """
+        myRank = self.getRank(ncbid)
+        if myRank == rank:
+            return ncbid
+        if rank is 'root':
+            return 1
+
+        parentSet = self.getParentsNcbidSet(ncbid)
+        for p in parentSet:
+            rankOfParent = self.getRank(p)
+            if rankOfParent == rank:
+                return p
+        return None
+
 
 def _test():
     databaseFile = "/Users/ivan/Documents/work/binning/taxonomy/ncbi_taxonomy_20110629/ncbitax_sqlite.db"

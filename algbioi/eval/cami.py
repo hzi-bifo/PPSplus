@@ -38,42 +38,21 @@ def concatenate(directory, outputFile):
 
 def outToCami(ppspOutFile):
     """
-        Creates a cami output file, in format:
-
-        #CAMI Format for Binning
-        @Task:Binning
-        @Version:1.0
-        @ContestantID:CONTESTANTID
-        @SampleID:SAMPLEID
-        @Referencebased:T
-        @Assemblybased:T
-        @ReplicateInfo:T
-
-        @@SEQUENCEID	TAXID	BINID
-
-        read1201	123	123
-        read1202	123	123
-        read1203	131564	131564
-        read1204	562	562.1
-        read1205	562	562.2
-
+        Creates a cami output file, in format.
     """
-    out = csv.OutFileBuffer(ppspOutFile + '.cami')
-    out.writeText("""#CAMI Format for Binning
-@Task:Binning
-@Version:1.0
-@ContestantID:CONTESTANTID
-@SampleID:SAMPLEID
-@Referencebased:T
-@Assemblybased:T
-@ReplicateInfo:T
+    out = csv.OutFileBuffer(ppspOutFile + '.binning')
+    out.writeText("""# The bioboxes.org binning output format: https://github.com/bioboxes/rfc/tree/master/data-format
 
-@@SEQUENCEID	TAXID	BINID
+@Version:0.9.1
+@SampleID:
+@TaxonomyID:
+
+@@SEQUENCEID	TAXID
 
 """)
     for line in open(ppspOutFile):
         name, taxonId = line.strip('\n').split('\t', 2)
-        out.writeText("%s\t%s\t%s\n" % (name, taxonId, taxonId))
+        out.writeText("%s\t%s\n" % (name, taxonId))
     out.close()
 
 
@@ -104,7 +83,7 @@ def readAssignments(assignmentFile):
         @rtype: dict
         @return: mapping(name->taxonId)
     """
-    if os.path.basename(assignmentFile).split('.')[-1] == 'cami':
+    if os.path.basename(assignmentFile).split('.')[-1] == 'binning':
         return readCami(assignmentFile)
     else:
         return csv.predToDict(assignmentFile)

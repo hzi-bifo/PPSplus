@@ -46,7 +46,7 @@ class Scaffold():
         if (scaffoldSeq != None):
             seq = noNewLine(scaffoldSeq)
             self.seqBp = len(removeNonDna(seq))
-            self._scaffCompressed = zlib.compress(seq)
+            self._scaffCompressed = zlib.compress(seq, 1)
             self._hash = hash(seq.upper())
             self._scaffDef = True
         else:

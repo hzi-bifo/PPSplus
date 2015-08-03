@@ -577,7 +577,37 @@ def getColumnAsList(filePath, colNum=0):
 
 
 
+def scaffToContigsAssignments():
+    # contigLab = '/Users/ivan/Documents/work/Doc/PPSplus/revision/kraken/results/cr_contigs_lab.csv'
+
+    scaffLab = '/Users/ivan/Documents/work/Doc/PPSplus/revision/kraken/results/cr_scaffolds_lab.csv'
+    scaffContig = '/Users/ivan/Documents/work/Doc/PPSplus/revision/nobackup/cr_scaff_to_contig.txt'
+    contigScaffLabOut = '/Users/ivan/Documents/work/Doc/PPSplus/revision/kraken/results/cr_scaffolds_contig_assignment.csv'
+
+    # contigLab = '/Users/ivan/Documents/work/Doc/PPSplus/revision/kraken/results/hg_contigs_lab.csv'
+    # scaffLab = '/Users/ivan/Documents/work/Doc/PPSplus/revision/kraken/results/hg_scaffolds_lab.csv'
+    # scaffContig = '/Users/ivan/Documents/work/Doc/PPSplus/revision/nobackup/hg_scaff_to_contig.txt'
+    # contigScaffLabOut = '/Users/ivan/Documents/work/Doc/PPSplus/revision/kraken/results/hg_scaffolds_contig_assignment.csv'
+
+    scaffIdToTaxId = csv.predToDict(scaffLab)
+
+    scaffIdToContigIdList = csv.getMapping(scaffContig, 0, 1)
+
+    out = csv.OutFileBuffer(contigScaffLabOut)
+
+    for scaffId, contigIdList in scaffIdToContigIdList.iteritems():
+        taxonId = scaffIdToTaxId.get(scaffId)
+        if taxonId is not None:
+            taxonId = int(taxonId)
+            for contigId in contigIdList:
+                out.writeText('%s\t%s\n' % (contigId, taxonId))
+
+    out.close()
+
+
+
 if __name__ == "__main__":
+    scaffToContigsAssignments()
     #getListAcc()
     #filterRank()
     # filterReference()

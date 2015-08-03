@@ -50,7 +50,7 @@ ART_Q_PROFILE = [(None, None), (None, None)]  # the default profiles are taken !
 #     assert False  # add paths on the system ?
 
 # maximum number of CPUs to be used
-MAX_PROC = min(40, mp.cpu_count())
+MAX_PROC = min(55, mp.cpu_count())
 
 TRANSLATION_TABLE = 11
 
@@ -125,12 +125,21 @@ HMM_PROFILE_FILE = 'Pfam-A_and_Amphora2.hmm'
 HMM_PROFILE_FILES_PARTITIONED_DIR = 'pfam_a_and_amphora2'
 
 # Assembly parameters
-ASSEMBLY_MAX_MISMATCH_QS_ALLOWED = 9
-ASSEMBLY_MIN_SCORE_REQIURED = 75
-ASSEMBLY_MIN_ANNOT_OVERLAP_SCORE = 40
-ASSEMBLY_SCORE_STOP_SEARCH = 100
-ASSEMBLY_MAX_QS = 94
+# ASSEMBLY_MAX_MISMATCH_QS_ALLOWED = 9
+# ASSEMBLY_MIN_SCORE_REQIURED = 75  # 25, 100
+# ASSEMBLY_MIN_ANNOT_OVERLAP_SCORE = 40  # 3, 50
+# ASSEMBLY_SCORE_STOP_SEARCH = 100  # 30, 200
+# ASSEMBLY_MAX_QS = 94
+
+ASSEMBLY_CONSIDER_PROT_COMP = (False,)
+ASSEMBLY_ONLY_POVERLAP = (False,)
+ASSEMBLY_POVERLAP = (0.8,)  # 0.7 - 0.8
+ASSEMBLY_OVERLAP_LEN = (0.5,)  # 0.25 - 0.8
+ASSEMBLY_OVERLAP_ANNOT_LEN = (0.2,)
+ASSEMBLY_STOP_OVERLAP_MISMATCH = (0.1,)
+ASSEMBLY_MAX_LOOPS = 1
 ASSEMBLY_SUPER_READ_EVAL_INIT = 'super_read_init_eval.txt'
+ASSEMBLY_SUPER_READ_STAT_INIT = 'super_read_init_stat.txt'
 
 # Binary locations
 if sys.platform == 'darwin':
@@ -247,3 +256,28 @@ def extract(compressedFile):
         tar = tarfile.open(compressedFile, 'r:gz')
         for item in tar:
             tar.extract(item, dstDir)
+
+
+class SampleDef(object):
+    def __init__(self, defFile):
+        """
+            @param defFile: SAMPLES_DEF_FILE
+        """
+        self.idToStrainList = {}
+        for line in open(defFile):
+            line = line.strip()
+            if len(line) > 0:
+                tokens = line.split('\t', 2)
+                sId = int(tokens[0])
+                strains = tokens[1].split(',')
+                self.idToStrainList[sId] = strains
+
+    def sIdToStrainListLen(self, sId):
+        """
+            @return: of how many strains a sample consist
+        """
+        strains = self.idToStrainList.get(int(sId))
+        if strains is not None:
+            return len(strains)
+        else:
+            return None

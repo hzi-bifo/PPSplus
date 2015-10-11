@@ -303,7 +303,7 @@ def getError(dnaSeq, refSeq, covArray, maxCov, annotStart, annotLen, tripletMap)
 def getPerBaseErrorPkl(recListFile, refGmap, refSeqBuff, maxCov, translTable, storeLabels=True):
     try:
         recSet = set(hio.loadReadRec(recListFile))
-        error = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov, translTable, allLabels=storeLabels)
+        error = getPerBaseError(recSet, refGmap, refSeqBuff, maxCov, translTable, allLabels=storeLabels, tag=recListFile)
         if storeLabels:
             hio.storeReadRec(list(recSet), recListFile)
         return error
@@ -316,7 +316,7 @@ def getPerBaseErrorPkl(recListFile, refGmap, refSeqBuff, maxCov, translTable, st
         return None
 
 
-def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allLabels=False):
+def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allLabels=False, tag=''):
     """
         Get the per position, per coverage error.
 
@@ -330,7 +330,7 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allL
 
         @type recSet: set[read_rec.ReadRec]
         @type refGmap: str
-        @type refSeqBuff: map[(str,str),str]
+        @type refSeqBuff: dict[(str,str),str]
         @type maxCov: int
         @type allLabels: bool
 
@@ -345,9 +345,7 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allL
 
     # the result error array (1st row ~ total count, 2nd row error count, 3rd row codon error); array length ~ coverage
     errorA = np.zeros((3, maxCov + 1), dtype=np.uint64)
-
-    # examined settings (strainId, seqId, startPos, strain{1,-1})
-    examinedSet = set()
+    errorSum = 0
 
     # second buffer for frequently retrieved entries
     refSeqBuff2 = {}
@@ -357,6 +355,9 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allL
         # skip not assembled reads
         if rec.readRecList is None:
             continue
+
+        # examined settings (strainId, seqId, startPos, strain{1,-1})
+        examinedSet = set()
 
         # count the error with respect to each read (also consider reverse complements)
         errList = []
@@ -414,22 +415,27 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allL
                     break
                 examinedSet.add((strainId, seqId, startPos, -1))
 
+        if len(errList) == 0:
+            print('Cannot determine error for: %s %s' % (rec.recordId, len(rec.dnaSeq)))
+            continue
+
         # get the results from the smallest error (first sort according to the error, then codon-error)
-        errList.sort(key=lambda x: (x[1], x[2]))
+        errList.sort(key=lambda x: (x[1], x[2], x[6], x[7], x[8], x[9]))
 
         totalErrorA, error, codonError, correct, refContig, refSeq, seqId, strainId, startPos, s = errList[0]
 
         # if the start position is outside of the reference sequence, try a different reference seq. with the same error
-        if startPos < 0:  # TODO: is it necessary?
-            for err in errList[1:]:
-                totalErrorA2, error2, codonError2, correct2, refContig2, refSeq2, seqId2, strainId2, startPos2, s2 = err
-                if error2 > error or codonError2 > codonError:
-                    break
-                elif startPos2 >= 0:
-                    totalErrorA = totalErrorA2
-                    break
+        # if startPos < 0:  # TODO: is it necessary?
+        #     for err in errList[1:]:
+        #         totalErrorA2, error2, codonError2, correct2, refContig2, refSeq2, seqId2, strainId2, startPos2, s2 = err
+        #         if error2 > error or codonError2 > codonError:
+        #             break
+        #         elif startPos2 >= 0:
+        #             totalErrorA = totalErrorA2
+        #             break
 
         errorA += totalErrorA
+        errorSum += error
 
         # store all the possible labels with corresponding errors
         if allLabels:
@@ -442,12 +448,25 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allL
                     examinedSet2.add((strainId2, seqId2))
 
             # all possible labels of the read-record
+            # if rec.labelEval is not None:
+            #
+            #     if len(rec.labelEval) != len(labelList):
+            #         print("Diff label list len: %s (%s, %s) %s" % (rec.recordId, len(rec.labelEval), len(labelList)), tag)
+            #     else:
+            #         for lb1, lb2 in zip(rec.labelEval, labelList):
+            #             if lb1.error != lb2.error or lb1.codonError != lb2.codonError:
+            #                 print('Diff err %s (%s, %s) (%s, %s) %s' % (rec.recordId, lb1.error, lb2.error, lb1.codonError,
+            #                                                    lb2.codonError, tag))
+                        # else:
+                        #     print '.',
+                # pass
+
             rec.labelEval = labelList
 
         # if errList[0][1] > 0 and len(rec.readRecList) > 30:
         #     print 'Error "%s" at contig len: "%s" reads: "%s" matrix: %s' % (errList[0][1], len(rec.dnaSeq), len(rec.readRecList), errList[0][0][1])
 
-    return errorA
+    return errorA, errorSum  # TODO: remove errorSum !!!
 
 
 def getAssemblyReport(errorAList, maxCov=20):
@@ -457,13 +476,15 @@ def getAssemblyReport(errorAList, maxCov=20):
         @return:
     """
     errorASum = np.zeros((3, maxCov + 1), dtype=np.uint64)
-    for e in errorAList:
+    eSum = 0
+    for e, es in errorAList:
         if e is not None:
             errorASum += e
+            eSum += es
         else:
             print('Warning: None in heval.getAssemblyReport')
 
-    buff = ''
+    buff = 'err: %s\n' % eSum
     buff += str('Error per coverage total:\n%s\n\n' % errorASum)
     buff += str('@01:(' + ', '.join(map(lambda x: str(x), errorASum[0])) + ')\n')
     buff += str('@02:(' + ', '.join(map(lambda x: str(x), errorASum[1])) + ')\n')

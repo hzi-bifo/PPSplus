@@ -92,7 +92,7 @@ class ReadRec(object):
         self.readRecList = None
 
         # a list of (overlapIdx, score) used to merge the read-records (list of (idx, score), i.e. list[(int, int)]
-        # self.overlapIdxList = None  # TODO: drop this
+        # self.overlapIdxList = None  # remove: drop this
 
         # the position of this (super-)read within a bigger contig (super-read)
         self.posWithinContig = 0
@@ -100,12 +100,15 @@ class ReadRec(object):
         # label for the evaluation purposes
         self.labelEval = None
 
-        # TODO: remove this checking
+        # hmm coordinates for evaluation purposes
+        self.evalHmmCoord = None
+
+        # remove: remove this checking
         # p = self.protSeq[self.protStart:self.protStart + self.protLen]
         # d = str(Seq(self.dnaSeq[self.annotStart:self.annotStart + self.annotLen], generic_dna).translate(translTable))
         # assert p == d
 
-        # TODO: remove: checking of the stop codons withing the annotation
+        # remove: checking of the stop codons withing the annotation
         # for i in range(self.annotStart, self.annotStart + self.annotLen, 3):
         #     if (self.dnaSeq[i:i+3] == 'TAG' or self.dnaSeq[i:i+3] == 'TAA' or self.dnaSeq[i:i+3] == 'TGA'):
         #         print self.dnaSeq[i:i+3], i, self.annotStart, self.annotStart + self.annotLen, \

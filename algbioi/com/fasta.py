@@ -49,6 +49,29 @@ def dnaToProt(inFastaDna, outFastaProt, translTable=11):
     out.close()
 
 
+def fastaToProt(inFasta, outFasta, translTable=11):
+    """
+        Translate sequences from the input fasta file to all six reading frames and store them into a FASTA file.
+    """
+    out = OutFileBuffer(outFasta)
+
+    for name, seq in fastaFileToDictWholeNames(inFasta).iteritems():
+        sLen = len(seq)
+        revSeq = str(Seq(seq, generic_dna).reverse_complement())
+
+        assert len(seq) == len(revSeq)
+
+        out.writeText('>%s_1\n%s\n' % (name, Seq(seq[:(sLen / 3) * 3], generic_dna).translate(table=translTable)))
+        out.writeText('>%s_2\n%s\n' % (name, Seq(seq[1:((sLen - 1) / 3) * 3 + 1], generic_dna).translate(table=translTable)))
+        out.writeText('>%s_3\n%s\n' % (name, Seq(seq[2:((sLen - 2) / 3) * 3 + 2], generic_dna).translate(table=translTable)))
+
+        out.writeText('>%s_4\n%s\n' % (name, Seq(revSeq[:(sLen / 3) * 3], generic_dna).translate(table=translTable)))
+        out.writeText('>%s_5\n%s\n' % (name, Seq(revSeq[1:((sLen - 1) / 3) * 3 + 1], generic_dna).translate(table=translTable)))
+        out.writeText('>%s_6\n%s\n' % (name, Seq(revSeq[2:((sLen - 2) / 3) * 3 + 2], generic_dna).translate(table=translTable)))
+
+    out.close()
+
+
 def getSeqFromDir(seqId, dirList, baseFileName):
     """
         Search for a sequence (seqId) in all files defined by a baseFileName and a list of directories,

@@ -33,6 +33,7 @@ import platform
 
 # list of species to be processed
 SPECIES_LIST = ["562"]  # Escherichia coli, 562, species
+# SPECIES_LIST = ["1166683"]
 
 # Art simulator setting
 ART_READ_LEN = [150, 150]  # changed from 150
@@ -50,7 +51,7 @@ ART_Q_PROFILE = [(None, None), (None, None)]  # the default profiles are taken !
 #     assert False  # add paths on the system ?
 
 # maximum number of CPUs to be used
-MAX_PROC = min(55, mp.cpu_count())
+MAX_PROC = min(12, mp.cpu_count())
 
 TRANSLATION_TABLE = 11
 
@@ -92,7 +93,7 @@ CLUSTER_PHYLO_STRAINS_FNA = 'genes_concat_align.fna'
 CLUSTER_MOTHUR_METHOD = 'furthest'  # only this one defined
 CLUSTER_MOTHUR_CWD = 'mothur_cwd'
 
-SAMPLES_DIR = 'samples'
+SAMPLES_DIR = 'samples100'
 SAMPLES_DEF_FILE = 'samples_definitions.txt'  # individual sample definitions
 SAMPLES_ERROR_PROFILE = 'samples_error_profile.csv'
 SAMPLES_ERROR_QS_CUTOFF = 'samples_error_qs_cutoffs.csv'
@@ -140,6 +141,12 @@ ASSEMBLY_STOP_OVERLAP_MISMATCH = (0.1,)
 ASSEMBLY_MAX_LOOPS = 1
 ASSEMBLY_SUPER_READ_EVAL_INIT = 'super_read_init_eval.txt'
 ASSEMBLY_SUPER_READ_STAT_INIT = 'super_read_init_stat.txt'
+ASSEMBLY_SUPER_READ_EVAL_INIT_SAT = 'sat_super_read_init_eval.txt'
+ASSEMBLY_SUPER_READ_EVAL_CLEN = 'super_read_clen.txt'
+ASSEMBLY_SUPER_READ_EVAL_CLEN_SAT = 'sat_super_read_clen.txt'
+ASSEMBLY_SUPER_READ_EVAL_RCOV = 'super_read_rcov.txt'
+ASSEMBLY_SUPER_READ_EVAL_RCOV_SAT = 'sat_super_read_rcov.txt'
+
 
 # Binary locations
 if sys.platform == 'darwin':
@@ -147,18 +154,24 @@ if sys.platform == 'darwin':
     MOTHUR_BINARY = '/Users/ivan/Documents/work/tools/mothur/mothur/mothur'
     ART_ILLUMINA_BINARY = '/Users/ivan/Documents/work/tools/art/art_bin_ChocolateCherriesOSX/art_illumina'
     HMMER_BINARY = '/Users/ivan/Documents/work/tools/hmmer/hmmer-3.0-macosx-intel/binaries'
+    SAT_INSTALL_DIR = '/Users/ivan/Documents/work/tools/sat/SAT-Assembler'
+    BWA_INSTALL_DIR = '/Users/ivan/Documents/work/tools/Bowtie/bowtie2-2.2.5'
 else:
     if platform.dist()[0] == 'Ubuntu':
         MUSCLE_BINARY = '/home/igregor/Documents/work/tools/muscle/muscle3.8.31_i86linux64'
         MOTHUR_BINARY = '/home/igregor/Documents/work/tools/mothur/mothur'
         ART_ILLUMINA_BINARY = '/home/igregor/Documents/work/tools/art/art_bin_ChocolateCherriesLinux/art_illumina'
         HMMER_BINARY = '/home/igregor/Documents/work/tools/hmmer-3.0/binaries'
+        SAT_INSTALL_DIR = '/home/igregor/Documents/work/tools/sat/SAT-Assembler'
+        BWA_INSTALL_DIR = '/home/igregor/Documents/work/tools/bowtie/bowtie2-2.2.5'
     else:
         assert sys.platform == 'linux2'
         MUSCLE_BINARY = '/net/metagenomics/projects/PPSmg/hsim/muscle3.8.31_i86linux64'
         MOTHUR_BINARY = '/net/metagenomics/projects/PPSmg/tools/mothur/mothur_1_333/mothur'
         ART_ILLUMINA_BINARY = '/net/metagenomics/projects/PPSmg/tools/art/art_bin_ChocolateCherriesLinux/art_illumina'
         HMMER_BINARY = '/net/metagenomics/projects/PPSmg/tools/hmmer-3.0/binaries'
+        SAT_INSTALL_DIR = '/net/metagenomics/projects/PPSmg/tools/sat/SAT-Assembler'
+        BWA_INSTALL_DIR = '/net/metagenomics/projects/PPSmg/tools/Bowtie/bowtie2-2.2.5'
 
 # Common functionality
 

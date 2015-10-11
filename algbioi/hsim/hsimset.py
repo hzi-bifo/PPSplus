@@ -42,11 +42,13 @@ from algbioi.com import fq
 from algbioi.hsim import comh
 from algbioi.hsim import gene_map
 from algbioi.hsim import pfam
+from algbioi.hsim import sat
 from algbioi.haplo import hmain
 from algbioi.haplo import heval
 from algbioi.haplo import align
 from algbioi.haplo import scaff
 from algbioi.haplo import stat
+from algbioi.haplo import len_eval
 
 
 def _main():
@@ -130,10 +132,10 @@ def _main():
         if False:
             assembleContigs(specDir)
 
-        if False:
+        if True:
             computePerBaseAssemblyError(specDir, storeAllLabels=True)
 
-        if True:
+        if False:
             computeAssemblyStat(specDir)
 
         # calculate overlaps between reads and contigs for scaffolding
@@ -143,15 +145,18 @@ def _main():
         if False:
             readUniqueMapScaff(specDir)
 
-            # filter reads given QS cutoffs
-            # if False:
-            #     filterReadsQS(specDir)
+        # run the SAT assembler
+        if True:
+            runSat(specDir, assembly=False, postProcessing=True, countError=True)
 
+        # contig length eval
+        if True:
+            contigLengthEval(specDir, snowballHmmAnnot=True, satHmmAnnot=True, lenSummary=True)
 
-            # getGenesStat(specDir)  # check, put to a new module,
+        # contig coverage eval
+        if True:
+            contigCoverageEval(specDir)
 
-
-            ###
     taxonomy.close()
 
 
@@ -965,7 +970,7 @@ def assembleContigs(specDir):
     parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=False)
 
 
-def computePerBaseAssemblyError(specDir, storeAllLabels=False):
+def computePerBaseAssemblyError(specDir, storeAllLabels=False, maxCov=30):
     """
         Compute the per base assembly error.
     """
@@ -975,15 +980,16 @@ def computePerBaseAssemblyError(specDir, storeAllLabels=False):
     # buffer the reference sequences
     refSeqBuff = fas.getSequenceBuffer([os.path.join(specDir, comh.FASTA_GENOMES_DIR_NAME),
                            os.path.join(specDir, comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
-    # collect tasks
-    taskList = []
-    # rList = []
+    # collect all results
+    errListAll = []
     for sample in os.listdir(samplesDir):
         if sample.isdigit():
-            # if int(sample) != 5:  # TODO: remove !!!
+            # if not(int(sample) == 1 or int(sample) == 2):  # TODO: remove !!! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            # if int(sample) != 1:  # TODO: !!!!!!!!!!!!!!!!
             #     continue
             partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
             if os.path.isdir(partitionedDir):
+                taskList = []
                 for f in os.listdir(partitionedDir):
                     fPath = os.path.join(partitionedDir, f)
                     if f.endswith('join_read_rec.pkl.gz') and os.path.isfile(fPath):
@@ -993,17 +999,20 @@ def computePerBaseAssemblyError(specDir, storeAllLabels=False):
                         assert os.path.isfile(gmapSam)
 
                         taskList.append(parallel.TaskThread(heval.getPerBaseErrorPkl,
-                                                            (readRecPkl, gmapSam, refSeqBuff, 30,
+                                                            (readRecPkl, gmapSam, refSeqBuff, maxCov,
                                                              comh.TRANSLATION_TABLE, storeAllLabels)))
-
                         # a = heval.getPerBaseErrorPkl(readRecPkl, gmapSam, refGenomesDraftGDirList, 30, comh.TRANSLATION_TABLE)
                         # rList.append(a)
                         # heval.getAssemblyReport([a], maxCov=30)
-    rList = parallel.runThreadParallel(taskList, comh.MAX_PROC)
-    report = heval.getAssemblyReport(rList, maxCov=30)
-    print report
+                rList = parallel.runThreadParallel(taskList, comh.MAX_PROC)
+                out = csv.OutFileBuffer(os.path.join(samplesDir, sample, comh.ASSEMBLY_SUPER_READ_EVAL_INIT))
+                out.writeText(heval.getAssemblyReport(rList, maxCov))
+                out.close()
+                errListAll.extend(rList)
+
+    # print report
     out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_INIT))
-    out.writeText(report)
+    out.writeText(heval.getAssemblyReport(errListAll, maxCov))
     out.close()
 
 
@@ -1119,65 +1128,218 @@ def readUniqueMapScaff(specDir):
     print scaff.readUniqueMapReport(rList)
 
 
-def filterReadsQS(specDir):
+def runSat(specDir, assembly=False, postProcessing=False, countError=True):
     """
-        Filter reads according to the QS cutoffs
-        @attention: TODO: not ready yet !
+        Runs the SAT assembler.
     """
-    assert False  # TODO: not ready yet !
-    print("Filtering reads according to the QS cutoffs")
-
-    # get the QS cutoff arrays for each library
-    qsArrayD = {}
-    for cutoff, readLen, i in zip(comh.SAMPLES_READ_TRIM_CUTOFFS, comh.ART_READ_LEN, range(len(comh.ART_READ_LEN))):
-        qsArrayD[i] = sam.readCutoffArray(os.path.join(specDir, comh.SAMPLES_DIR, comh.SAMPLES_ERROR_QS_CUTOFF),
-                                          cutoff, readLen)
-
-    # list of (pair1.fq, pair2.fq, filtered.fq, qsArray, readLen, trimRemain)
-    fileTupleList = []
-
-    # directory containing all samples
     samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
 
-    # collect all pairs of (fq1, fq2) files, define the output file
+    if assembly:
+        print('Running the SAT assembler.')
+
+        # collect tasks
+        taskList = []
+        for sample in os.listdir(samplesDir):
+            if sample.isdigit():
+                sampleDir = os.path.join(samplesDir, sample)
+                # for each sample, buffer all reads (list of (pair1, pair2))
+                fqPairList = []
+                for d in os.listdir(sampleDir):
+                    fq1 = os.path.join(sampleDir, d, '0_pair1.fq.gz')
+                    if os.path.isfile(fq1):
+                        fq2 = os.path.join(sampleDir, d, '0_pair2.fq.gz')
+                        assert os.path.isfile(fq2)
+                        fqPairList.append((fq1, fq2))
+
+                # creates sat output directory for a sample
+                satDir = os.path.join(sampleDir, 'sat')
+                if not os.path.isdir(satDir):
+                    os.mkdir(satDir)
+
+                # creates an input FASTA file for SAT
+                fnaFile = os.path.join(satDir, '0_sat.fna')
+                sat.fqToFasta(fqPairList, fnaFile, checkUniqueNames=True)
+
+                # run SAT
+                satOutDir = os.path.join(satDir, '0_sat')
+                hmmProfiles = os.path.join(comh.HMM_PROFILE_DIR, comh.HMM_PROFILE_FILE)
+                task = sat.getSatRunTask(fnaFile, satOutDir, hmmProfiles, comh.SAT_INSTALL_DIR, comh.HMMER_BINARY)
+                taskList.append(task)
+
+        # run tasks
+        parallel.reportFailedCmd(parallel.runCmdParallel(taskList, comh.MAX_PROC))
+
+    if postProcessing:
+        print('Running the SAT read to contig mapping.')
+        taskList = []
+        for sample in os.listdir(samplesDir):
+            if sample.isdigit():
+                sampleDir = os.path.join(samplesDir, sample)
+                satDir = os.path.join(sampleDir, 'sat')
+                satOutDir = os.path.join(satDir, '0_sat')
+
+                # for each sample, buffer all reads (list of (pair1, pair2))
+                fqPairList = []
+                for d in os.listdir(sampleDir):
+                    fq1 = os.path.join(sampleDir, d, '0_pair1.fq.gz')
+                    if os.path.isfile(fq1):
+                        fq2 = os.path.join(sampleDir, d, '0_pair2.fq.gz')
+                        assert os.path.isfile(fq2)
+                        fqPairList.append((fq1, fq2))
+
+                # for each sample, map reads, get the mapping
+                if os.path.isdir(satOutDir):
+                    fqPartitionDir = os.path.join(satDir, 'fq_part')
+                    aliIndexDir = os.path.join(satDir, 'ali_idx')
+                    samDir = os.path.join(satDir, 'sam')
+                    sat.satMapReads(satOutDir, fqPairList, fqPartitionDir, aliIndexDir, samDir, maxProc=comh.MAX_PROC)
+                    contigsDir = os.path.join(satDir, 'cont_pkl')
+                    taskList.append(parallel.TaskThread(sat.satToContigRecords, (samDir, fqPartitionDir, satOutDir,
+                                                                                 contigsDir)))
+                    dstGmap = os.path.join(satDir, '0_gmap.sam.gz')
+                    taskList.append(parallel.TaskThread(sat.getReadGmap, (sampleDir, dstGmap)))
+
+        # store contigs and read mapping as records
+        parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=False)
+
+    if countError:
+        print('Running the SAT per-base error computation')
+        refSeqBuff = fas.getSequenceBuffer([os.path.join(specDir, comh.FASTA_GENOMES_DIR_NAME),
+                                            os.path.join(specDir, comh.FASTA_GENOMES_DRAFT_DIR_NAME)])
+        errListAll = []
+        maxCov = 30
+        for sample in os.listdir(samplesDir):
+            if sample.isdigit():
+                sampleDir = os.path.join(samplesDir, sample)
+                satDir = os.path.join(sampleDir, 'sat')
+                contigsDir = os.path.join(satDir, 'cont_pkl')
+                if os.path.isdir(contigsDir):
+                    refGmap = os.path.join(satDir, '0_gmap.sam.gz')
+                    storeLab = True
+
+                    errAList = sat.countError(contigsDir, refGmap, refSeqBuff, storeLab, maxCov, comh.MAX_PROC)
+                    out = csv.OutFileBuffer(os.path.join(satDir, comh.ASSEMBLY_SUPER_READ_EVAL_INIT_SAT))
+                    out.writeText(heval.getAssemblyReport(errAList, maxCov))
+                    out.close()
+                    errListAll.extend(errAList)
+        out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_INIT_SAT))
+        out.writeText(heval.getAssemblyReport(errListAll, maxCov))
+        out.close()
+
+
+def contigLengthEval(specDir, snowballHmmAnnot=True, satHmmAnnot=True, lenSummary=True):
+    print('Running contig length evaluation')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+
     for sample in os.listdir(samplesDir):
         if sample.isdigit():
             sampleDir = os.path.join(samplesDir, sample)
-            if os.path.isdir(sampleDir):
-                # for all strains of one sample
-                for strain in os.listdir(sampleDir):
-                    strainDir = os.path.join(sampleDir, strain)
-                    if os.path.isdir(strainDir):
-                        # get fq1 and fq2 files for all libraries of one strain
-                        fq1D = {}
-                        fq2D = {}
-                        for f in os.listdir(strainDir):
-                            i = f.split('_', 1)[0]
-                            if i.isdigit():
-                                if f.endswith('1.fq.gz'):
-                                    fq1D[int(i)] = os.path.join(strainDir, f)
-                                elif f.endswith('2.fq.gz'):
-                                    fq2D[int(i)] = os.path.join(strainDir, f)
-                        assert len(fq1D) == len(fq2D)
-                        for i, fq1 in fq1D.iteritems():
-                            fq2 = fq2D[i]
-                            # store the files and param (pair1.fq, pair2.fq, filtered.fq, qsArray, readLen, trimRemain)
-                            fileTupleList.append((fq1, fq2, os.path.join(os.path.dirname(fq1),
-                                                                         '%s_filtered_qs.fq.gz' % i),
-                                                                         qsArrayD[i], comh.ART_READ_LEN[i],
-                                                                         comh.SAMPLES_READ_TRIM_REMAIN[i]))
-    # filter reads according to the QS cutoffs
-    fq.qsFilter(fileTupleList)
+
+            if snowballHmmAnnot:
+                partitionedDir = os.path.join(sampleDir, comh.SAMPLES_PFAM_PARTITIONED_DIR)
+                tmpLenDir = os.path.join(sampleDir, 'tmp_len')
+                len_eval.hmmAnnotContigsSnowball(partitionedDir, tmpLenDir)
+
+            if satHmmAnnot:
+                satDir = os.path.join(sampleDir, 'sat')
+                contigsDir = os.path.join(satDir, 'cont_pkl')
+                tmpDir = os.path.join(satDir, 'tmp_len')
+                if os.path.isdir(contigsDir):
+                    len_eval.hmmAnnotContigsSat(contigsDir, tmpDir)
+                else:
+                    print('Not a directory: %s' % contigsDir)
+
+    # compute the lengths summary
+    if lenSummary:
+        taskList1 = []
+        taskList2 = []
+        tagList1 = []
+        tagList2 = []
+
+        # collect data
+        for sample in os.listdir(samplesDir):
+            if sample.isdigit():
+                # if int(sample) != 0:  # TODO: remove !!!
+                #     continue
+
+                sampleDir = os.path.join(samplesDir, sample)
+                tagList1.append(sample)
+                partitionedDir = os.path.join(sampleDir, comh.SAMPLES_PFAM_PARTITIONED_DIR)
+                taskList1.append(parallel.TaskThread(len_eval.contLenEval, (partitionedDir,)))
+                satDir = os.path.join(sampleDir, 'sat')
+                contigsDir = os.path.join(satDir, 'cont_pkl')
+                if os.path.isdir(contigsDir):
+                    tagList2.append(sample)
+                    taskList2.append(parallel.TaskThread(len_eval.contLenEval, (contigsDir,)))
+
+        # run computation
+        errList1 = parallel.runThreadParallel(taskList1, comh.MAX_PROC, keepRetValues=True)
+        errList2 = parallel.runThreadParallel(taskList2, comh.MAX_PROC, keepRetValues=True)
+
+        # for snowball
+        for sample, errA in zip(tagList1, errList1):
+            out = csv.OutFileBuffer(os.path.join(samplesDir, sample, comh.ASSEMBLY_SUPER_READ_EVAL_CLEN))
+            out.writeText(len_eval.contLenEvalReport([errA], sample))
+            out.close()
+        out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_CLEN))
+        out.writeText(len_eval.contLenEvalReport(errList1, 'all'))
+        out.close()
+
+        # for sat
+        for sample, errA in zip(tagList2, errList2):
+            out = csv.OutFileBuffer(os.path.join(samplesDir, sample, comh.ASSEMBLY_SUPER_READ_EVAL_CLEN_SAT))
+            out.writeText(len_eval.contLenEvalReport([errA], sample))
+            out.close()
+        out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_CLEN_SAT))
+        out.writeText(len_eval.contLenEvalReport(errList2, 'all'))
+        out.close()
 
 
-    # SAMPLES_READ_TRIM_CUTOFFS = [0.07, 0.07]
-    # ART_READ_LEN = [100, 100]
-    # SAMPLES_ERROR_QS_CUTOFF = 'samples_error_qs_cutoffs.csv'
-    # implement in the SAM file
+def contigCoverageEval(specDir):
+    print('Running contig coverage evaluation')
+    samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
+    refDirList = [os.path.join(specDir, comh.FASTA_GENOMES_DIR_NAME),
+                  os.path.join(specDir, comh.FASTA_GENOMES_DRAFT_DIR_NAME)]
 
-    # define it as a task.. create com. fq.py !!! implementing the reading from fq and filtering
+    taskList = []
+    for sample in os.listdir(samplesDir):
+        if sample.isdigit():
 
-    # output filtering report..
+            sampleDir = os.path.join(samplesDir, sample)
+            partitionedDir = os.path.join(sampleDir, comh.SAMPLES_PFAM_PARTITIONED_DIR)
+            contigsDirSat = os.path.join(sampleDir, 'sat', 'cont_pkl')
+
+            taskList.append(parallel.TaskThread(len_eval.getRefCover, (partitionedDir, refDirList, '%s_%s' % (sample, 'snow'), partitionedDir)))
+            taskList.append(parallel.TaskThread(len_eval.getRefCover, (contigsDirSat, refDirList, '%s_%s' % (sample, 'sat'), os.path.dirname(contigsDirSat))))
+
+    # run
+    retList = parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=True)
+
+    snowList = []
+    satList = []
+    for cumulA, strainBp, tag in retList:
+        if tag.endswith('snow'):
+            snowList.append((cumulA, strainBp, tag.split('_')[0]))
+        else:
+            assert tag.endswith('sat')
+            satList.append((cumulA, strainBp, tag.split('_')[0]))
+
+    out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_RCOV))
+    r = []
+    for cumulA, strainBp, tag in snowList:
+        out.writeText(len_eval.getRefCoverReport([(cumulA, strainBp)], tag))
+        r.append((cumulA, strainBp))
+    out.writeText(len_eval.getRefCoverReport(r, 'all'))
+    out.close()
+
+    out = csv.OutFileBuffer(os.path.join(samplesDir, comh.ASSEMBLY_SUPER_READ_EVAL_RCOV_SAT))
+    r = []
+    for cumulA, strainBp, tag in satList:
+        out.writeText(len_eval.getRefCoverReport([(cumulA, strainBp)], tag))
+        r.append((cumulA, strainBp))
+    out.writeText(len_eval.getRefCoverReport(r, 'all'))
+
+    out.close()
 
 
 def _tmp():

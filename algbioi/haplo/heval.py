@@ -18,21 +18,19 @@
 
     Gene assembly evaluation and statistics.
 """
-import os
 import gzip
+import os
 
 import numpy as np
-
 from Bio.Alphabet import generic_dna
 from Bio.Seq import Seq
 
-from algbioi.com import fasta as fas
 from algbioi.com import common as com
-from algbioi.hsim import comh
-from algbioi.haplo import hmain
+from algbioi.com import fasta as fas
+from algbioi.haplo import qs
 from algbioi.haplo import hio
-from algbioi.haplo import join_rec
-from algbioi.com import qs
+from algbioi.haplo import hmain
+from algbioi.hsim import comh
 
 
 def assemblyStat(recSet):
@@ -341,7 +339,7 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allL
     gmap = getReadTrueMap(refGmap)
 
     # define map: triplet -> codon
-    tripletMap = join_rec.getTripletMap(translTable)
+    tripletMap = com.getTripletMap(translTable)
 
     # the result error array (1st row ~ total count, 2nd row error count, 3rd row codon error); array length ~ coverage
     errorA = np.zeros((3, maxCov + 1), dtype=np.uint64)
@@ -423,6 +421,9 @@ def getPerBaseError(recSet, refGmap, refSeqBuff, maxCov=20, translTable=11, allL
         errList.sort(key=lambda x: (x[1], x[2], x[6], x[7], x[8], x[9]))
 
         totalErrorA, error, codonError, correct, refContig, refSeq, seqId, strainId, startPos, s = errList[0]
+
+        # if error > 10:  # TODO: !!!
+        #     print 'error, codonError, length: ', error, codonError, len(refContig), totalErrorA
 
         # if the start position is outside of the reference sequence, try a different reference seq. with the same error
         # if startPos < 0:  # TODO: is it necessary?
@@ -543,10 +544,10 @@ def _test():
     # gf = 'pfl_3'
     # gf = 'aminotran_3_1'
 
-    # gf = 'acr_tran_3'
+    gf = 'acr_tran_3'
     # gf = 'abc_tran_3'  # too many pieces..
     # gf = 'usher_1'
-    gf = 'aldedh_1'  # TODO: explore two long contigs belonging to one reference !!!
+    # gf = 'aldedh_1'  # TODO: explore two long contigs belonging to one reference !!!
     # gf = 'molybdopterin_1'
     # gf = 'aa_permease_2'
     # gf = 'hth_1_3'

@@ -18,7 +18,7 @@
 
 
     ***********************************************************************
-    Manage the strains - reference data for a list of given species species.
+    Manage the strains - reference data for a list of given species.
 
     NCBI genomes and draft genomes downloaded using commands (for e.coli):
     wget -r --no-parent ftp://ftp.ncbi.nih.gov/genomes/Bacteria/Escherichia_coli*
@@ -59,7 +59,7 @@ GENOMES_SOURCES_FILE_NAME = 'bacteria_genomes_sources.csv'  # contains a list of
 
 def _main():
     """
-        Main function, choose steps you want to execute
+        Main function, choose steps you want to execute (change: False -> True)
     """
     assert os.path.isfile(comh.NCBI_TAXONOMY_FILE)
     assert os.path.isdir(comh.REFERENCE_DIR_ROOT)

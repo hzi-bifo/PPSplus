@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
     Copyright (C) 2015  Ivan Gregor
 
@@ -16,49 +14,39 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Note that we could have written some parts of this code in a nicer way,
-    but didn't have time. Be careful when reusing the source code.
-
-
-    Contains constants and common functionality used in this package.
+    Module version 1.2.1
+    Contains parameters, constants, paths to binaries, paths to results, and common functionality used in this package.
+    Please modify the PATHS according to your project setup !!!
 """
+
 import os
 import sys
 import re
 import tarfile
-# import numpy as np
 import multiprocessing as mp
 from algbioi.com import parallel
 import platform
 
 # list of species to be processed
-SPECIES_LIST = ["562"]  # Escherichia coli, 562, species
-# SPECIES_LIST = ["1166683"]
+SPECIES_LIST = ["562"]  # Escherichia coli, species
+# SPECIES_LIST = ["1166683"]  # Rhizobia
 
-# Art simulator setting
-ART_READ_LEN = [150, 150]  # changed from 150
+# Art simulator setting (only the first val used)
+ART_READ_LEN = [150, 150]
 ART_INSERT_SIZE = [225, 5000]  # 150, 180, 450  # try 180 and 5000
-ART_INSERT_SD = [23, 500]  # 5? and 50? "10 %"
+ART_INSERT_SD = [23, 500]  # "10 %"
 ART_MIN_SEQ_LEN = [200, 5000]  # this should be handled by art !!!
 ART_QS_MAX = [60, 60]  # maximum quality score
 ART_Q_PROFILE = [(None, None), (None, None)]  # the default profiles are taken !
-# if sys.platform == 'darwin':
-#     ART_Q_PROFILE = [('/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR1.txt',
-#                       '/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR2.txt'),
-#                      ('/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR1.txt',
-#                       '/Users/ivan/Documents/work/tools/art/cami_profiles/EmpHiSeq2kR2.txt')]
-# else:
-#     assert False  # add paths on the system ?
 
 # maximum number of CPUs to be used
 MAX_PROC = min(12, mp.cpu_count())
 
 TRANSLATION_TABLE = 11
 
-# Data locations
+# Data locations (depending on which OS it's run, please modify according to your project setup)
 if sys.platform == 'darwin':
-    # REFERENCE_DIR_ROOT = '/Volumes/VerbatimSSD/work/hsim01'  # external storage !!!
-    REFERENCE_DIR_ROOT = '/Users/ivan/Documents/nobackup/hsim01'  # local disk !!!
+    REFERENCE_DIR_ROOT = '/Users/ivan/Documents/nobackup/hsim01'
     NCBI_TAXONOMY_FILE = '/Users/ivan/Documents/work/binning/taxonomy/20140916/ncbitax_sqlite.db'
     HMM_PROFILE_DIR = '/Volumes/VerbatimSSD/work/pfam'
 else:
@@ -93,7 +81,7 @@ CLUSTER_PHYLO_STRAINS_FNA = 'genes_concat_align.fna'
 CLUSTER_MOTHUR_METHOD = 'furthest'  # only this one defined
 CLUSTER_MOTHUR_CWD = 'mothur_cwd'
 
-SAMPLES_DIR = 'samples100'
+SAMPLES_DIR = 'samples'
 SAMPLES_DEF_FILE = 'samples_definitions.txt'  # individual sample definitions
 SAMPLES_ERROR_PROFILE = 'samples_error_profile.csv'
 SAMPLES_ERROR_QS_CUTOFF = 'samples_error_qs_cutoffs.csv'
@@ -126,12 +114,6 @@ HMM_PROFILE_FILE = 'Pfam-A_and_Amphora2.hmm'
 HMM_PROFILE_FILES_PARTITIONED_DIR = 'pfam_a_and_amphora2'
 
 # Assembly parameters
-# ASSEMBLY_MAX_MISMATCH_QS_ALLOWED = 9
-# ASSEMBLY_MIN_SCORE_REQIURED = 75  # 25, 100
-# ASSEMBLY_MIN_ANNOT_OVERLAP_SCORE = 40  # 3, 50
-# ASSEMBLY_SCORE_STOP_SEARCH = 100  # 30, 200
-# ASSEMBLY_MAX_QS = 94
-
 ASSEMBLY_CONSIDER_PROT_COMP = (False,)
 ASSEMBLY_ONLY_POVERLAP = (False,)
 ASSEMBLY_POVERLAP = (0.8,)  # 0.7 - 0.8
@@ -148,7 +130,7 @@ ASSEMBLY_SUPER_READ_EVAL_RCOV = 'super_read_rcov.txt'
 ASSEMBLY_SUPER_READ_EVAL_RCOV_SAT = 'sat_super_read_rcov.txt'
 
 
-# Binary locations
+# Binary locations (depending on which OS it's run, please modify according to your project setup)
 if sys.platform == 'darwin':
     MUSCLE_BINARY = '/Users/ivan/Documents/work/tools/muscle/muscle3.8.31_i86darwin64'
     MOTHUR_BINARY = '/Users/ivan/Documents/work/tools/mothur/mothur/mothur'
@@ -175,10 +157,9 @@ else:
 
 # Common functionality
 
-
 def getGeneNameToFileName(geneName):
     """
-        From a gene name get a fasta file name.
+        From a gene name get a FASTA file name.
         All letters lowered, chars [^a-z0-9] are replaced by underscore)
     """
     fileName = re.sub(r"[^a-z0-9]", "_", geneName.lower())
@@ -207,7 +188,7 @@ def getSeqNameToDict(seqName):
 
 def getAlignments(inDir, outDir, reportFailedCmd=True, listOfInFileNames=None):
     """
-        Build a multiple sequence alignments for fasta files in the input directory.
+        Build a multiple sequence alignments for FASTA files in the input directory.
 
         @param inDir: directory containing input fasta files
         @param outDir: directory for the output aligned fasta files

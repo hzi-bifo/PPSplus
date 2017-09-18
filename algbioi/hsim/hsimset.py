@@ -16,15 +16,18 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Note that we could have written some parts of this code in a nicer way,
-    but didn't have time. Be careful when reusing the source code.
-
     ***********************************************************************
 
+    Evaluation MASTER SCRIPT of the Snowball gene assembly project.
+    It contains all the steps from
+    (1) the simulated data generation
+    (2) running Snowball and SAT assembler
+    (3) running the evaluation scripts to generate data for Figures generation.
 
-    Manages the simulated data generation for the haplotype reconstruction.
-
+    In the main method (_main), set to True steps that you want to perform.
+    Set the global parameters in hsim.comh (e.g. external tools, paths, etc.)
 """
+
 import os
 import re
 # import sys
@@ -44,6 +47,7 @@ from algbioi.hsim import gene_map
 from algbioi.hsim import pfam
 from algbioi.hsim import sat
 from algbioi.haplo import hmain
+from algbioi.haplo import hio
 from algbioi.haplo import heval
 from algbioi.haplo import align
 from algbioi.haplo import scaff
@@ -53,12 +57,13 @@ from algbioi.haplo import len_eval
 
 def _main():
     """
-        Main function, choose steps you want to execute
+        Main function, choose steps you want to execute (change: False -> True)
     """
     assert os.path.isfile(comh.NCBI_TAXONOMY_FILE)
     assert os.path.isdir(comh.REFERENCE_DIR_ROOT)
     taxonomy = taxonomy_ncbi.TaxonomyNcbi(comh.NCBI_TAXONOMY_FILE, considerNoRank=True)
 
+    # performs the experiment for each species in the list (tested only with one at the time).
     for spec in comh.SPECIES_LIST:
         specDir = os.path.join(comh.REFERENCE_DIR_ROOT, spec)
         assert comh.isSpeciesDirectory(specDir, taxonomy), "Not a species directory: %s" % specDir
@@ -91,15 +96,15 @@ def _main():
         if False:
             getReadStatAndQSCutoff(specDir)
 
-        # join overlapping pair-end reads
+        # join overlapping paired-end reads
         if False:
             joinPairEndReads(specDir)
 
-        # create a SAM file for the joined pair-end reads
+        # create a SAM file for the joined paired-end reads
         if False:
             createSamFileForJoinedPairEndReads(specDir)
 
-        # compute error profile for the joined pair-end reads
+        # compute error profile for the joined paired-end reads
         if False:
             getJoinedReadsStat(specDir)
 
@@ -107,12 +112,13 @@ def _main():
         if False:
             getGeneMapping(specDir)
 
+        # Translate reads to PROT sequences using all 6 reading frames
         if False:
-            translateReadsToProt(specDir, translateJoined=False, translateNotJoined=True)
+            translateReadsToProt(specDir, translateJoined=True, translateNotJoined=False)
 
-        # Get HMM annotation
+        # Get HMM annotation for all PROT sequences
         if False:
-            getHmmAnnotation(specDir, considerJoined=False, considerNotJoined=True)
+            getHmmAnnotation(specDir, considerJoined=True, considerNotJoined=False)
 
         # Get the precision/recall of the pfam-annotations.
         if False:
@@ -120,41 +126,46 @@ def _main():
 
         # Partition reads into Pfam-domains
         if False:
-            partitionReadsToPfamDom(specDir, considerJoined=True, considerNotJoined=True)
+            partitionReadsToPfamDom(specDir, considerJoined=True, considerNotJoined=False)
 
+        # Make alignments for the partitioned reads
         if False:
             alignHmmPartitionedReads(specDir)
 
-        # Get Stat for partitioned reads into Pfam-domains
+        # Get statistics for the partitioned reads ~ Pfam-domains
         if False:
             getStatPartitionedReadsPfamDom(specDir)
 
+        # Run Snowball gene assembly
         if False:
             assembleContigs(specDir)
 
-        if True:
+        # Comput per-base error of the assembled reads (via Snowball)
+        if False:
             computePerBaseAssemblyError(specDir, storeAllLabels=True)
 
+        # Compute the assembly statistics
         if False:
             computeAssemblyStat(specDir)
 
-        # calculate overlaps between reads and contigs for scaffolding
+        # Experimental: calculate overlaps between reads and contigs for scaffolding
         if False:
             calculatePairOverlapsScaff(specDir)
 
+        # Experimental: evaluation of scaffold mapping
         if False:
             readUniqueMapScaff(specDir)
 
-        # run the SAT assembler
-        if True:
-            runSat(specDir, assembly=False, postProcessing=True, countError=True)
+        # Run the SAT assembler (runs up to several weeks for moderate datasets)
+        if False:
+            runSat(specDir, assembly=False, postProcessing=False, countError=True)
 
-        # contig length eval
-        if True:
+        # Contig length evaluation
+        if False:
             contigLengthEval(specDir, snowballHmmAnnot=True, satHmmAnnot=True, lenSummary=True)
 
-        # contig coverage eval
-        if True:
+        # Contig coverage evaluation
+        if False:
             contigCoverageEval(specDir)
 
     taxonomy.close()
@@ -271,7 +282,6 @@ def getPhyloAlignments(specDir, onlyPhyloGenes=True):
     comh.getAlignments(os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_DIR_NAME),
                        os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_ALIGN_DIR_NAME),
                        listOfInFileNames=fileNameList, reportFailedCmd=True)
-    #
 
 
 def concatenatePhyloGenesForClustering(specDir):
@@ -601,9 +611,9 @@ def getReadStatAndQSCutoff(specDir):
 
 def joinPairEndReads(specDir):
     """
-        Join overlapping pair end reads.
+        Join overlapping paired-end reads.
     """
-    print('Joining overlapping pair end reads.')
+    print('Joining overlapping paired-end reads.')
 
     # collect all libraries with overlapping reads
     librarySet = set()
@@ -644,19 +654,19 @@ def joinPairEndReads(specDir):
                             fileTupleList.append(
                                 (fq1Path, fq2Path, fqJoinPath, comh.ART_READ_LEN[i], comh.ART_INSERT_SIZE[i],
                                  comh.ART_INSERT_SD[i], comh.ART_QS_MAX[i]))
-    # join pair end reads
+    # join paired-end reads
     r = fq.joinPairEnd(fileTupleList,
                        minOverlap=comh.SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP,
                        minOverlapIdentity=comh.SAMPLES_PAIRED_END_JOIN_MIN_OVERLAP_IDENTITY,
                        maxCpu=comh.MAX_PROC)
-    print("Not joined: %s %%" % r)
+    print("Not joined paired-end reads: %s %%" % r)
 
 
 def createSamFileForJoinedPairEndReads(specDir):
     """
-        Create SAM files for the joined pair-end reads.
+        Create SAM files for the joined paired-end reads.
     """
-    print('Creating SAM files for the joined pair-end reads')
+    print('Creating SAM files for the joined paired-end reads')
     # all files for the SAM files creation
     fileTupleList = []
 
@@ -680,17 +690,16 @@ def createSamFileForJoinedPairEndReads(specDir):
                                 joinSamPath = os.path.join(strainDir, "%s_join.sam.gz" % i)
                                 assert os.path.isfile(pairEndSamPath)
                                 fileTupleList.append((fqJoinPath, pairEndSamPath, joinSamPath))
-    # create SAM files for all joined pair end reads
+    # create SAM files for all joined paired-end reads
     r = sam.createSamFileForJoinedPairEndReads(fileTupleList, maxCpu=comh.MAX_PROC)
-    print('SAM files for "%s" joined pair end reads created' % r)
+    print('SAM files for "%s" joined paired-end reads created' % r)
 
 
 def getJoinedReadsStat(specDir):
     """
-        Compute error profile for the joined pair-end reads.
-
+        Compute error profile for the joined paired-end reads.
     """
-    print("Computing error profile for the joined pair-end reads.")
+    print("Computing error profile for the joined paired-end reads.")
     # all files for the error profile computation
     fileTupleList = []
 
@@ -718,7 +727,7 @@ def getJoinedReadsStat(specDir):
                                                           comh.ART_READ_LEN[int(i)], comh.ART_QS_MAX[int(i)]))
     # compute error profiles
     rc = sam.getJoinedReadStat(fileTupleList, os.path.join(samplesDir, comh.SAMPLES_JOIN_ERROR_PROFILE), comh.MAX_PROC)
-    print('Statistics for "%s" joined pair-end reads counted' % rc)
+    print('Statistics for "%s" joined paired-end reads counted' % rc)
 
 
 def getGeneMapping(specDir):
@@ -733,7 +742,7 @@ def getGeneMapping(specDir):
     # directory containing all samples
     samplesDir = os.path.join(specDir, comh.SAMPLES_DIR)
 
-    # collect all files: FNA references for the joined pair-end reads and the corresponding SAM files
+    # collect all files: FNA references for the joined paired-end reads and the corresponding SAM files
     refList = []  # list of reference FNA files
     samList = []  # list of SAM file tuples (input SAM, output SAM)
     for sample in os.listdir(samplesDir):
@@ -757,7 +766,7 @@ def getGeneMapping(specDir):
 
 def translateReadsToProt(specDir, translateJoined=False, translateNotJoined=False):
     """
-        Translate reads to all 6 reading frames.
+        Translate reads to PROT sequences using all 6 reading frames.
     """
     print('Translating reads into 6 reading frames (joined: %s, notJoined: %s)' % (translateJoined, translateNotJoined))
     # directory containing all samples
@@ -794,7 +803,7 @@ def translateReadsToProt(specDir, translateJoined=False, translateNotJoined=Fals
 
 def getHmmAnnotation(specDir, considerJoined=False, considerNotJoined=False):
     """
-        Get the Hmm annotation for all the joined pair-end reads or the not joined pair end reads.
+        Get the Hmm annotation for all the joined paired-end reads or the not joined paired-end reads.
     """
     print('Running Hmm search.')
     # directory containing all samples
@@ -886,11 +895,11 @@ def partitionReadsToPfamDom(specDir, considerJoined=False, considerNotJoined=Fal
             sampleDir = os.path.join(samplesDir, sample)
             if os.path.isdir(sampleDir):
                 if considerJoined:
-                    taskList.append(parallel.TaskThread(pfam.partitionReads, (sampleDir, comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
+                    taskList.append(parallel.TaskThread(hio.partitionReads, (sampleDir, comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
                                         comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY, comh.SAMPLES_SHUFFLE_RAND_SEED,
                                         comh.SAMPLES_PFAM_PARTITIONED_DIR, True)))
                 if considerNotJoined:
-                    taskList.append(parallel.TaskThread(pfam.partitionReads, (sampleDir, comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
+                    taskList.append(parallel.TaskThread(hio.partitionReads, (sampleDir, comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
                                         comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY, comh.SAMPLES_SHUFFLE_RAND_SEED,
                                         comh.SAMPLES_PFAM_PARTITIONED_DIR, False)))
 
@@ -984,9 +993,6 @@ def computePerBaseAssemblyError(specDir, storeAllLabels=False, maxCov=30):
     errListAll = []
     for sample in os.listdir(samplesDir):
         if sample.isdigit():
-            # if not(int(sample) == 1 or int(sample) == 2):  # TODO: remove !!! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # if int(sample) != 1:  # TODO: !!!!!!!!!!!!!!!!
-            #     continue
             partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
             if os.path.isdir(partitionedDir):
                 taskList = []
@@ -1031,8 +1037,6 @@ def computeAssemblyStat(specDir):
         if sample.isdigit():
             strainNum = sampleDef.sIdToStrainListLen(int(sample))
             strainNumMax = max(strainNumMax, strainNum)
-            # if int(sample) != 3:  # TODO: remove !!!
-            #     continue
             taskList = []
             partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
             if os.path.isdir(partitionedDir):
@@ -1066,8 +1070,6 @@ def calculatePairOverlapsScaff(specDir):
     taskList = []
     for sample in os.listdir(samplesDir):
         if sample.isdigit():
-            # if int(sample) != 5:  # TODO: remove !!!
-            #     continue
             partitionedDir = os.path.join(samplesDir, sample, comh.SAMPLES_PFAM_PARTITIONED_DIR)
             if os.path.isdir(partitionedDir):
                 for f in os.listdir(partitionedDir):
@@ -1122,7 +1124,6 @@ def readUniqueMapScaff(specDir):
 
                         # (scaffOverlapFile, pFrom=0.8, pTo=0.99, step=0.01)
                         taskList.append(parallel.TaskThread(scaff.readUniqueMap, (fPath,)))
-                # break  # TODO: remove !!!
 
     rList = parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=True)
     print scaff.readUniqueMapReport(rList)
@@ -1198,7 +1199,7 @@ def runSat(specDir, assembly=False, postProcessing=False, countError=True):
                                                                                  contigsDir)))
                     dstGmap = os.path.join(satDir, '0_gmap.sam.gz')
                     taskList.append(parallel.TaskThread(sat.getReadGmap, (sampleDir, dstGmap)))
-
+        print '...'
         # store contigs and read mapping as records
         parallel.runThreadParallel(taskList, comh.MAX_PROC, keepRetValues=False)
 
@@ -1259,8 +1260,6 @@ def contigLengthEval(specDir, snowballHmmAnnot=True, satHmmAnnot=True, lenSummar
         # collect data
         for sample in os.listdir(samplesDir):
             if sample.isdigit():
-                # if int(sample) != 0:  # TODO: remove !!!
-                #     continue
 
                 sampleDir = os.path.join(samplesDir, sample)
                 tagList1.append(sample)
@@ -1342,19 +1341,14 @@ def contigCoverageEval(specDir):
     out.close()
 
 
-def _tmp():
-    # test ..
-    readLen = 100
-    qsArrayLen = 64
-    fq1 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_pair1.fq'
-    fq2 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_pair2.fq'
-    samFile = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_pair.sam'
-    # samFile = '/Users/ivan/Documents/nobackup/hsim01/562/samples/5/NZ_AIHP00000000/0_pair.sam'
-    fasFile = '/Users/ivan/Documents/nobackup/hsim01/562/samples/4/NZ_AIEZ00000000/0_NZ_AIEZ00000000.fna'
-    # _getStatSam(samFile)
+if __name__ == "__main__":
+    _main()
 
 
-def getGenesStat(specDir):
+# -------- end of master script, miscelaneous:
+
+
+def getGenesStat(specDir):  # not used!
     srcDir = os.path.join(specDir, comh.FASTA_PULL_GENES_PHYLO_ALIGN_DIR_NAME)
     geneToAccSet = {}
     for f in os.listdir(srcDir):
@@ -1383,26 +1377,6 @@ def getGenesStat(specDir):
         print('%s%% -> %s' % (i, count))
 
 
-
-    # count = 0
-    # for f in os.listdir(srcDir):
-    #     filePath = os.path.join(srcDir, f)
-    #
-    #     names = fas.fastaFileToDictWholeNames(filePath).keys()
-    #     s = set(map(lambda x: getSeqNameToDict(x)['geneName'], names))
-    #     if len(s) != 1:
-    #         print f, len(names)
-    #         count += 1
-
-        # geneName = getSeqNameToDict(names[0])['geneName']
-        # if len(names) > 290:
-        #     geneCount[geneName] = len(names)
-    # TODO !!!
-    #
-    #
-    # print geneCount
-    # print count
-
 def fun():
     specList = ["562"]
     geneFileList = ['/Users/ivan/Documents/nobackup/hsim01/562/mg_31.txt',
@@ -1418,17 +1392,3 @@ def fun():
             pullGenesDir = os.path.join(speciesDir, comh.FASTA_PULL_GENES_DIR_NAME)
             accAllList = _getAccIntersectAll(pullGenesDir, geneList)  # list of accessions of genomes or draft genomes containing all
             print('spec: %s, accession count: %s, file: %s' % (species, len(accAllList), f))
-
-    # Get genes based on which
-    # Generates simulated dataset scenarios for one folder !!!
-    # Escherichia coli, 562, species
-    # assert os.path.isfile(NCBI_TAXONOMY_FILE), "The taxonomy file does not exists!"
-    # assert os.path.isdir(REFERENCE_DIR_ROOT), "The root of the reference does not exist!"
-    # taxonomy = taxonomy_ncbi.TaxonomyNcbi(NCBI_TAXONOMY_FILE, considerNoRank=True)
-    # getAlignments('/Users/ivan/Documents/nobackup/hsim01/562/s', '/Users/ivan/Documents/nobackup/hsim01/562/d')
-    # taxonomy.close()
-
-
-if __name__ == "__main__":
-    _main()
-    # getAlignments('/Users/ivan/Documents/nobackup/hsim01/562/a', '/Users/ivan/Documents/nobackup/hsim01/562/b', maxCPU=1)

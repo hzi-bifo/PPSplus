@@ -21,20 +21,20 @@
 
 # ./SAT-Assembler.sh -m <HMM file> -f <fasta file> [options] -o:  output file name
 
-import os
 import gzip
-import numpy as np
+import os
 
-from Bio.Seq import Seq
+import numpy as np
 from Bio.Alphabet import generic_dna
+from Bio.Seq import Seq
 
 from algbioi.com import csv
-from algbioi.com import fq
 from algbioi.com import fasta as fas
+from algbioi.com import fq
 from algbioi.com import parallel
-from algbioi.hsim import comh
-from algbioi.haplo import hio
 from algbioi.haplo import heval
+from algbioi.haplo import hio, qs
+from algbioi.hsim import comh
 
 
 class CRec(object):
@@ -277,6 +277,18 @@ def diff(str1, str2):
     return c
 
 
+def isEq(dna1, dna2):
+    length = len(dna1)
+    if length != len(dna2):
+        return False
+
+    for i in range(length):
+        if dna1[i] != dna2[i] and qs.isDNAChar(dna1[i]) and qs.isDNAChar(dna2[i]):
+            return False
+
+    return True
+
+
 def satToContigRecords(samDir, fqPartitionDir, satOutDir, dstDir=None, maxDiff=10):
     """
         @type samDir: str
@@ -285,7 +297,8 @@ def satToContigRecords(samDir, fqPartitionDir, satOutDir, dstDir=None, maxDiff=1
         @type dstDir: str
         @type maxDiff: int
     """
-    try:
+    # try:
+    if True:
         over = 0
         overDiffSize = 0
         total = 0
@@ -358,7 +371,7 @@ def satToContigRecords(samDir, fqPartitionDir, satOutDir, dstDir=None, maxDiff=1
                                 dna = str(Seq(dna1, generic_dna).reverse_complement())
                             else:
                                 dna = dna1
-                            assert dna == seq
+                            assert isEq(dna, seq)
 
                             if diff(dna, cSeq) > maxDiff and ('I' not in cigar and 'D' not in cigar):
                                 over += 1
@@ -375,7 +388,7 @@ def satToContigRecords(samDir, fqPartitionDir, satOutDir, dstDir=None, maxDiff=1
                                 dna = str(Seq(dna2, generic_dna).reverse_complement())
                             else:
                                 dna = dna2
-                            assert dna == seq
+                            assert isEq(dna, seq)
 
                             if diff(dna, cSeq) > maxDiff and ('I' not in cigar and 'D' not in cigar):
                                 over += 1
@@ -424,11 +437,11 @@ def satToContigRecords(samDir, fqPartitionDir, satOutDir, dstDir=None, maxDiff=1
                 hio.storeObj(recSet, dstFile)
 
         print 'STAT: over: %s overDiffSize: %s total: %s' % (over, overDiffSize, total)
-    except Exception as e:
-        print samDir, fqPartitionDir, satOutDir, dstDir, maxDiff
-        print e.message
-        print e.args
-        raise e
+    # except Exception as e:
+    #     print samDir, fqPartitionDir, satOutDir, dstDir, maxDiff
+    #     print e.message
+    #     print e.args
+    #     raise e
 
 
 def getReadGmap(sampleDir, dstGmap):
@@ -444,34 +457,38 @@ def getReadGmap(sampleDir, dstGmap):
     # 2353    -4424   CAGAATGTGTAATCAGGTAACTGGCAAGCTTTTGCGTAAAGTAGCGTTCGCCGCGCAGGACGCCTTGCAATCCATTGACAACGCGTTCTTGATCCTCCATGGCATATAAAACGCCGTTGATATGAGGCTAGTTTTCAATCTCGCGGTACG
     # CCCGCCG=GGGGGJJGJJJJGJCGJCJJGJJGGGGJJGCGGGJJG$G=JCJCGJCCJJJJJCGG=C$GGGGGGCGCGC1GGGCCGCCGGCGCGGGGCGGGJCCGG1$CGCGGGGGCGCGGGGGGGCCG$GG=G=GCGGG$GCGG$GCGCC
     # *       NZ_ANLR00000000
-    out = fq.WriteFq(dstGmap)
+    try:
+        out = fq.WriteFq(dstGmap)
 
-    for strainId in os.listdir(sampleDir):
-        samPath = os.path.join(sampleDir, strainId, '0_pair.sam.gz')
-        fq1Path = os.path.join(sampleDir, strainId, '0_pair1.fq.gz')
-        fq2Path = os.path.join(sampleDir, strainId, '0_pair2.fq.gz')
-        if os.path.isfile(samPath) and os.path.isfile(fq1Path) and os.path.isfile(fq2Path):
-            # print samPath
-            # for each sam record
-            for line in gzip.open(samPath):
-                line = line.strip()
-                if not line.startswith('@'):  # skip comments
+        for strainId in os.listdir(sampleDir):
+            samPath = os.path.join(sampleDir, strainId, '0_pair.sam.gz')
+            fq1Path = os.path.join(sampleDir, strainId, '0_pair1.fq.gz')
+            fq2Path = os.path.join(sampleDir, strainId, '0_pair2.fq.gz')
+            if os.path.isfile(samPath) and os.path.isfile(fq1Path) and os.path.isfile(fq2Path):
+                # print samPath
+                # for each sam record
+                for line in gzip.open(samPath):
+                    line = line.strip()
+                    if not line.startswith('@'):  # skip comments
 
-                    tokens = line.split('\t')
-                    readName, flag, contigName, pos, m, cigar, rnext, pnext, tlen, seq, qs = tokens[:11]
-                    flag = int(flag)
-                    if flag & 0x40 != 0:  # first segment
-                        readName += '\\1'
-                    else:
-                        assert flag & 0x80 != 0  # last segment
-                        readName += '\\2'
-                    seq = qs = geneAnnot = '*'
+                        tokens = line.split('\t')
+                        readName, flag, contigName, pos, m, cigar, rnext, pnext, tlen, seq, qs = tokens[:11]
+                        flag = int(flag)
+                        if flag & 0x40 != 0:  # first segment
+                            readName += '\\1'
+                        else:
+                            assert flag & 0x80 != 0  # last segment
+                            readName += '\\2'
+                        seq = qs = geneAnnot = '*'
 
-                    entry = '\t'.join(map(lambda x: str(x), [readName, flag, contigName, pos, m, cigar, rnext, pnext,
-                                                             tlen, seq, qs, geneAnnot, strainId])) + '\n'
-                    out.write(entry)
+                        entry = '\t'.join(map(lambda x: str(x), [readName, flag, contigName, pos, m, cigar, rnext, pnext,
+                                                                 tlen, seq, qs, geneAnnot, strainId])) + '\n'
+                        out.write(entry)
 
-    out.close()
+        out.close()
+    except Exception as e:
+        print e.message
+        print 'getReadGmap:', sampleDir, dstGmap
 
 
 def countError(contRecDir, refGmap, refSeqBuff, storeLab=True, maxCov=30, maxProc=4):
@@ -504,63 +521,6 @@ def countError(contRecDir, refGmap, refSeqBuff, storeLab=True, maxCov=30, maxPro
             #     break
 
     return parallel.runThreadParallel(taskList, maxProc)
-
-
-def tmpF(contRecDir, refGmap, refSeqBuff, storeLab=True, maxCov=30, maxProc=4, pfToRecSet=None, labContigsPklFile=None):
-    # TODO: remove
-    # contigs = 0
-    # total = 0
-    # errAList = []
-    taskList = []
-    # c = 0
-    # count = 0
-    # maxi = 1000000
-    for pfName, recSet in pfToRecSet.iteritems():
-        # print pfName, len(recSet)
-        # contigs = len(recSet)
-        # total += 1
-        recSet2 = set()
-
-        for rec in recSet:
-            # if len(rec.dnaSeq) > 0:
-                # print len(rec.dnaSeq)
-                # count += 1
-                # maxi = min(maxi, len(rec.dnaSeq))
-
-            if rec.readRecList is not None:  # dnaSeq
-                recSet2.add(rec)
-
-        if len(recSet2) > 0:
-            # print contigs
-            # errA = heval.getPerBaseError(recSet2, refGmap, refSeqBuff, maxCov, allLabels=True)
-            taskList.append(parallel.TaskThread(heval.getPerBaseError, (recSet2, refGmap, refSeqBuff, maxCov, True)))
-            # c += 1
-            # if c > 100:
-            #     break
-            # print errA
-            # errAList.append(errA)
-            break  # TODO: !!!
-    # print '1000 contigs: %s %s' % (count, maxi)
-
-    print 'computing'
-    errAList = parallel.runThreadParallel(taskList, maxProc)
-    # print report
-    print heval.getAssemblyReport(errAList, maxCov)
-
-    hio.storeObj(pfToRecSet, labContigsPklFile)
-
-    print 'loading'
-    d2 = hio.loadObj(labContigsPklFile)
-    for k, v in d2.iteritems():
-        print k
-        for i in v:
-            if i.labelEval is not None:
-                for e in i.labelEval:
-                    print e.getContent()
-
-    # print len(pfToRecSet)
-
-    # print 'all', contigs, total, float(contigs) / total
 
 
 def _test1():
@@ -631,10 +591,17 @@ def _test():
         print r.labelEval
 
 if __name__ == "__main__":
-    satToContigRecords('/home/igregor/Documents/work/hsim/562/samples/3/sat/sam',
-                       '/home/igregor/Documents/work/hsim/562/samples/3/sat/fq_part',
-                       '/home/igregor/Documents/work/hsim/562/samples/9/sat/0_sat',
-                       '/home/igregor/Documents/work/hsim/562/samples/3/sat/cont_pkl',
-                       10)
+    # satToContigRecords('/home/igregor/Documents/work/hsim/562/samples/3/sat/sam',
+    #                    '/home/igregor/Documents/work/hsim/562/samples/3/sat/fq_part',
+    #                    '/home/igregor/Documents/work/hsim/562/samples/9/sat/0_sat',
+    #                    '/home/igregor/Documents/work/hsim/562/samples/3/sat/cont_pkl',
+    #                    10)
     # _test()
     # test_sat_out()
+
+    satToContigRecords('/home/igregor/Documents/work/hsim/1166683/samples/1/sat/sam',
+                       '/home/igregor/Documents/work/hsim/1166683/samples/1/sat/fq_part',
+                       '/home/igregor/Documents/work/hsim/1166683/samples/1/sat/0_sat',
+                       '/home/igregor/Documents/work/hsim/1166683/samples/1/sat/cont_pkl',
+                       10)
+    # print isEq('ATGCC', 'ATGST')

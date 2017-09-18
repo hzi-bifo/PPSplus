@@ -26,8 +26,8 @@ from algbioi.hsim import comh
 from algbioi.haplo import hio
 from algbioi.haplo import heval
 from algbioi.haplo import snowball
-from algbioi.haplo import join_rec
 from algbioi.haplo import read_rec
+from algbioi.com import common as com
 # from algbioi.com import common as com
 # from algbioi.com import fasta as fas
 
@@ -69,7 +69,7 @@ def calculatePairOverlaps(readFq, readDomtblout, contigRecFile, outFile=None,
         readMap = heval.getReadTrueMapSimple(readSam)
 
     # define the triplet mapping if PROT sequences are used for comparison
-    # tripletMap = join_rec.getTripletMap(tTable)
+    # tripletMap = com.getTripletMap(tTable)
     tripletMap = None
 
     # contig-read overlap mapping
@@ -97,7 +97,7 @@ def calculatePairOverlaps(readFq, readDomtblout, contigRecFile, outFile=None,
                 for overlap in overlapList:
 
                     # count the overlap probability
-                    overlapProb, overlapScore, annoLen = snowball.inspectOverlap2(contig, read, overlap, tripletMap,
+                    overlapProb, overlapScore, annoLen = snowball.inspectOverlap(contig, read, overlap, tripletMap,
                                                                                   False, minScore, minAnnotLen,
                                                                                   stopOverlapMaxMismatch=0.05,
                                                                                   continuousOverlap=True)
@@ -282,7 +282,7 @@ def checkReadLabels(scaffOverlapFile):
 
 
 def checkContigLabels(scaffOverlapFile):
-    tripletMap = join_rec.getTripletMap(11)
+    tripletMap = com.getTripletMap(11)
     contigList, readList, overlapMap = hio.loadObj(scaffOverlapFile)
     # contigs
     for contig in contigList:
@@ -391,7 +391,7 @@ def test():
     # return
 
     # print len(contigList), len(readList), len(readMap)
-    tripletMap = join_rec.getTripletMap(translTable)
+    tripletMap = com.getTripletMap(translTable)
 
     okCount = 0
     noCount = 0

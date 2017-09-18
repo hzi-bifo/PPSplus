@@ -1,25 +1,50 @@
-#!/usr/bin/env python
-
 """
-    Copyright (C) 2014  Ivan Gregor
+    Common functionality module version: 1.2
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+    The MIT License (MIT)
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    Copyright (c) 2015  Ivan Gregor
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+    and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions
+    of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+    THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+    CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
 """
 
 import os
 import re
 import numpy as np
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
+
+
+def getTripletMap(translTable=11):
+    """
+        Gets a mapping between nucleotide triplets and aminoacids
+
+        @return: map: dna-triplet -> aminoacid
+        @rtype: dict[str, str]
+    """
+    nucL = ['A', 'T', 'G', 'C']
+    tripletToAmino = {}
+    for p1 in nucL:
+        for p2 in nucL:
+            for p3 in nucL:
+                dna = p1 + p2 + p3
+                prot = str(Seq(dna, generic_dna).translate(table=translTable))
+                assert dna not in tripletToAmino
+                tripletToAmino[dna] = prot
+
+    return tripletToAmino
 
 
 def isclose(a, b, epsilon=0.00000001):
@@ -235,8 +260,3 @@ def binarySearch(objList, obj, fun=lambda x: x):
             else:
                 first = midpoint + 1
     return []
-
-# if __name__ == "__main__":
-#     inputFastaFilePath = '/net/metagenomics/projects/PPSmg/tests/V35/07/working/contigsMappedBlast1000.fna.ids.23S_rRNA.fna'
-#     refTaxonomyFilePath = '/net/metagenomics/projects/PPSmg/data/silva/lsuparc_silva106_ncbitax.bacteria+archaea.tax'
-#     print getMothurOutputFilePath(inputFastaFilePath, refTaxonomyFilePath)

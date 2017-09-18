@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
     Copyright (C) 2015  Ivan Gregor
 
@@ -16,36 +14,24 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Implements the main "Snowball" algorithm of the package
+    Implements the main "Snowball" algorithm of the package. Module version 1.2
 """
-from algbioi.com import common
 
-from algbioi.haplo import join_rec
+from algbioi.com import common as com
 from algbioi.haplo import read_rec
 
 
 class JoinInfo(object):
     def __init__(self, score, overlap, seedRec, neighborRec):
         """
-            Represents an info used to help to join two records.
+            Represents a helper record representing an overlap of two (super-)reads.
         """
-        # TODO: move to the record class?
         self.score = score
         self.overlap = overlap
         self.seedRec = seedRec
         self.neighborRec = neighborRec
 
 
-# maxMismatchQSAllowed, minScore, minAnnotOverlapScore, scoreStopSearch,
-# @param maxMismatchQSAllowed: allow mismatches at positions with QS lower or equal to this QS
-# @param minScore: minimum score required to join records
-# @param minAnnotOverlapScore: minimum annotation overlap score required
-# @param scoreStopSearch: stop searching alternative overlaps after this score has been found
-# @param scoreStopSearch: stop searching alternative overlaps after this score has been found
-# @type maxMismatchQSAllowed: int
-# @type minScore: int
-# @type minAnnotOverlapScore: int
-# @type scoreStopSearch: int
 def getBestOverlap(inspectList, tripletMap, considerProtSeqCmp, pOverlapMin, scoreOverlapLenMin,
                    scoreOverlapAnnotLenMin, stopOverlapMaxMismatch, considerOnlyPOverlap=False):
     """
@@ -91,10 +77,10 @@ def getBestOverlap(inspectList, tripletMap, considerProtSeqCmp, pOverlapMin, sco
             for overlap in overlapList:
 
                 # ge the score of this overlap
-                overlapProb, overlapScore, annotScore = inspectOverlap2(seedRec, neighborRec, overlap, tripletMap,
+                overlapProb, overlapScore, annotScore = inspectOverlap(seedRec, neighborRec, overlap, tripletMap,
                                                                         considerProtSeqCmp, minScore, minAnnotScore,
                                                                         stopOverlapMaxMismatch, continuousOverlap=True)
-                # the scores are sufficiently good
+                # the scores are sufficient (good enough)
                 if overlapProb is not None and overlapProb >= pOverlapMin \
                         and overlapScore >= minScore and annotScore >= minAnnotScore:
 
@@ -115,11 +101,11 @@ def getBestOverlap(inspectList, tripletMap, considerProtSeqCmp, pOverlapMin, sco
         candidateJoinList.sort(key=lambda x: x.score, reverse=True)
         return candidateJoinList[0]
     else:
-        # no sufficient overlap has been found
+        # no sufficient overlap was found
         return None
 
 
-def inspectOverlap2(rec1, rec2, overlapIdx, tripletMap, considerProtSeqCmp, overlapLenMin, overlapAnnotLenMin,
+def inspectOverlap(rec1, rec2, overlapIdx, tripletMap, considerProtSeqCmp, overlapLenMin, overlapAnnotLenMin,
                     stopOverlapMaxMismatch, continuousOverlap=False):
     """
         Compute the overlap probability and expected length of the matching positions in the overlap.
@@ -133,8 +119,8 @@ def inspectOverlap2(rec1, rec2, overlapIdx, tripletMap, considerProtSeqCmp, over
         @param overlapAnnotLenMin: the overlapping annotated regions must have at least this overlap
         @param stopOverlapMaxMismatch: if this percentage of the positions don't overlap, stop and return 3*[None]
         @param continuousOverlap: count the overlap score for dna sequences at once
-        (doesn't consider annotation separately) in this case the last returned value is the annotation length,
-        not score..
+        (do not consider annotation separately) in this case the last returned value is the annotation length,
+        not score)
 
         @type rec1: read_rec.ReadRec
         @type rec2: read_rec.ReadRec
@@ -226,7 +212,7 @@ def inspectOverlap2(rec1, rec2, overlapIdx, tripletMap, considerProtSeqCmp, over
         return tuple(3 * [None])
 
     # count the overlap only based on the DNA sequences and the whole overlap at once
-    if continuousOverlap and not considerProtSeqCmp:  # TODO: not considerProtSeqCmp ???
+    if continuousOverlap and not considerProtSeqCmp:
         overlapProb, overlapScore = rec1.qsArray.getOverlapScore(r1, rec2.qsArray, r2, overlapLen)
         overlapScoreAnnot = annLen
     else:
@@ -275,104 +261,6 @@ def inspectOverlap2(rec1, rec2, overlapIdx, tripletMap, considerProtSeqCmp, over
     return (overlapProb, overlapScore, overlapScoreAnnot)
 
 
-def inspectOverlap(rec1, rec2, overlapIdx, tripletMap, maxMismatchQSAllowed):  # TODO: remove, not used !!!
-    """
-        Get a score (number of matching positions) of the records overlap, or None if the overlap contains a mismatch.
-
-        Allowed mismatches at positions with low QS or at positions that result in the same aminoacid, in the case
-        it's within the annotated pars of the sequences.
-        In addition to the score, annotation score is computed, which is the number of matching positions from within
-        the Hmm annotation.
-
-        @param rec1: first read-record
-        @param rec2: second read-record
-        @param overlapIdx: an overlap to be inspected, start pos of rec1 mapped onto rec2 (it can be a negative value)
-        @param tripletMap: map: triplet -> aminoacid
-        @param maxMismatchQSAllowed: mismatches at positions with QS lower or equal to this QS  are allowed
-
-        @type rec1: algbioi.haplo.read_rec.ReadRec
-        @type rec2: algbioi.haplo.read_rec.ReadRec
-        @type overlapIdx: int
-        @type tripletMap: dict[str,str]
-        @type maxMismatchQSAllowed: int
-        @rtype: (int, int, int, int)
-
-        @return: counts of (mis-)matches (overlap score, annot. score, low-QS-mismatch, aminoacid-match-nucl-mismatch)
-    """
-    score = 0
-    scoreAnnot = 0
-    lowQsMismatch = 0
-    aminoMatchMismatch = 0
-
-    dna1 = rec1.dnaSeq
-    dna2 = rec2.dnaSeq
-
-    # get start positions withing the dna sequences
-    if overlapIdx >= 0:
-        r1 = 0
-        r2 = overlapIdx
-    else:
-        r1 = - overlapIdx
-        r2 = 0
-
-    # length of the dna overlap
-    overlapLen = min(len(dna1) - r1, len(dna2) - r2)
-
-    # go along the overlapping dna sequences, count matching positions, stop at the first mismatch
-    i = 0
-    while i < overlapLen:
-
-        # the position is within the Hmm annotation
-        if (rec1.annotStart <= r1 < rec1.annotStart + rec1.annotLen) \
-                and (rec2.annotStart <= r2 < rec2.annotStart + rec2.annotLen):
-            withinAnnot = True
-        else:
-            withinAnnot = False
-
-        # position match
-        if dna1[r1] == dna2[r2]:
-            score += 1
-            if withinAnnot:
-                scoreAnnot += 1
-
-        # mismatch at low QS
-        elif ord(rec1.qsArray[r1]) - 33 <= maxMismatchQSAllowed or ord(rec2.qsArray[r2]) - 33 <= maxMismatchQSAllowed:
-            lowQsMismatch += 1
-
-        # the position is within the Hmm annotation (coding region)
-        elif withinAnnot:
-            # do the corresponding triplets encode the same aminoacid
-
-            # get the frame offset, the triplet start-position, the triplet
-            offset = (r1 - rec1.annotStart) % 3
-            start = r1 - offset
-            # triplet1 = dna1[start:start+3]
-            amino1 = tripletMap.get(dna1[start:start+3])
-
-            offset = (r2 - rec2.annotStart) % 3
-            start = r2 - offset
-            # triplet2 = dna2[start:start+3]
-            amino2 = tripletMap.get(dna2[start:start+3])
-            # TODO: check index out of range !!!
-            # both triplets encode the same aminoacid
-            if amino1 is not None and amino1 == amino2:
-                aminoMatchMismatch += 1
-            else:
-                # mismatch found
-                return tuple(4 * [None])
-        else:
-            # mismatch found
-            return tuple(4 * [None])
-
-        # move to the next position
-        i += 1
-        r1 += 1
-        r2 += 1
-
-    # no mismatch found
-    return score, scoreAnnot, lowQsMismatch, aminoMatchMismatch
-
-
 def getPossibleOverlaps(rec1, rec2):
     """
         Get possible overlaps of the read-records.
@@ -383,7 +271,7 @@ def getPossibleOverlaps(rec1, rec2):
         @return: a list of possible overlaps as index 0 of rec1 start within rec2 (negative values possible, also None)
         @rtype: list[int] | None
     """
-    # get the overlap length of the Hmm annotated regions (startHmmCoord + local annotation) .. just an estimate!
+    # get the overlap length of the Hmm annotated regions (startHmmCoord + local annotation), this is just an estimate
     start = max(3 * rec1.hmmCoordStart, 3 * rec2.hmmCoordStart)
     end = min(3 * rec1.hmmCoordStart + rec1.annotLen - 1, 3 * rec2.hmmCoordStart + rec2.annotLen - 1)
 
@@ -398,8 +286,8 @@ def getPossibleOverlaps(rec1, rec2):
         middlePoint = rec2.annotStart + coordDiff - rec1.annotStart
 
         # how far to go to the left and right from the middle point
-        goLeftMax = rec1.annotLen + coordDiff  # may be reduced !!! for performance purposes !!!
-        goRightMax = rec2.annotLen - coordDiff  # may be reduced too !!!
+        goLeftMax = rec1.annotLen + coordDiff  # this may be reduced to boost the performance!
+        goRightMax = rec2.annotLen - coordDiff  # may be reduced as well to boost the performance!
 
         overlapList.append(middlePoint)
 
@@ -430,7 +318,7 @@ def runSnowball(recList, recSeedList, considerProtSeqCmp=False, considerOnlyPOve
                 stopOverlapMaxMismatch=0.1, translTable=11):
     """
         Runs the snowball assembly algorithm. Given read records representing individual reads,
-        outputs super-reads (contigs).
+        outputs super-reads (i.e. contigs).
 
         @param recList: read-record list sorted according to the start alignment coordinates within a gene family
         @param recSeedList: read-record list sorted according to the biggest overlap with all the annotations
@@ -440,8 +328,8 @@ def runSnowball(recList, recSeedList, considerProtSeqCmp=False, considerOnlyPOve
         @param pOverlapMin: min. overlap probability required
         @param scoreOverlapLenMin: min. overlap expected length
         @param scoreOverlapAnnotLenMin: min. overlap annotation expected length
-        @param stopOverlapMaxMismatch: stop investigating an overlap when so many DNA have a mismatch
-        @param translTable:
+        @param stopOverlapMaxMismatch: stop investigating an overlap when so many positions DNA have a mismatch
+        @param translTable: 11 for bacteria and archaea
 
         @type recList: list[read_rec.ReadRec]
         @type recSeedList: list[read_rec.ReadRec]
@@ -456,7 +344,6 @@ def runSnowball(recList, recSeedList, considerProtSeqCmp=False, considerOnlyPOve
         @return: set of read-records representing assembled super-reads (contigs)
         @rtype: set[read_rec.ReadRec]
     """
-    # print considerProtSeqCmp, considerOnlyPOverlap, pOverlapMin, scoreOverlapLenMin, scoreOverlapAnnotLenMin, stopOverlapMaxMismatch, translTable
     if len(recList) == 0 or len(recSeedList) == 0:
         return set()
 
@@ -465,14 +352,14 @@ def runSnowball(recList, recSeedList, considerProtSeqCmp=False, considerOnlyPOve
     workingSet = {seed}
 
     # map: triplet -> aminoacid
-    tripletMap = join_rec.getTripletMap(translTable)
+    tripletMap = com.getTripletMap(translTable)
 
     # next record to be considered in the snowball
     left = None
     right = None
 
     # find the position of the seed in the recList
-    for i in common.binarySearch(recList, seed, fun=lambda x: x.hmmCoordStart):
+    for i in com.binarySearch(recList, seed, fun=lambda x: x.hmmCoordStart):
         if recList[i].recordId == seed.recordId:
             if i - 1 >= 0:
                 left = i - 1
@@ -492,7 +379,11 @@ def runSnowball(recList, recSeedList, considerProtSeqCmp=False, considerOnlyPOve
             if right is not None:
                 inspectList.append((seed, recList[right]))
 
-        # get the best overlap, compute overlap of the left and right to all the seeds
+        # left and right may be the best to join
+        if left is not None and right is not None:
+            inspectList.append((recList[left], recList[right]))
+
+        # get the best overlap, compute overlap of the left and right to all the seeds (and left and right)
         joinInfo = getBestOverlap(inspectList, tripletMap, considerProtSeqCmp, pOverlapMin, scoreOverlapLenMin,
                                   scoreOverlapAnnotLenMin, stopOverlapMaxMismatch, considerOnlyPOverlap)
 
@@ -501,11 +392,12 @@ def runSnowball(recList, recSeedList, considerProtSeqCmp=False, considerOnlyPOve
         # there is a sufficient overlap of the seed and a neighbor, join them
         if joinInfo is not None:
 
-            # remove the seed from the working set
-            workingSet.remove(joinInfo.seedRec)
+            # remove the seed from the working set (if the best overlap is not between left and right)
+            if not (left is not None and joinInfo.seedRec.recordId == recList[left].recordId):
+                workingSet.remove(joinInfo.seedRec)
 
             # merge the records (seed and a neighbor)
-            mergedRec = read_rec.mergeRecords(joinInfo.seedRec, joinInfo.neighborRec, joinInfo.overlap)  #, joinInfo.score)
+            mergedRec = read_rec.mergeRecords(joinInfo.seedRec, joinInfo.neighborRec, joinInfo.overlap)
 
             # replace the seed in the working set by the merged record
             workingSet.add(mergedRec)
@@ -516,6 +408,11 @@ def runSnowball(recList, recSeedList, considerProtSeqCmp=False, considerOnlyPOve
             else:
                 assert right is not None and joinInfo.neighborRec.recordId == recList[right].recordId
                 moveRight = True
+
+            # if left and right were joined then seed ~ left record
+            if left is not None and joinInfo.seedRec.recordId == recList[left].recordId:
+                moveLeft = True
+
         else:
             # there is no sufficient overlap, add neighbors to the working set
             if left is not None:

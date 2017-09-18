@@ -24,14 +24,7 @@ import os
 import numpy as np
 
 from algbioi.hsim import comh
-from algbioi.haplo import hio
-# from algbioi.haplo import heval
-# from algbioi.haplo import snowball
-# from algbioi.haplo import join_rec
-# from algbioi.haplo import read_rec
-# from algbioi.com import common as com
-# from algbioi.com import fasta as fas
-from algbioi.com import qs
+from algbioi.haplo import hio, qs
 
 SNP_ERROR_ARRAY_LEN = 10
 

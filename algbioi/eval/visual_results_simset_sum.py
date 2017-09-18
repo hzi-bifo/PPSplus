@@ -108,13 +108,14 @@ def createChart():
     """
         Creates a summary figure for simulated datasets divided into 4 subplots.
     """
-    outFile = '/Users/ivan/Documents/work/Doc/PPSplus/revision/figures_simset/Fig_1_simset_summary_Kraken.png'
+    # outFile = '/Users/ivan/Documents/work/Doc/PPSplus/revision/figures_simset/Fig_1_simset_summary_Kraken.png'
+    outFile = '/Users/ivan/Documents/work/Doc/PPSplus/peerj/revision1/fig/Fig_1_simset_summary_peerj.png'
     dpi = 300
 
     N = 3  # N ranks
     ind = np.arange(N)    # the x locations for the groups
-    width = 0.16 # 0.2
-    width2 = 0.18 # 0.22
+    width = 0.16  # 0.2
+    width2 = 0.18  # 0.22
     data = getData()  # (method, rank, correction, simset) # ((cTp/cT), (cW/cT), (cU/cT)) true, wrong, unassigned
 
     # create subplots
@@ -182,25 +183,35 @@ def createChart():
         p2 = ax.bar(ind, w_taxator, width, color='r')
         p3 = ax.bar(ind, tp_taxator, width, color='b')
 
+        print('Taxator: %s %s %s' % (simset, correction, getMeasures(u_taxator, w_taxator, tp_taxator)))
+
         # PPS
         p1 = ax.bar(ind + width2, u_pps, width, color='y')
         p2 = ax.bar(ind + width2, w_pps, width, color='r')
         p3 = ax.bar(ind + width2, tp_pps,   width, color='b')
+
+        print('PPS: %s %s %s' % (simset, correction, getMeasures(u_pps, w_pps, tp_pps)))
 
         # Megan
         p1 = ax.bar(ind + 2 * width2, u_megan, width, color='y')
         p2 = ax.bar(ind + 2 * width2, w_megan, width, color='r')
         p3 = ax.bar(ind + 2 * width2, tp_megan,   width, color='b')
 
+        print('Megan: %s %s %s' % (simset, correction, getMeasures(u_megan, w_megan, tp_megan)))
+
         # Kraken
         p1 = ax.bar(ind + 3 * width2, u_kraken, width, color='y')
         p2 = ax.bar(ind + 3 * width2, w_kraken, width, color='r')
         p3 = ax.bar(ind + 3 * width2, tp_kraken, width, color='b')
 
+        print('Kraken: %s %s %s' % (simset, correction, getMeasures(u_kraken, w_kraken, tp_kraken)))
+
         # PPS+
         p1 = ax.bar(ind + 4 * width2, u_ppsp, width, color='y')
         p2 = ax.bar(ind + 4 * width2, w_ppsp, width, color='r')
         p3 = ax.bar(ind + 4 * width2, tp_ppsp, width, color='b')
+
+        print('PPS+: %s %s %s' % (simset, correction, getMeasures(u_ppsp, w_ppsp, tp_ppsp)))
 
         ax.set_ylabel('Percentage')
         ax.set_yticks(np.arange(0, 110, 10))
@@ -226,10 +237,38 @@ def createChart():
     # add legend
     fontP = FontProperties()
     fontP.set_size(12)
-    plt.legend((p3[0], p2[0], p1[0]), ('True', 'False', 'Unassigned'), loc='lower right',
-                bbox_to_anchor=(0.57, -0.77), prop = fontP, ncol=3)
+    plt.legend((p3[0], p2[0], p1[0]), ('Correct', 'Incorrect', 'Unassigned'), loc='lower right',
+                bbox_to_anchor=(0.57, -0.77), prop=fontP, ncol=3)
 
     plt.savefig(outFile, dpi=dpi)
+
+
+def getMeasures(uList, wList, tpList):
+
+    ret = []
+    for u, w, tp in zip(uList, wList, tpList):
+
+        correct = tp
+        false = w - tp
+        unassigned = u - w
+
+        if not np.isclose(correct + false, 0.):
+            p = round((correct / (correct + false)) * 100.0, 1)  # precision
+        else:
+            p = 0.0
+
+        if not np.isclose(correct + false + unassigned, 0.):
+            r = round((correct / (correct + false + unassigned)) * 100.0, 1)  # recall
+        else:
+            r = 0.0
+
+        if not np.isclose(p + r, 0.):
+            f = round(((2 * p * r) / (p + r)), 1)  # f-score, harmonic mean: (2 * precision * recall) / (precision + recall)
+        else:
+            f = 0.0
+        ret.append('f:%s, p:%s, r:%s, (%s, %s, %s)' % (f, p, r, round(correct, 1), round(false, 1), round(unassigned, 1)))
+
+    return ret
 
 
 def createDemo():

@@ -1,20 +1,23 @@
-#!/usr/bin/env python
-
 """
-    Copyright (C) 2014  Ivan Gregor
+    FASTQ read/write module version: 1.2
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+    The MIT License (MIT)
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    Copyright (c) 2014  Ivan Gregor
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+    and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions
+    of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+    THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+    CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
 
     Contains basic functionality to work with FASTAQ files.
 """
@@ -102,7 +105,7 @@ class WriteFq():
 
 def getFqToDict(inFq1, inFq2, compressLevel=0):
     """
-        Store pair-end reads into a dictionary.
+        Store paired-end reads into a dictionary.
 
         @param compressLevel: if set to 1-9, the dictionary values are compressed (see zlib.decompress())
         @type inFq1: str
@@ -130,11 +133,11 @@ def getFqToDict(inFq1, inFq2, compressLevel=0):
 
 def joinPairEnd(fileTupleList, minOverlap=0.05, minOverlapIdentity=0.9, maxCpu=mp.cpu_count()):
     """
-        Join pair end reads
+        Join self overlapping paired-end reads.
 
-        Insert must be max: 2 * readLen - int(round(readLen * minOverlap))
+        Insert size must be max: 2 * readLen - int(round(readLen * minOverlap))
 
-        @param fileTupleList: list of (fq1, fq2, fqJoin, readLen, insert, sd, qsMax); but sd not used!?
+        @param fileTupleList: list of (fq1, fq2, fqJoin, readLen, insert, sd, qsMax); but sd not used!
         @param minOverlap: percentage of the readLen, minimum that must overlap
         @param minOverlapIdentity: the overlapping region must have at least this identity
     """
@@ -157,11 +160,11 @@ def joinPairEnd(fileTupleList, minOverlap=0.05, minOverlapIdentity=0.9, maxCpu=m
 
 def _joinPairEnd(fq1, fq2, fqJoin, readLen, insert, qsMax, minOverlap, minOverlapIdentity, trace=False):
     """
-        Join pair end reads.
+        Join self overlapping paired-end reads.
 
         @param fq1: in FASTAQ file 1
         @param fq2: in FASTAQ file 2
-        @param fqJoin: out FASTAQ file with joined reads
+        @param fqJoin: out FASTAQ file with joined paired-end reads
         @param readLen:
         @param insert:
         @param qsMax:
@@ -234,7 +237,7 @@ def _joinPairEnd(fq1, fq2, fqJoin, readLen, insert, qsMax, minOverlap, minOverla
             print str('[' + str("'__', " * (overlapInsert - readLen)).rstrip() + str(map(lambda x: f(ord(x) - 33),
                                                                                          list(qs2Rev))))  # qs2 as list
 
-    # close the file !!!
+    # close the file!
     out.close()
     return stored, skipped
 
@@ -264,14 +267,6 @@ class QsMultMatrix(object):
             for j in range(qsMax):
                 self._qsMulMatrix[i][j] = min(qsMax - 1, self._probToQs(qsToProb[i] * qsToProb[j])) + 33
 
-        # for different bases, resolve consensus Qs, map: Qs1, Qs2 -> QS
-        # self._qsMismatchMatrix = np.zeros((qsMax, qsMax), dtype=np.uint8)
-
-        # for i in range(qsMax):  # values stored only for i <= j
-        #     for j in range(i, qsMax):
-                # QS = 1 - [ (1 - qs1) * qs2/3 ]
-                # self._qsMismatchMatrix[i][j] = self._probToQs(1 - ((1 - qsToProb[j]) * (qsToProb[i] / 3.)))
-
         self._qsMax = qsMax
 
     def _probToQs(self, prob):
@@ -289,36 +284,6 @@ class QsMultMatrix(object):
             @rtype: int
         """
         return min(qsMax + 32, self._qsMulMatrix[ord(qs1) - 33][ord(qs2) - 33])
-
-
-    # def _qsMismatchMul(self, qs1, qs2):
-    #     """
-    #         @type qs1: str
-    #         @type qs2: str
-    #         @rtype: int
-    #     """
-    #     q1 = ord(qs1) - 33
-    #     q2 = ord(qs2) - 33
-    #     return self._qsMismatchMatrix[min(q1, q2)][max(q1, q2)]
-
-    # def _getPosLogProb(qsMax):  # qs1, qs2, qsMax, match=True):
-    #     """
-    #         Get log-probability that two positions overlap, given their quality scores and whether they match or not.
-    #         @type qs1: int
-    #         @type qs2: int
-    #         @type qsMax: int
-    #         @type match: bool
-    #         @rtype: ndarray
-    #         @return:
-    #     """
-    #     pass
-        # logProb = np.zeros((2, qsMax, qsMax), dtype=np.float256)
-        # for i in range(qsMax):
-        #     for j in range(i, qsMax):
-        #
-        #         logProb[0][i][j] =
-        #
-        #         logProb[1][i][j] =
 
     def getConsensus(self, dna1, dna2, qs1, qs2, qsMax=None):
         """
@@ -343,22 +308,9 @@ class QsMultMatrix(object):
             elif ord(qs1[i]) >= ord(qs2[i]):
                 consDna[i] = ord(dna1[i])
                 consQs[i] = ord(qs1[i])
-                # print 'mismatch ', i
             else:
-                # print 'mismatch_', i
                 consDna[i] = ord(dna2[i])
                 consQs[i] = ord(qs2[i])
-
-            # else:
-            #     consQs[i] = self._qsMismatchMul(qs1[i], qs2[i])
-            #     if ord(qs1[i]) >= ord(qs2[i]):
-            #         consDna[i] = ord(dna1[i])
-            #     else:
-            #         consDna[i] = ord(dna2[i])
-                # consQs[i] = ord(qs1[i])
-            # else:
-                # consDna[i] = ord(dna2[i])
-                # consQs[i] = ord(qs2[i])
 
         return ''.join(map(lambda x: chr(x), consDna)), ''.join(map(lambda x: chr(x), consQs))
 
@@ -412,15 +364,6 @@ def _getPossibleInsertSizes(minInsert, maxInsert, insert):
     return exploreChain
 
 
-def _testJoin():
-    fileTupleList = (('/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_pair1.fq.gz',
-                      '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_pair2.fq.gz',
-                      '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_join.fq.gz',
-                      100, 150, 15, 60),)
-    print joinPairEnd(fileTupleList)
-    # a = DnaOverlapConcensus()
-
-
 def readsToProt(inFq, outFasta, translTable=11):
     """
         Translates reads from the input file to all six reading frames and stores them as a compressed FASTA file.
@@ -443,6 +386,8 @@ def readsToProt(inFq, outFasta, translTable=11):
 
     out.close()
 
+# TESTS ---------------------------------------------------
+
 
 def _testReadsToProt():
     inFq = '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_join.fq.gz'
@@ -450,147 +395,8 @@ def _testReadsToProt():
     readsToProt(inFq, outFasta, 11)
 
 
-def qsFilter(fileTupleList):
-    """
-        Filter reads according to the QS cutoffs.
-        TODO: not implemented yet, not in production stage
-
-        @param fileTupleList: list of tuples (pair1.fq, pair2.fq, filtered.fq, qsArray, readLen, trimRemain)
-    """
-    for fq1, fq2, fqFilter, qsArray, readLen, trimRemain in fileTupleList:
-
-        _gsFilterTask(fq1, fq2, fqFilter, qsArray, readLen, trimRemain)
-        break  # !!!
-    # print fileTupleList[0]
-
-
-def _getQualityChunk(qs, readLen, qsArray):
-    """
-        Get the longest part of the read satisfying min quality scores for respective positions.
-
-        TODO: not in production stage
-
-        @param qs: array of quality scores
-        @param qsArray: min QS for each position
-        @return: (start position, chunk length)
-    """
-    start = None
-    count = 0
-    startMax = None
-    countMax = 0
-    # check QS for each read position
-    for i in range(readLen):
-        if ord(qs[i]) - 33 >= qsArray[i]:
-            if count == 0:
-                start = i
-            count += 1
-        else:
-            if count > countMax:
-                startMax = start
-                countMax = count
-            count = 0
-    if count > countMax:
-        countMax = count
-        startMax = start
-    if startMax is None:
-        startMax = 0
-        countMax = 0
-
-    return startMax, countMax
-
-
-def _gsFilterTask(fq1, fq2, fqFilter, qsArray, readLen, trimRemain):
-    """
-        TODO: not in production stage
-        @param fq1:
-        @param fq2:
-        @param fqFilter:
-        @param qsArray:
-        @param readLen:
-        @param trimRemain:
-        @return:
-    """
-    # print fq1, fq2, fqFilter, qsArray, readLen, trimRemain
-
-    # out = WriteFq(fqFilter)
-    okPair = 0
-    allPair = 0
-    countListMin = []
-    countListMax = []
-    countListAvg = []
-    avgStartList = []
-
-    threashold = int(round(trimRemain * readLen))  # !!!
-    # print threashold
-    for r1, r2 in zip(ReadFqGen(fq1), ReadFqGen(fq2)):
-        n1, dna1, p, qs1 = r1
-        n2, dna2, p, qs2 = r2
-        start1, count1 = _getQualityChunk(qs1, readLen, qsArray)
-        start2, count2 = _getQualityChunk(qs2, readLen, qsArray)
-
-        if count1 >= threashold and count2 >= threashold:
-            # keep else throw away both pairs!
-            okPair += 1
-        allPair += 1
-
-        countListMin.append(min(count1, count2))
-        countListMax.append(max(count1, count2))
-        countListAvg.append(count1)
-        countListAvg.append(count2)
-        avgStartList.append(start1)
-        avgStartList.append(start2)
-        # countList.append(count2)
-        # print zip(map(lambda x: ord(x) - 33, qs1), range(100)) ,'\n'
-
-        # print qsArray
-        # break
-    print round((float(okPair) / float(allPair)) * 100., 3), '%', okPair, allPair
-    print np.mean(countListMin), np.std(countListMin)
-    print np.mean(countListMax), np.std(countListMax)
-    print np.mean(countListAvg), np.std(countListAvg)
-    print np.mean(avgStartList), np.std(avgStartList)
-
-    # out.close()
-    # return  # TODO: report
-
-
-def _testFilter():
-    fileTupleList = [('/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_pair1.fq.gz',
-                      '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_pair2.fq.gz',
-                      '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_filtered_qs.fq.gz',
-                      np.array([11, 11, 11,  8, 11,  9, 10, 10, 10,  9,  9,  9,  9,  9,  9,  9,  9,
-                                9,  9,  9,  9,  9,  9,  9,  9,  9,  9, 10, 10, 10, 10, 10, 10, 10,
-                                10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,  9, 10,
-                                9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,
-                                9,  9,  9,  9,  9,  9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-                                11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11], dtype=np.uint16),
-                      100, 0.4),
-                     ('/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/1_pair1.fq.gz',
-                      '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/1_pair2.fq.gz',
-                      '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/1_filtered_qs.fq.gz',
-                      np.array([11, 11, 11,  8, 11,  9, 10, 10, 10,  9,  9,  9,  9,  9,  9,  9,  9,
-                                9,  9,  9,  9,  9,  9,  9,  9,  9,  9, 10, 10, 10, 10, 10, 10, 10,
-                                10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,  9, 10,
-                                9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,
-                                9,  9,  9,  9,  9,  9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-                                11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11], dtype=np.uint16),
-                      100, 0.4)]
-    qsFilter(fileTupleList)
-    # pass
-    # fq1 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/small.fq.gz'
-    # fq1 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_ANLR00000000/0_pair1.fq.gz'
-    # fq2 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_ANLR00000000/0_pair2.fq.gz'
-    # fq1 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/0_pair1.fq.gz'
-    #
-
-    # out = WriteFq('/Users/ivan/Documents/nobackup/hsim01/562/samples/test.fq.gz')
-
-    # out.close()
-
-
 def _fqReadWriteTest():
     fq1 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/0_pair1.fq.gz'
-    # fq1 = '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_ANLR00000000/0_pair1.fq.gz'
 
     out = WriteFq('/Users/ivan/Documents/nobackup/hsim01/562/samples/test.fq.gz')
     c = 0
@@ -601,13 +407,16 @@ def _fqReadWriteTest():
     print("%s, %s" % (c, c*4))
     out.close()
 
-# def _testQSMismatch():
-#
-#     q = QsMultMatrix(62)
-    # print q._qsMismatchMatrix
+
+def _testJoin():
+    fileTupleList = (('/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_pair1.fq.gz',
+                      '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_pair2.fq.gz',
+                      '/Users/ivan/Documents/nobackup/hsim01/562/samples/0/NZ_AKLB00000000/0_join.fq.gz',
+                      100, 150, 15, 60),)
+    print joinPairEnd(fileTupleList)
 
 
-def testGetFqToDict():
+def _testGetFqToDict():
     d = getFqToDict('/home/igregor/Documents/work/hsim/562/samples/0/NZ_AKLX00000000/0_pair1.fq.gz',
                 '/home/igregor/Documents/work/hsim/562/samples/0/NZ_AKLX00000000/0_pair2.fq.gz')
     i=0
@@ -616,14 +425,9 @@ def testGetFqToDict():
         if i > 10:
             break
         i += 1
-    # _fqReadWriteTest()
-    # _testFilter()
-    # _testJoin()
-    # _testReadsToProt()
-    # _testQSMismatch()
 
 
-def testConsecutiveRead():
+def _testConsecutiveRead():
     fq1 ='/home/igregor/Documents/work/hsim/562/samples/0/NZ_AKLX00000000/0_pair1.fq.gz'
     fq2 = '/home/igregor/Documents/work/hsim/562/samples/0/NZ_AKLX00000000/0_pair2.fq.gz'
     i = 0  # 464658 464658
@@ -632,7 +436,3 @@ def testConsecutiveRead():
             print a,b,c,d
         i += 1
     print i
-
-
-if __name__ == "__main__":
-    pass

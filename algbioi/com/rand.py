@@ -1,31 +1,33 @@
-#!/usr/bin/env python
-
 """
-    Copyright (C) 2014  Ivan Gregor
+    Random Python module version: 1.2
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+    The MIT License (MIT)
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    Copyright (c) 2015  Ivan Gregor
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+    and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-    This module performs all tasks related to the randomness.
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions
+    of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+    THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+    CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+
+    This module contain functions related to randomness.
 """
-import sys
+
 import gzip
 import cPickle
 import tempfile
 import time
 import numpy as np
 from algbioi.com import fq
-# from algbioi.com import fasta as fas
 
 
 def shuffleLines(inFilePath, outFilePath, linesPerRecord=4, randomSeed=1, recordLimit=1000000):
@@ -153,7 +155,7 @@ def getRandSubsets(itemList, subsetSizes, maxSubsetsPerSize, randomSeed=1, rand=
     """
         For a list of items create a list of lists representing random subsets of the input list.
 
-        For each size, random subsets are chosen greedily. However, the last subset is created
+        For each size, random subsets are chosen greedily.
 
         @param itemList: list of items
         @param subsetSizes: a tuple of subset sizes
@@ -204,13 +206,15 @@ def getRandSubsets(itemList, subsetSizes, maxSubsetsPerSize, randomSeed=1, rand=
 def strToRandInt(s, upperBound=31727):
     """
         Get a pseudo random integer given a string.
-        Each call with the same string result in the same integer
+        Each call with the same string result in the same integer.
+        @param upperBound:  a big prime number (e.g. 31727)
 
         @return: integer from [0, upperBound - 1]
     """
     rand = np.random.RandomState(np.array(map(lambda x: ord(x), list(s))))
-    return rand.randint(upperBound)  # 31727 is a big prime number
+    return rand.randint(upperBound)
 
+# TESTS ---------------------------------------------------
 
 def _testShuffleLines():
     t = time.time()
@@ -227,13 +231,11 @@ def _testShuffleLines():
     # print('Runtime test: %s' % (time.time() - t))
 
 
-if __name__ == "__main__":
-    # _testShuffleLines()
-    # print getRandLognormNumbers([3, 5, 7])
-    # print getRandSubsets(['A', 'B', 'C', 'D', 'E'], subsetSizes=(3,4,5), maxSubsetsPerSize=4)
-    # print strToRandInt('0NC_0130082.05528149')
-    # print strToRandInt('0NC_0130082.05528149')
-    # print strToRandInt('0NC_0130083.05528149')
-    # print strToRandInt('0NC_0130083.05528149')
-    # print getRandLognormNumbers([500], mean=1, sd=2, minVal=1., maxVal=50., randomSeed=1, rand=None)
-    pass
+def _test1():
+    print getRandLognormNumbers([3, 5, 7])
+    print getRandSubsets(['A', 'B', 'C', 'D', 'E'], subsetSizes=(3,4,5), maxSubsetsPerSize=4)
+    print strToRandInt('0NC_0130082.05528149')
+    print strToRandInt('0NC_0130082.05528149')
+    print strToRandInt('0NC_0130083.05528149')
+    print strToRandInt('0NC_0130083.05528149')
+    print getRandLognormNumbers([500], mean=1, sd=2, minVal=1., maxVal=50., randomSeed=1, rand=None)

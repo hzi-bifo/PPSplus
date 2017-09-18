@@ -25,27 +25,7 @@ from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna
 
 
-def getTripletMap(translTable=11):
-    """
-        Gets a mapping between nucleotide triplets and aminoacids
-
-        @return: map: dna-triplet -> aminoacid
-        @rtype: dict[str, str]
-    """
-    nucL = ['A', 'T', 'G', 'C']
-    tripletToAmino = {}
-    for p1 in nucL:
-        for p2 in nucL:
-            for p3 in nucL:
-                dna = p1 + p2 + p3
-                prot = str(Seq(dna, generic_dna).translate(table=translTable))
-                assert dna not in tripletToAmino
-                tripletToAmino[dna] = prot
-
-    return tripletToAmino
-
-
-def getCodingTable(translTable=11):
+def _getCodingTable(translTable=11):
     nucL = ['A', 'T', 'G', 'C']
     buff = ''
     aToN = {}
@@ -72,7 +52,7 @@ def getCodingTable(translTable=11):
     return buff
 
 
-def testStartCodon(translTable=11):
+def _testStartCodon(translTable=11):
     dnaL = ['ATG', 'GTG', 'TTG', 'CTG', 'ATT', 'ATC', 'ATA']
 
     for dna in dnaL:

@@ -7,10 +7,13 @@ import shutil
 from Bio.Seq import Seq
 
 from algbioi.com import fasta as fas
+from algbioi.com import fq
 from algbioi.com import csv
 from algbioi.com import taxonomy_ncbi as tax
+from algbioi.com import rand
 import traceback
-import traceback
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
 
 def sayHello2(a, b, d=4, e=5, c=3):
     """
@@ -605,9 +608,171 @@ def scaffToContigsAssignments():
     out.close()
 
 
+def renameRef():
+    # src = '/home/igregor/Documents/work/hsim/1166683/_fasta_draft_genomes_'
+    # dst = '/home/igregor/Documents/work/hsim/1166683/fasta_draft_genomes'
+    src = '/home/igregor/Documents/work/hsim/1166683/_fasta_genomes_'
+    dst = '/home/igregor/Documents/work/hsim/1166683/fasta_genomes'
+    for f in os.listdir(src):
+        fPath = os.path.join(src, f)
+        outPath = os.path.join(dst, f)
+        tag = f[:-4]
+        out = csv.OutFileBuffer(outPath)
+        for seqId, seq in fas.fastaFileToDictWholeNames(fPath).iteritems():
+            out.writeText('>%s_%s\n%s\n' % (seqId, tag, seq))
+        out.close()
+
+
+def getSize():
+    inF = '/home/igregor/Documents/work/doc/strains22_acc.txt'
+    genomesE = '/home/igregor/Documents/work/hsim/562/fasta_genomes'
+    draftGenomesE = '/home/igregor/Documents/work/hsim/562/fasta_draft_genomes'
+    genomesR = '/home/igregor/Documents/work/hsim/1166683/fasta_genomes'
+    srcList = [genomesE, draftGenomesE, genomesR]
+    for acc in open(inF):
+        if acc.startswith('#'):
+            print '################\n\n'
+            continue
+        # print 'accession:', acc
+        acc = acc.strip()
+        found = False
+        for d in srcList:
+            # print d
+            f = os.path.join(d, acc + '.fna')
+            # print f
+            # print acc
+            if os.path.isfile(f):
+                print('%s\t%s') % (acc, round(sum(fas.getSequenceToBpDict(f).values())/1000000., 3))
+                found = True
+                break
+
+        if not found:
+            print 'acc %s not found!' % acc
+                # break
+        # break
+
+def genBenchmarkData():
+    dst = '/media/igregor/verbatim/work/benchmark_pub_samples21'
+    # meta = '/home/igregor/Documents/work/doc/strains22_acc.txt'
+    meta = '/home/igregor/Documents/work/doc/strains22_acc_last.txt'
+    # src = '/home/igregor/Documents/work/hsim/562/samples'
+    src = '/home/igregor/Documents/work/hsim/1166683/samples'
+    strainList = None
+    strainNum = None
+    for line in open(meta):
+        line = line.strip()
+        if line.startswith('##'):
+            continue
+        if line.startswith('#'):
+            srcId, dstId, strainNum = line.strip('#').split(':')
+            # print srcId, dstId, strainNum
+            strainList = []
+            continue
+        strainList.append(line)
+        if len(strainList) == int(strainNum):
+            print srcId, dstId, strainNum, strainList
+            readList1 = []
+            readList2 = []
+            for strain in strainList:
+                f1 = os.path.join(src, srcId, strain, '0_pair1.fq.gz')
+                f2 = os.path.join(src, srcId, strain, '0_pair2.fq.gz')
+                for rec in fq.ReadFqGen(f1):
+                    readList1.append(rec)
+                for rec in fq.ReadFqGen(f2):
+                    readList2.append(rec)
+
+            fOut1 = os.path.join(dst, 's_' + dstId + '_1.fq.gz')
+            fOut2 = os.path.join(dst, 's_' + dstId + '_2.fq.gz')
+
+            w1 = fq.WriteFq(fOut1)
+            w2 = fq.WriteFq(fOut2)
+            print fOut1
+            print fOut2
+            print 'reads:', str(dstId), str(round(len(readList1)*150*2 / 1000000., 0))
+
+            for rec in readList1:
+                w1.writeFqEntry(rec[0], rec[1], rec[3])
+
+            for rec in readList2:
+                w2.writeFqEntry(rec[0], rec[1], rec[3])
+
+            w1.close()
+            w2.close()
+
+
+def shuffleFiles():
+    srcDir = '/media/igregor/verbatim/work/benchmark_pub_samples21/'
+    for f in os.listdir(srcDir):
+        fPath = os.path.join(srcDir, f)
+        if f.startswith('s_'):
+            outPath = os.path.join(srcDir, 'r' + f[1:])
+            rand.shuffleLines(fPath, outPath)
+            print fPath
+            print outPath
+
+
+def test_bam():
+    from Bio import SeqIO
+    import gzip
+    from Bio import bgzf
+    import struct
+    import gzip
+    handle = bgzf.BgzfReader("/Volumes/Macintosh HD/Users/ivan/Documents/nobackup/bam_syntax_check/n1.bam", "rb")
+    for i in range(100):
+        print handle.readline()
+
+
+
+
+
+class TableClass(object):
+    def __init__(self, x):
+        self.x = x
+
+def cast_to_TableClass(t):
+    """
+        @rtype: TableClass
+    """
+    return t
+
+def do_something(t):
+    t = cast_to_TableClass(t)
+    print t.x
+    print t.z  # Pycharm says "unresolved attribute reference" and highlights it, inspect code find such places
+
+
+# class TableClass(TableClassParent):
+#     def __init__(self, x, y):
+#         TableClassParent.__init__(self, x)
+#         self.y = y
+
+
+def to_se(fq1_in, fq2_in, out_fq1, out_fq2):
+
+    out_fq1 = fq.WriteFq(out_fq1)
+    out_fq2 = fq.WriteFq(out_fq2)
+    file_counter = 0
+    for fq_in in [fq1_in, fq2_in]:
+        file_counter += 1
+        for name1, dna1, p1, qs1 in fq.ReadFqGen(fq_in):
+            dna2 = str(Seq(dna1, generic_dna).reverse_complement())
+            qs2 = qs1[::-1]
+            name1 = name1[:-2] + '_%s/1' % (file_counter)
+            name2 = name1[:-1] + '2'
+            out_fq1.writeFqEntry(name1, dna1, qs1)
+            out_fq2.writeFqEntry(name2, dna2, qs2)
+
+    out_fq1.close()
+    out_fq2.close()
+
 
 if __name__ == "__main__":
-    scaffToContigsAssignments()
+    test_bam()
+    # getSize()
+    # genBenchmarkData()
+    # shuffleFiles()
+    # renameRef()
+    # scaffToContigsAssignments()
     #getListAcc()
     #filterRank()
     # filterReference()

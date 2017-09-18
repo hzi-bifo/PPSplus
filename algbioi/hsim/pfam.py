@@ -36,6 +36,8 @@ from algbioi.com import rand
 from algbioi.com import common as com
 
 from algbioi.hsim import comh
+from algbioi.haplo import hmm
+from algbioi.haplo import hio
 
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna
@@ -383,30 +385,6 @@ class ResultHolder():
         self.overlapLenTrueList = []  # list of true gene lengths (on reads)
 
 
-def getReadNameToHitList(domFile):
-    """
-        map: read-name -> list of hits (lists sorted according to the scores)
-    """
-    nameToHitList = {}
-    for line in gzip.open(domFile):
-        line = line.strip()
-        if line.startswith('#'):
-            continue
-        assert line.startswith('@')
-        tokens = line.split()
-        name = tokens[0][1:-2]
-
-        if name not in nameToHitList:
-            nameToHitList[name] = []
-        nameToHitList[name].append(tokens)
-
-    # sort lists according to the best hit score
-    for hitList in nameToHitList.values():
-        hitList.sort(key=lambda x: float(x[13]), reverse=True)
-
-    return nameToHitList
-
-
 def getHmmAnnotationAccuracy(domFile, pfamToGeneFile, scoreThreshold=40, accuracyThreshold=0.8):
     """
         Evaluate the Pfam annotations of the reads.
@@ -422,7 +400,7 @@ def getHmmAnnotationAccuracy(domFile, pfamToGeneFile, scoreThreshold=40, accurac
     protNameToSeq = fas.fastaFileToDictWholeNames(fqProtFile)
 
     # map: read-name -> list of hits (lists sorted according to the scores)
-    nameToHitList = getReadNameToHitList(domFile)
+    nameToHitList = hio.getReadNameToHitList(domFile)
 
     # map: read-name -> set of gene-names-true
     nameToTrueGeneSet = {}
@@ -514,7 +492,7 @@ def getHmmAnnotationAccuracy(domFile, pfamToGeneFile, scoreThreshold=40, accurac
             if topHit is not None:
 
                 # top hit coordinates within the read
-                startOnReadH, overlapLenH, strainH, scoreH, accH = dnaHitInfo(topHit, dna, protNameToSeq[topHit[0]])
+                startOnReadH, overlapLenH, strainH, scoreH, accH = hmm.dnaHitInfo(topHit, dna, protNameToSeq[topHit[0]])
 
                 # get the set of genes corresponding to the pfam
                 pfamGeneSet = None
@@ -708,277 +686,6 @@ def mergeResultsHmmAnnotationAccuracy(resultHolderList, outFile=None, scoreThres
             out.writeText(', '.join(map(lambda x: str(x), t)) + '\n')
 
 
-def dnaHitInfo(hit, dnaSeq, protSeq=None, translTable=11):
-    """
-        Given the hit entry from the domtblout file for a prot sequence, return the hit coordinates on the dna sequence.
-
-        @type hit: list[str]
-        @type dnaSeq: str
-
-        @param protSeq: if equal to a sequence, verification is performed (no verification if None)
-
-        @return: tuple (startOnRead, overlapLen, strain, score, acc)
-    """
-    # read hit info
-    score = float(hit[13])
-    fromEnv = int(hit[19]) - 1
-    lenEnv = int(hit[20]) - fromEnv
-    # toEnv = int(hit[20]) - 1
-    acc = float(hit[21])
-    frame = int(hit[0][-1:])
-    translSeq = None
-
-    # length of the overlap on the dna sequence
-    overlapLen = lenEnv * 3
-
-    # frame shift on the positive strain
-    if 1 <= frame <= 3:
-        # start position on the DNA read
-        startOnRead = fromEnv * 3 + frame - 1
-        strain = 1
-
-        # get the prot sequence based on the position on the DNA read
-        if protSeq is not None:
-            translSeq = str(Seq(dnaSeq[startOnRead:startOnRead + overlapLen], generic_dna).translate(translTable))
-
-    else:
-        assert 4 <= frame <= 6
-        offset = frame - 4
-
-        # start position on the DNA read
-        startOnRead = len(dnaSeq) - 1 - offset - (fromEnv * 3 + overlapLen - 1)
-        strain = -1
-
-        # get the prot sequence based on the position on the DNA read
-        if protSeq is not None:
-            subStrRev = str(Seq(dnaSeq[startOnRead:(startOnRead + overlapLen)], generic_dna).reverse_complement())
-
-            startOnRead2 = len(dnaSeq) - startOnRead - overlapLen
-            subStrRev2 = str(Seq(dnaSeq, generic_dna).reverse_complement())[startOnRead2:(startOnRead2 + overlapLen)]
-            assert subStrRev == subStrRev2
-
-            translSeq = str(Seq(subStrRev, generic_dna).translate(translTable))
-
-    # verify that the translated part of the DNA sequence really correspond to the substring of the prot sequence
-    if protSeq is not None and translSeq != protSeq[fromEnv: fromEnv + lenEnv]:
-        raise Exception('Translation not equal:\n%s\n%s\n%s' % (translSeq, protSeq[fromEnv: fromEnv + lenEnv], strain))
-
-    return startOnRead, overlapLen, strain, score, acc
-
-
-def partitionReads(sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed, pfamPartitionedDir, joinedReads=True):
-    """
-        Partitioning reads into the individual Pfam-domains.
-    """
-    try:
-        strainDirList = map(lambda x: os.path.join(sampleDir, x), os.listdir(sampleDir))
-
-        samplePartDir = os.path.join(sampleDir, pfamPartitionedDir)
-        if not os.path.isdir(samplePartDir):
-            os.mkdir(samplePartDir)
-
-        # for each pfam-dom
-        fqOutDict = {}
-        fqProtOutDict = {}
-        fqSamOutDict = {}
-        fqDomOutDict = {}
-
-        for strainDir in strainDirList:
-            strainAcc = os.path.basename(strainDir)
-            if strainAcc == 'sample_partitioned':  # skip the directory containing the partitioned data
-                continue
-            if os.path.isdir(strainDir):
-                # find the dom file! do it for each dom file you find
-                for f in os.listdir(strainDir):
-
-                    if (joinedReads and f.endswith('join_prot.domtblout.gz')) \
-                            or (not joinedReads and f.endswith('pair1_prot.domtblout.gz')):  # a domtblout file found
-                        i = f.split('_', 1)[0]
-                        if i.isdigit():
-                            if joinedReads:
-                                domPath = os.path.join(strainDir, f)
-                                domPath2 = None
-                                fqPath = os.path.join(strainDir, '%s_join.fq.gz' % (i,))
-                                fqPair1Path = os.path.join(strainDir, '%s_pair1.fq.gz' % (i,))
-                                fqPair2Path = os.path.join(strainDir, '%s_pair2.fq.gz' % (i,))
-                                fqProtPath = os.path.join(strainDir, '%s_join_prot.fna.gz' % (i,))
-                                fqProtPath2 = None
-                                samPath = os.path.join(strainDir, '%s_join_gmap.sam.gz' % (i,))
-                                assert os.path.isfile(fqPath)
-                            else:
-                                domPath = os.path.join(strainDir, f)
-                                domPath2 = os.path.join(strainDir, '%s_pair2_prot.domtblout.gz' % (i,))
-                                fqPath = None
-                                fqPair1Path = os.path.join(strainDir, '%s_pair1.fq.gz' % (i,))
-                                fqPair2Path = os.path.join(strainDir, '%s_pair2.fq.gz' % (i,))
-                                fqProtPath = os.path.join(strainDir, '%s_pair1_prot.fna.gz' % (i,))
-                                fqProtPath2 = os.path.join(strainDir, '%s_pair2_prot.fna.gz' % (i,))
-                                samPath = os.path.join(strainDir, '%s_pair.sam.gz' % (i,))
-                                assert os.path.isfile(domPath2) and os.path.isfile(fqProtPath2)
-                            assert os.path.isfile(domPath) and os.path.isfile(samPath) and os.path.isfile(fqPair1Path) \
-                                   and os.path.isfile(fqPair2Path) and os.path.isfile(fqProtPath)
-
-                            # map: read-name -> list of hits (lists sorted according to the scores)
-                            nameToHitList = getReadNameToHitList(domPath)
-                            if not joinedReads:
-                                nameToHitList2 = getReadNameToHitList(domPath2)
-                                len1 = len(nameToHitList)
-                                len2 = len(nameToHitList2)
-                                nameToHitList.update(nameToHitList2)
-                                assert len(nameToHitList) == len1 + len2
-
-                            # map: read-name-prot -> seq-prot
-                            protNameToSeq = fas.fastaFileToDictWholeNames(fqProtPath)
-                            if not joinedReads:
-                                protNameToSeq.update(fas.fastaFileToDictWholeNames(fqProtPath2))
-
-                            # map: read-name -> sam-line-entry
-                            readNameToSam = {}
-                            if joinedReads:
-                                for line in gzip.open(samPath):
-                                    line = line.strip()
-                                    if line.startswith('#'):
-                                        continue
-                                    readName = line.split('\t', 1)[0]
-                                    if len(line.split('\t')) == 11:  # lines with only 11 entries will be padded with * to 12
-                                        line += '\t*'
-                                    readNameToSam[readName] = line + '\t' + strainAcc
-                            else:
-                                entry = []
-                                for line in gzip.open(samPath):
-                                    line = line.strip()
-                                    if line.startswith('#') or line.startswith('@'):
-                                        continue
-                                    if len(entry) < 2:
-                                        entry.append(line)
-                                    if len(entry) == 2:
-                                        readName = entry[0].split('\t', 1)[0]
-                                        assert readName == entry[1].split('\t', 1)[0]
-                                        readNameToSam[readName] = entry[0] + '\t*\t' + strainAcc + '\n' \
-                                                                  + entry[1] + '\t*\t' + strainAcc
-                                        entry = []
-
-                            # map read-name -> "pair1-dna tab pair1-qs tab pair2-dna tab pair2-qs"
-                            if joinedReads:
-                                readNameToPairReads = fq.getFqToDict(fqPair1Path, fqPair2Path)
-                            else:
-                                readNameToPairReads = None
-
-                            if joinedReads:
-                                g1 = fq.ReadFqGen(fqPath)
-                                g2 = []
-                            else:
-                                g1 = fq.ReadFqGen(fqPair1Path)
-                                g2 = fq.ReadFqGen(fqPair2Path)
-
-                            # go over all reads !!!
-                            for readName, dna, p, qs in list(g1) + list(g2):
-                                readName = readName[1:]  # strip starting '@'
-
-                                # take the hit with the highest score
-                                topHit = None
-                                if readName in nameToHitList:
-                                    topHit = nameToHitList[readName][0]
-
-                                # is the hit significant, filter according to the score and accuracy
-                                if topHit is None or float(topHit[13]) < scoreThreshold or float(topHit[21]) < accuracyThreshold:
-                                    continue
-                                else:
-                                    famName = topHit[3]
-                                    if famName not in fqOutDict:
-                                        fqOutDict[famName] = []
-                                        fqProtOutDict[famName] = []
-                                        fqSamOutDict[famName] = []
-                                        fqDomOutDict[famName] = []
-
-                                    if joinedReads:
-                                        comment = readNameToPairReads[readName]
-                                    else:
-                                        comment = ''
-                                    fqOutDict[famName].append((readName, dna, qs, comment))
-
-                                    protSeqName = topHit[0]
-                                    protSeq = protNameToSeq[protSeqName]
-                                    fqProtOutDict[famName].append((readName, protSeq))
-
-                                    if joinedReads:
-                                        fqSamOutDict[famName].append(readNameToSam[readName])
-                                    else:
-                                        fqSamOutDict[famName].append(readNameToSam[readName[:-2]])
-                                    # top hit coordinates within the read
-                                    startOnRead, overlapLen, strain = dnaHitInfo(topHit, dna, protSeq)[:3]
-
-                                    fqDomOutDict[famName].append('\t'.join(topHit) + '\t%s\t%s\t%s' % (startOnRead, overlapLen, strain))
-
-        if joinedReads:
-            ident = 'join'
-        else:
-            ident = 'pair'
-
-        # for each pfam-dom, store into a file
-        for famName, fqContentList in fqOutDict.iteritems():
-
-            # get the tagged fam-dom-name that can be used in file names
-            pf = comh.getGeneNameToFileName(famName)[:-4]
-
-            # define output files
-            fqOutO = os.path.join(samplePartDir, 'o_%s_%s.fq.gz' % (pf, ident))  # 'o_' ~ ordered entries
-            fqOutR = os.path.join(samplePartDir, 'r_%s_%s.fq.gz' % (pf, ident))  # 'r_' ~ random shuffled entries
-
-            fqProtOutO = os.path.join(samplePartDir, 'o_%s_%s_prot.fna.gz' % (pf, ident))
-            fqProtOutR = os.path.join(samplePartDir, 'r_%s_%s_prot.fna.gz' % (pf, ident))
-
-            fqSamOutO = os.path.join(samplePartDir, 'o_%s_%s_gmap.sam.gz' % (pf, ident))
-            fqSamOutR = os.path.join(samplePartDir, 'r_%s_%s_gmap.sam.gz' % (pf, ident))
-
-            fqDomOutO = os.path.join(samplePartDir, 'o_%s_%s_prot.domtblout.gz' % (pf, ident))
-            fqDomOutR = os.path.join(samplePartDir, 'r_%s_%s_prot.domtblout.gz' % (pf, ident))
-
-            # write fq
-            fqOut = fq.WriteFq(fqOutO)
-            for e in fqContentList:
-                fqOut.writeFqEntry('@' + e[0], e[1], e[2], e[3])
-            fqOut.close()
-
-            # write prot
-            fqProtOut = fq.WriteFq(fqProtOutO)
-            fqProtOut.write('\n'.join(map(lambda x: '>%s\n%s' % (x[0], x[1]), fqProtOutDict[famName])) + '\n')
-            fqProtOut.close()
-
-            # write sam
-            fqSamOut = fq.WriteFq(fqSamOutO)
-            fqSamOut.write('\n'.join(fqSamOutDict[famName]) + '\n')
-            fqSamOut.close()
-
-            # write dom
-            fqDomOut = fq.WriteFq(fqDomOutO)
-            fqDomOut.write('\n'.join(fqDomOutDict[famName]) + '\n')
-            fqDomOut.close()
-
-            # shuffle file entries
-            rand.shuffleLines(fqOutO, fqOutR, 4, shuffleRandSeed)
-            rand.shuffleLines(fqProtOutO, fqProtOutR, 2, shuffleRandSeed)
-            rand.shuffleLines(fqDomOutO, fqDomOutR, 1, shuffleRandSeed)
-
-            if joinedReads:
-                rand.shuffleLines(fqSamOutO, fqSamOutR, 1, shuffleRandSeed)
-            else:
-                rand.shuffleLines(fqSamOutO, fqSamOutR, 2, shuffleRandSeed)
-
-            # delete ordered files (keep only the shuffled ones)
-            os.remove(fqOutO)
-            os.remove(fqProtOutO)
-            os.remove(fqSamOutO)
-            os.remove(fqDomOutO)
-    except Exception as e:
-
-        print('Exception in partitionReads:')
-        print sampleDir, scoreThreshold, accuracyThreshold, shuffleRandSeed, pfamPartitionedDir, joinedReads
-        print e.message
-        print type(e)
-        print e.args
-
-
 def getStatPartitionedReads(sampleDir, pfamPartitionedDir, pfamPartitionedStatFile):
 
     samplePartDir = os.path.join(sampleDir, pfamPartitionedDir)
@@ -1034,12 +741,12 @@ def getStatPartitionedReads(sampleDir, pfamPartitionedDir, pfamPartitionedStatFi
     out.close()
 
 
-def testPartition():
-    partitionReads('/home/igregor/Documents/work/hsim/562/samples/0',
-                   comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
-                   comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY,
-                   comh.SAMPLES_SHUFFLE_RAND_SEED,
-                   comh.SAMPLES_PFAM_PARTITIONED_DIR)
+# def testPartition():
+#     partitionReads('/home/igregor/Documents/work/hsim/562/samples/0',
+#                    comh.SAMPLES_PFAM_EVAN_MIN_SCORE,
+#                    comh.SAMPLES_PFAM_EVAN_MIN_ACCURACY,
+#                    comh.SAMPLES_SHUFFLE_RAND_SEED,
+#                    comh.SAMPLES_PFAM_PARTITIONED_DIR)
 
 
 def testPartitionStat():

@@ -1,22 +1,27 @@
-#!/usr/bin/env python
-
 """
-    Copyright (C) 2014  Ivan Gregor
+    Parallel Python module version: 1.2
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+    The MIT License (MIT)
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    Copyright (c) 2015  Ivan Gregor
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+    and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-    Provides convenient functions to run functions and command line commands in parallel.
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions
+    of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+    THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+    CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+
+    Provides convenient functions to run functions and command line tools in parallel.
+    Basically, everything that can be done in a for-loop, can be done in parallel using this module.
+    Note: if I/O or the amount of the main memory is the limitation, do not use this module.
 """
 
 import os
@@ -92,7 +97,6 @@ def runThreadParallel(threadTaskList, maxThreads=mp.cpu_count(), keepRetValues=T
 
     for taskHandler in taskHandlerList:
         taskHandler.wait()
-        assert taskHandler.successful()
         if keepRetValues:
             retValList.append(taskHandler.get())
 
@@ -248,108 +252,7 @@ def reportFailedCmd(failList):
     else:
         return None
 
-
-# Deprecated implementation!
-
-
-class _ProcHandlerCmd():
-    """
-        Stores context of one process.
-
-        @deprecated: there is a newer implementation !!!
-    """
-    def __init__(self, task, timeout=None):
-        """
-            @type task: TaskCmd
-        """
-        self.process = subprocess.Popen('exec ' + task.cmd, shell=True, bufsize=-1, cwd=task.cwd)
-        self.cmd = task.cmd
-        self.runtime = 0.
-        self.timeout = timeout
-
-    def incRuntime(self, timeStep):
-        self.runtime += timeStep
-
-    def isTimeOut(self):
-        if self.timeout is not None and self.runtime > self.timeout:
-            return True
-        return False
-
-    def getPid(self):
-        return self.process.pid
-
-
-def runCmdParallel0(cmdTaskList, maxProc=mp.cpu_count(), timeout=None, timeStep=0.3):
-    """
-        Run several command line commands in parallel.
-
-        @deprecated: there is a newer implementation !!!
-        @see: runCmdParallel
-        @warning: use just for testing purposes when making use of the timeout option
-
-        @param cmdTaskList: list of command line tasks
-        @type cmdTaskList: list of TaskCmd
-        @param maxProc: maximum number of tasks that will be run in parallel at the same time
-        @param timeout: after this number of seconds, the process will be killed, (None if no timeout set)
-        @param timeStep: time interval in which processes will be actively checked whether they are running
-        @return: list of failed commands, tuple (command, return code, runtime, pid)
-    """
-    counter = 0
-    failList = []
-    cmdInGen = True
-    cmdGen = iter(cmdTaskList)  # generator of commands
-    procArray = {}
-    for i in range(maxProc):
-        procArray[i] = None
-
-    # loop until all processes finish (or are killed)
-    while True:
-
-        # run commands
-        if cmdInGen:
-            for i in range(maxProc):
-                if procArray[i] is None:
-                    try:
-                        task = cmdGen.next()
-                        procArray[i] = _ProcHandlerCmd(task, timeout)  # run process
-                        counter += 1
-                        print('Running "%s" cmd: %s' % (counter, task.cmd))
-                    except StopIteration:
-                        cmdInGen = False  # there are no processes to be run
-
-        # sleep for a while
-        time.sleep(timeStep)
-
-        # check for finished processes and processes passed timeout
-        for i in range(maxProc):
-            ph = procArray[i]
-            if ph is not None:  # there is a process in the slot
-                if ph.process.poll() is None:
-                    # process running
-                    ph.incRuntime(timeStep)
-                    if ph.isTimeOut():
-                        # process over time, kill it!
-                        ph.process.kill()
-                        print("Process (%s): %s killed! (after %ss)" % (ph.getPid(), ph.cmd, ph.runtime))
-                        failList.append((ph.cmd, 9, ph.runtime, ph.getPid()))
-                        procArray[i] = None  # free slot
-                else:
-                    # process finished
-                    ph.process.wait()
-                    if ph.process.returncode != 0:
-                        print('Process(%s): "%s" ended with return code: "%s' % (ph.getPid(), ph.cmd,
-                                                                                 ph.process.returncode))
-                        failList.append((ph.cmd, ph.process.returncode, ph.runtime, ph.getPid()))
-                    procArray[i] = None  # free slot
-
-        # finish if no process is running and there is not process to be run
-        if len(set(procArray.values())) == 1 and not cmdInGen:
-            break
-
-    return failList
-
-
-# TESTING !!!
+# TESTS ---------------------------------------------------
 
 def _testCmd(parallel=True):
     print('Start: Test: runCmdParallel')
@@ -402,11 +305,3 @@ def _testMisc():
     # print runCmdSerial([TaskCmd(cmd)], stdInErrLock=lock, verbose=True)
     t = TaskThread(_runCmd, (TaskCmd(cmd), lock))
     print runThreadParallel([t])
-
-
-# if __name__ == "__main__":
-#     pass
-    # reportFailedCmd(runCmdSerial([TaskCmd('pythonn -version')], verbose=True))
-    # _testThread()
-    # _testCmd()
-    # _testMisc()

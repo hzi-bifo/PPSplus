@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
     Copyright (C) 2015  Ivan Gregor
 
@@ -16,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-    Module that handle quality scores of consensus sequences.
+    Module that handle quality scores of consensus sequences. Module version 1.2
 """
 
 import numpy as np
@@ -24,7 +22,7 @@ import numpy as np
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna
 
-PROB_MATRIX_ROWS = 5  # A, C, T, G, cov
+PROB_MATRIX_ROWS = 5  # rows correspond to: A, C, T, G, coverage
 
 
 def nuclToInt(nucl):
@@ -308,7 +306,7 @@ class QSArray(object):
         i = 0
         j = self._len - 1
 
-        tmp = np.zeros(5, dtype=np.float128)
+        tmp = np.zeros(5, dtype=np.float64)
         interval1 = [0, 1, 2, 3, 4]
         interval2 = [2, 3, 0, 1, 4]
 
@@ -328,14 +326,22 @@ class QSArray(object):
             j -= 1
 
     def getPosCovArray(self):
+        """
+            @return: coverage of each base in the probability matrix
+            @rtype: ndarray
+        """
         return self._probMatrix[PROB_MATRIX_ROWS - 1]
 
     def getAvgCov(self):
+        """
+            @return: average coverage of the consensus sequence represented by the probability matrix
+            @rtype: float
+        """
         return self._probMatrix[PROB_MATRIX_ROWS - 1].sum() / float(len(self._probMatrix[PROB_MATRIX_ROWS - 1]))
 
     def getOverlapScore(self, selfPos, qsArray2, pos2, overlapLen):
         """
-            Get the overlap score of two QS arrays considering matching of DNA sequences.
+            Get the overlap score of two QS arrays considering matching DNA sequences.
 
             @attention: for the normalization, divide by the overlap-length.
             @type selfPos: int
@@ -359,12 +365,12 @@ class QSArray(object):
             selfPos += 1
             pos2 += 1
 
-        # return float(sum[1]), float(sum[1] / overlapLen), np.power(10, float(sum[1] / overlapLen)), sum[2], (sum[2] / overlapLen)
         return (np.power(10, float(sumA[1] / overlapLen)), sumA[2])
 
     def getOverlapScoreProt(self, selfPos, qsArray2, pos2, overlapLen):
         """
             Get the overlap score of two QS arrays considering matching of PROT sequences.
+
             @attention: for the normalization, divide by the overlap-length.
             @type selfPos: int
             @type qsArray2: QSArray
@@ -464,7 +470,10 @@ class QSArray(object):
             sum[1] += np.log10(entry)
             sum[2] += entry
 
-        # return float(sum[1]), float(sum[1] / (overlapLen / 3)), np.power(10, float(sum[1] / (overlapLen / 3))), sum[2] * 3, (sum[2] / (overlapLen / 3))
+        # other interesting statistics:
+        # float(sum[1])
+        # float(sum[1] / (overlapLen / 3))
+        # (sum[2] / (overlapLen / 3))
         return (np.power(10, float(sum[1] / (overlapLen / 3))), sum[2] * 3)
 
     def update(self, startPos, qs):
@@ -478,10 +487,12 @@ class QSArray(object):
             for j in range(PROB_MATRIX_ROWS):
                 self._probMatrix[j][startPos + i] += qs._probMatrix[j][i]
 
-# TODO:  allowing different type of information to compute the overlap ?
-
+# TESTS ---------------------------------------------------
 
 def getRandQS(length, rand=None):
+    """
+        @return: random quality score
+    """
     if rand is None:
         rand = np.random.RandomState(length)
     l = []
@@ -490,14 +501,13 @@ def getRandQS(length, rand=None):
     return ''.join(l)
 
 
-def test2():
+def _test1():
     rand = np.random.RandomState(0)
-    dom = 'GAAAGTTGACCAACTGATATTTGCCGGTCTGGCATCAAGTTATTCGGTATTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGTACAATGAATATCGCCGTTTATACCGGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
-    # rare  = 'GAAAGTTGACCAACTGATATTTGCCGGTCTGGCATCAAGTTATTCGGTATTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGTACAATGAATATCGCCGTTTATACCGGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
-    rare = 'GAAAGTTGACCAACTGATATcTGCCGGTCTGGCATCAAGTTATTCGGTAcTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGTACAATGAATATCGCCGTTTATACCtGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
+    dom = 'GAAAGTTGACCAACTGATATTTGCCGGTCTGGCATCAAGTTATTCGGTATTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGTA' \
+          'CAATGAATATCGCCGTTTATACCGGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
+    rare = 'GAAAGTTGACCAACTGATATcTGCCGGTCTGGCATCAAGTTATTCGGTAcTGAGGGAAGATGAACGTGAACTGGGTGTCTGCGTCGTCGATATCGGTGGTGGT' \
+           'ACAATGAATATCGCCGTTTATACCtGTGGGGCATTGCGCCACACTAAGGTAATTCCTTATGCTGGCAATGTAGTGACCAG'
     length = len(dom)
-
-    # print getRandQS(10, rand)
 
     qsAll = QSArray(lenEmptyQSA=length)
 
@@ -515,10 +525,6 @@ def test2():
     qs2 = QSArray(dna=rare[:60+57], qsArrayFq=getRandQS(60+57, rand))
     print qsAll.getOverlapScore(0, qs2, 0, 60+57)
 
-    # print 'overlap:'
-    # qs2 = QSArray(dna=dom[60:60+57], qsArrayFq=getRandQS(57, rand))
-    # print qsAll.getOverlapScore(60, qs2, 0, 57)
-
     print 'suffix: dom vs align.'
     qs2 = QSArray(dna=dom[60:], qsArrayFq=getRandQS(57+66, rand))
     print qsAll.getOverlapScore(60, qs2, 0, 57+66)
@@ -527,52 +533,15 @@ def test2():
     qs2 = QSArray(dna=rare[60:], qsArrayFq=getRandQS(57+66, rand))
     print qsAll.getOverlapScore(60, qs2, 0, 57+66)
 
-def test1():
-    dna1 = 'ATGCACGAACACAGCAACCACTCTCTGGCCGTACTATCGCTTAAA'
-    dna2 = 'ATGCACGAACACAGCAACCACTCTCTGGCCGTACTATCGCTTACT'
-    # qsA1 = '+++++++++++++++++++++++++++++++++++++++++++++'
-    qsA2 = '0000000000000000000000000000000000000000000H+'  # #-
-    print len(dna1)
 
-    for i in range(40):
-        qsA1 = len(dna1) * chr(i + 33)
-
-        qs1 = QSArray(dna=dna1, qsArrayFq=qsA1)
-        qs2 = QSArray(dna=dna2, qsArrayFq=qsA2)
-        # qs3 = QSArray(qsA1=qs1, qsA2=qs2, pos1Within2=15)
-        # print 'cov', qs3.getAvgCov()
-    # print qs1._probMatrix
-    #     print i, ':', qs1.getOverlapScore(0, qs2, 0, len(dna1))
-
-    # print qs3._probMatrix
-
-
-    # dna2 = 'ATGCTCGACGAACACAGCAACCACTCTCTGGCCGTACTATCGCTTAAA'
-    # qsA2 = 'GGG11CGGGGGGCCCGG(GCGGCCC1GC8CGGGCGGG=GG=1CGGG=C'
-    # dna1 = 'ATGC'
-    # qsA1 = 'G1C('
-    # qs1 = QSArray(dna=dna1, qsArray=qsA1)
-    # qs2 = QSArray(dna=dna2, qsArray=qsA2)
-    # qs = QSArray(qs1=qs1, qs2=qs2)
-
-
-def test3():
-
+def _test2():
     dna = 'ATGCTACGAACACAGCAACCA'
     qs = 'G(C#$1GC8GCG=GG=1CG=C'
     qsA = QSArray(dna=dna, qsArrayFq=qs)
 
     rc = str(Seq(dna, generic_dna).reverse_complement())
-    # print qsA._probMatrix
+    print '(+)strand prob. matrix:\n%s' % qsA._probMatrix
     qsA.revCompl()
-    # print qsA._probMatrix
-
-    print dna
-    print rc
-    print qsA.getConsDna()
+    print '(-)strand prob. matrix:\n%s' % qsA._probMatrix
+    print '(+)strand\n%s\n(-)strand\n%s\n%s' % (dna, rc, qsA.getConsDna())
     assert rc == qsA.getConsDna()
-
-if __name__ == "__main__":
-    test1()
-    # test2()
-    # test3()

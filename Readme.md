@@ -14,7 +14,7 @@ https://github.com/algbioi/datasets
 ### Repositories (source code)
 
 PPS+ python scripts:
-https://github.com/hzi-bifo/PPSplus/tree/master/algbioi
+https://github.com/hzi-bifo/PPSplus/tree/master/ppsplus
 (https://github.com/algbioi/ppsplus)
 
 The k-mer counting algorithm:

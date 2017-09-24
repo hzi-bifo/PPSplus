@@ -59,3 +59,7 @@ Note that it is also possible to remove marker genes from the analysis by removi
 -u https://research.bifo.helmholtz-hzi.de/software/ppsp
 * PPS+ version 1.5c in a Docker container is in preparation, see: https://hub.docker.com/r/ivan737/ppsp/
 * There is an updated reference database available. Run "update -r NCBI201502" to get the new reference. The paths in the configuration file has to be set accordingly.
+
+### Note
+The source of this repository was:
+https://github.com/algbioi/ppsp/wiki

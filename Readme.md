@@ -4,8 +4,7 @@ https://peerj.com/articles/1603/
 
 ### Installation instructions, Tutorial
 
-https://github.com/hzi-bifo/PPSplus/tree/master/doc
-
+https://github.com/hzi-bifo/PPSplus/tree/master/doc 
 (https://github.com/algbioi/ppsp)
 
 ### Benchmark Datasets
@@ -15,7 +14,8 @@ https://github.com/algbioi/datasets
 ### Repositories (source code)
 
 PPS+ python scripts:
-https://github.com/algbioi/ppsplus
+https://github.com/hzi-bifo/PPSplus/tree/master/algbioi
+(https://github.com/algbioi/ppsplus)
 
 The k-mer counting algorithm:
 https://github.com/algbioi/kmer_counting

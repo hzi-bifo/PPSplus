@@ -18,7 +18,8 @@ https://github.com/hzi-bifo/PPSplus/tree/master/algbioi
 (https://github.com/algbioi/ppsplus)
 
 The k-mer counting algorithm:
-https://github.com/algbioi/kmer_counting
+https://github.com/hzi-bifo/PPSplus/tree/master/kmer_counting
+(https://github.com/algbioi/kmer_counting)
 
 ### (PPS+ VM - alternative installation instructions)
 

@@ -38,12 +38,12 @@ BLOCK_SIZE = 8192
 
 class Settings():
     def __init__(self):
-        self._url = "http://algbio.cs.uni-duesseldorf.de/software/ppsp"
+        self._url = "https://research.bifo.helmholtz-hzi.de/software/ppsp"
         self._customVal = ':'
         self._refVersion = None
         try:
             self._version = urllib2.urlopen(self._url + '/' + 'version.txt').read()
-        except urllib2.HTTPError:
+        except:
             self._version = "1_4"
             print("Can't get the current version from the server, version '%s' will be considered." % self._version)
 

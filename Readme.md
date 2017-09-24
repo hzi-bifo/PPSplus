@@ -4,7 +4,9 @@ https://peerj.com/articles/1603/
 
 ### Installation instructions, Tutorial
 
-https://github.com/algbioi/ppsp
+https://github.com/hzi-bifo/PPSplus/tree/master/doc
+
+(https://github.com/algbioi/ppsp)
 
 ### Benchmark Datasets
 

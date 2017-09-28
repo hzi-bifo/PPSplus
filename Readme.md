@@ -55,7 +55,7 @@ Now, when you run _PPS+_ with option "_-g_", it will also consider the newly add
 Note that it is also possible to remove marker genes from the analysis by removing the corresponding files from the reference directories and by editing "_content.csv_").
 
 ### News
-* **The data was moved to a different server, please use this link to download the VM:** https://research.bifo.helmholtz-hzi.de/software/ppsp/1_4/ppsp_1_4_vm_64bit.ova. Before running the "update" command, run "wget https://raw.githubusercontent.com/hzi-bifo/PPSplus/master/ppsplus/algbioi/ref/update.py?token=AHgcgMzH02drqhFnu-TsSVLNlgcuL9fgks5Z0RLcwA%3D%3D -O /apps/pps/sys/update.py" - this will tell the VM to use the new location of the source files (Please do not run "update -s", as this would reverse the change).
+* **The data was moved to a different server, please use this link to download the VM:** https://research.bifo.helmholtz-hzi.de/software/ppsp/1_4/ppsp_1_4_vm_64bit.ova. Before running the "update" command, run "wget https://raw.githubusercontent.com/hzi-bifo/PPSplus/master/ppsplus/algbioi/ref/update.py?token=AHgcgMzH02drqhFnu-TsSVLNlgcuL9fgks5Z0RLcwA%3D%3D -O /apps/pps/sys/update.py" - this will tell the VM where the source and reference files are located.
 * PPS+ version 1.5c in a Docker container is in preparation, see: https://hub.docker.com/r/ivan737/ppsp/
 * There is an updated reference database available. Run "update -r NCBI201502" to get the new reference. The paths in the configuration file has to be set accordingly.
 

@@ -7,6 +7,12 @@ https://peerj.com/articles/1603/
 https://github.com/hzi-bifo/PPSplus/tree/master/doc 
 (https://github.com/algbioi/ppsp)
 
+### PPS+ Docker image with instructions and latest reference database (updated 2019)
+
+https://hub.docker.com/r/cami/ppsp
+
+https://osf.io/heksw/
+
 ### Benchmark Datasets
 
 https://github.com/algbioi/datasets
